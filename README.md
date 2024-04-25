@@ -1,7 +1,7 @@
 # jloda3
 
 This is the third major release of the JLODA java library of data-structures and algorithms, written by Daniel Huson,
-2002-2024. It is used in the CatReNet, Diamer, SplitsTree6, Dendroscope3, Megan7 and PhyloSketch projects.
+2002-2024. It is used in the CatReNet, Diamer,  Dendroscope3, Megan7 or SplitsTree6 projects.
 
 The library has been split into multiple parts:
 
