@@ -1,7 +1,7 @@
 # jloda3
 
 This is the third major release of the JLODA java library of data-structures and algorithms, written by Daniel Huson,
-2002-2024. It is used in SplitsTree, Dendroscope, PhyloSketch and MEGAN.
+2002-2024. It is used in the CatReNet, Diamer, SplitsTree6, Dendroscope3, Megan7 and PhyloSketch projects.
 
 The library has been split into multiple parts:
 
@@ -10,4 +10,4 @@ The library has been split into multiple parts:
 - jloda-fx contains JavaFX-specific classes
 - jloda-connect contains code to open a SQLite database file. This is currently isolated because it causes problems when transpiling to iOS
 
-You will need to install the libraries provided here before building SplitsTree6 or MEGAN7.
+You will need to install the libraries provided here before building one of the above mentioned projects.
