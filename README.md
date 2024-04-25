@@ -10,4 +10,4 @@ The library has been split into multiple parts:
 - jloda-fx contains JavaFX-specific classes
 - jloda-connect contains code to open a SQLite database file. This is currently isolated because it causes problems when transpiling to iOS
 
-You will need to install the libraries provided here before building one of the above mentioned projects.
+You will need to install the libraries provided here before building one of the above-mentioned projects.

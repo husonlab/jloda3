@@ -27,7 +27,7 @@
     <artifactId>jloda-connect</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 
-    <name>SplitsTree</name>
+    <name>jloda-connect</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
