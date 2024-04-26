@@ -29,6 +29,7 @@ import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
@@ -37,6 +38,8 @@ import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import jloda.fx.util.ColorSchemeManager;
 import jloda.fx.util.FuzzyBoolean;
+
+import java.util.function.BiConsumer;
 
 import static jloda.fx.util.FuzzyBoolean.False;
 import static jloda.fx.util.FuzzyBoolean.True;
@@ -75,6 +78,8 @@ public class Legend extends StackPane {
 	private final ObservableSet<String> active = FXCollections.observableSet();
 	private final Pane pane;
 
+	private BiConsumer<MouseEvent, String> clickOnLabel;
+
 	public Legend(ObservableList<String> labels, String colorSchemeName, Orientation orientation) {
 		this.labels = labels;
 		setColorSchemeName(colorSchemeName);
@@ -96,6 +101,15 @@ public class Legend extends StackPane {
 			vbox.setAlignment(Pos.CENTER);
 		}
 		getChildren().setAll(pane);
+
+		setOnMouseClicked(e -> {
+			if (e.isStillSincePress() && getClickOnLabel() != null) {
+				if (!e.isShiftDown()) {
+					getClickOnLabel().accept(e, null);
+					e.consume();
+				}
+			}
+		});
 	}
 
 	private void update() {
@@ -117,6 +131,13 @@ public class Legend extends StackPane {
 					var shape = getColorPatchShae() == PatchShape.Circle ? new Circle(8) : new Rectangle(16, 16);
 					shape.setFill(colorScheme.get(i % colorScheme.size()));
 					var label = new Label(labels.get(i));
+					label.setOnMouseClicked(e -> {
+						if (getClickOnLabel() != null) {
+							getClickOnLabel().accept(e, label.getText());
+							e.consume();
+						}
+					});
+					shape.setOnMouseClicked(label.getOnMouseClicked());
 					var hbox = new HBox(shape, label);
 					hbox.setSpacing(3);
 					pane.getChildren().add(hbox);
@@ -270,6 +291,14 @@ public class Legend extends StackPane {
 
 	public void setShow(FuzzyBoolean show) {
 		this.show.set(show);
+	}
+
+	public BiConsumer<MouseEvent, String> getClickOnLabel() {
+		return clickOnLabel;
+	}
+
+	public void setClickOnLabel(BiConsumer<MouseEvent, String> clickOnLabel) {
+		this.clickOnLabel = clickOnLabel;
 	}
 }
 
