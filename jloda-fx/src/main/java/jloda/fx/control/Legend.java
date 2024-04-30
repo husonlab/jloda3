@@ -46,7 +46,7 @@ import static jloda.fx.util.FuzzyBoolean.True;
 
 /**
  * simple color scheme legend and scale indicator
- * Daniel Huson, 3.2022
+ * Daniel Huson, 4.2022
  */
 public class Legend extends StackPane {
 	public enum ScalingType {
