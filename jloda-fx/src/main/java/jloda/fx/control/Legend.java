@@ -1,5 +1,5 @@
 /*
- * Legend.java Copyright (C) 2024 Daniel H. Huson
+ *  Legend.java Copyright (C) 2024 Daniel H. Huson
  *
  *  (Some files contain contributions from other authors, who are then mentioned separately.)
  *
@@ -15,7 +15,6 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 package jloda.fx.control;
@@ -29,6 +28,7 @@ import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
@@ -67,9 +67,11 @@ public class Legend extends StackPane {
 	private final StringProperty title = new SimpleStringProperty(this, "title", null);
 	private final ObjectProperty<ScalingType> scalingType = new SimpleObjectProperty<>(this, "scalingType", ScalingType.none);
 	private final ObjectProperty<PatchShape> patchShape = new SimpleObjectProperty<>(this, "colorPatchShape", PatchShape.Circle);
-	private final DoubleProperty circleMinSize = new SimpleDoubleProperty(64);
-	private final DoubleProperty unitRadius = new SimpleDoubleProperty(this, "unitRadius", 0);
-	private final DoubleProperty scale = new SimpleDoubleProperty(this, "scaleProperty", 1.0);
+	private final DoubleProperty maxCircleRadius = new SimpleDoubleProperty(this, "maxCircleRadius", 32);
+
+	private final DoubleProperty maxCount = new SimpleDoubleProperty(this, "maxCount", 0);
+
+	private final IntegerProperty maxLabelsPerLine = new SimpleIntegerProperty(this, "maxLabelsPerLine", 20);
 
 	private final ObjectProperty<FuzzyBoolean> show = new SimpleObjectProperty<>(this, "show", True);
 
@@ -87,8 +89,8 @@ public class Legend extends StackPane {
 		this.active.addListener((InvalidationListener) e -> update());
 		this.show.addListener(e -> update());
 		colorSchemeNameProperty().addListener(e -> update());
-		this.unitRadius.addListener(e -> update());
-		scale.addListener(e -> update());
+		maxCircleRadius.addListener(e -> update());
+		maxCount.addListener(e -> update());
 
 		if (orientation == Orientation.HORIZONTAL) {
 			var hbox = new HBox();
@@ -96,7 +98,7 @@ public class Legend extends StackPane {
 			pane = hbox;
 		} else {
 			var vbox = new VBox();
-			vbox.setSpacing(6);
+			vbox.setSpacing(5);
 			pane = vbox;
 			vbox.setAlignment(Pos.CENTER);
 		}
@@ -117,14 +119,46 @@ public class Legend extends StackPane {
 
 		pane.getChildren().clear();
 
+		var unitRadius = (getMaxCount() <= 0 ? 0 : Math.sqrt(getMaxCircleRadius() * getMaxCircleRadius() / getMaxCount()));
+
 		if (getTitle() != null && !getTitle().isBlank()) {
 			pane.getChildren().add(new HBox(new Label(getTitle())));
 		}
-		if (getShow() != False && getScalingType() != ScalingType.none && getUnitRadius() > 0) {
-			pane.getChildren().add(createCircleScaleBox(getScalingType(), getUnitRadius(), getScale()));
+		if (getShow() != False && getScalingType() != ScalingType.none && unitRadius > 0) {
+			pane.getChildren().add(createCircleScaleBox(getScalingType(), unitRadius, 1.0));
 		}
 
 		if (getShow() == True && !getColorSchemeName().isBlank()) {
+			var orientation = (pane instanceof VBox ? Orientation.VERTICAL : Orientation.HORIZONTAL);
+			Pane labelsPane;
+			if (labels.size() <= getMaxLabelsPerLine()) {
+				labelsPane = pane;
+			} else {
+				if (orientation == Orientation.VERTICAL) {
+					labelsPane = new VBox();
+					((VBox) labelsPane).setSpacing(5);
+					var scrollPane = new ScrollPane(labelsPane);
+					scrollPane.setFitToWidth(true);
+					scrollPane.setPrefHeight(20 * (5 + 25)); // 20 items x gap x height
+					scrollPane.setMinHeight(ScrollPane.USE_PREF_SIZE);
+					scrollPane.setMaxHeight(ScrollPane.USE_PREF_SIZE);
+					scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+					scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+					pane.getChildren().add(scrollPane);
+				} else {
+					labelsPane = new HBox();
+					((HBox) labelsPane).setSpacing(5);
+					var scrollPane = new ScrollPane(labelsPane);
+					scrollPane.setFitToHeight(true);
+					scrollPane.setPrefWidth(600);
+					scrollPane.setMinWidth(ScrollPane.USE_PREF_SIZE);
+					scrollPane.setMaxWidth(ScrollPane.USE_PREF_SIZE);
+					scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+					scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+					pane.getChildren().add(scrollPane);
+				}
+			}
+
 			var colorScheme = ColorSchemeManager.getInstance().getColorScheme(getColorSchemeName());
 			for (var i = 0; i < labels.size(); i++) {
 				if (active.contains(labels.get(i))) {
@@ -140,7 +174,10 @@ public class Legend extends StackPane {
 					shape.setOnMouseClicked(label.getOnMouseClicked());
 					var hbox = new HBox(shape, label);
 					hbox.setSpacing(3);
-					pane.getChildren().add(hbox);
+					hbox.setPrefHeight(25);
+					hbox.setMinHeight(HBox.USE_PREF_SIZE);
+					hbox.setMaxHeight(HBox.USE_PREF_SIZE);
+					labelsPane.getChildren().add(hbox);
 				}
 			}
 		}
@@ -190,40 +227,28 @@ public class Legend extends StackPane {
 		this.scalingType.set(scalingType);
 	}
 
-	public double getUnitRadius() {
-		return unitRadius.get();
+	public double getMaxCircleRadius() {
+		return maxCircleRadius.get();
 	}
 
-	public DoubleProperty unitRadiusProperty() {
-		return unitRadius;
+	public DoubleProperty maxCircleRadiusProperty() {
+		return maxCircleRadius;
 	}
 
-	public void setUnitRadius(double unitRadius) {
-		this.unitRadius.set(unitRadius);
+	public void setMaxCircleRadius(double maxCircleRadius) {
+		this.maxCircleRadius.set(maxCircleRadius);
 	}
 
-	public double getScale() {
-		return scale.get();
+	public double getMaxCount() {
+		return maxCount.get();
 	}
 
-	public DoubleProperty scaleProperty() {
-		return scale;
+	public DoubleProperty maxCountProperty() {
+		return maxCount;
 	}
 
-	public void setScale(double scale) {
-		this.scale.set(scale);
-	}
-
-	public double getCircleMinSize() {
-		return circleMinSize.get();
-	}
-
-	public DoubleProperty circleMinSizeProperty() {
-		return circleMinSize;
-	}
-
-	public void setCircleMinSize(double circleMinSize) {
-		this.circleMinSize.set(circleMinSize);
+	public void setMaxCount(double maxCount) {
+		this.maxCount.set(maxCount);
 	}
 
 	public PatchShape getColorPatchShae() {
@@ -238,6 +263,18 @@ public class Legend extends StackPane {
 		this.patchShape.set(patchShape);
 	}
 
+	public int getMaxLabelsPerLine() {
+		return maxLabelsPerLine.get();
+	}
+
+	public IntegerProperty maxLabelsPerLineProperty() {
+		return maxLabelsPerLine;
+	}
+
+	public void setMaxLabelsPerLine(int maxLabelsPerLine) {
+		this.maxLabelsPerLine.set(maxLabelsPerLine);
+	}
+
 	private Node createCircleScaleBox(ScalingType scalingType, double unitRadius, double scale) {
 		var pane = new Pane();
 		for (var m = 1; m < 10000000; m *= 10) {
@@ -245,7 +282,7 @@ public class Legend extends StackPane {
 				var value = x * m;
 				if (value > 1) {
 					var radius = scalingType.apply(value) * unitRadius * scale;
-					if (radius >= 0.5 * getCircleMinSize()) {
+					if (radius >= 0.5 * getMaxCircleRadius()) {
 						{
 							var label = new Label(String.format("%,d", value));
 							label.setStyle("-fx-font-family: Arial; -fx-font-size: 11 px;");
