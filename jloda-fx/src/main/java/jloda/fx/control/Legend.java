@@ -138,23 +138,27 @@ public class Legend extends StackPane {
 					labelsPane = new VBox();
 					((VBox) labelsPane).setSpacing(5);
 					var scrollPane = new ScrollPane(labelsPane);
+					scrollPane.setFocusTraversable(false);
 					scrollPane.setFitToWidth(true);
 					scrollPane.setPrefHeight(20 * (5 + 25)); // 20 items x gap x height
 					scrollPane.setMinHeight(ScrollPane.USE_PREF_SIZE);
 					scrollPane.setMaxHeight(ScrollPane.USE_PREF_SIZE);
 					scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 					scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+					scrollPane.setStyle("-fx-focus-color: transparent;-fx-faint-focus-color: transparent;-fx-control-inner-background: transparent;");
 					pane.getChildren().add(scrollPane);
 				} else {
 					labelsPane = new HBox();
 					((HBox) labelsPane).setSpacing(5);
 					var scrollPane = new ScrollPane(labelsPane);
+					scrollPane.setFocusTraversable(false);
 					scrollPane.setFitToHeight(true);
 					scrollPane.setPrefWidth(600);
 					scrollPane.setMinWidth(ScrollPane.USE_PREF_SIZE);
 					scrollPane.setMaxWidth(ScrollPane.USE_PREF_SIZE);
 					scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 					scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+					scrollPane.setStyle("-fx-focus-color: transparent;-fx-faint-focus-color: transparent;-fx-control-inner-background: transparent;");
 					pane.getChildren().add(scrollPane);
 				}
 			}
