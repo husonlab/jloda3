@@ -531,9 +531,9 @@ public class NewickIO {
 								label = labelt;
 							}
 							seen.put(label, w);
+							tree.setLabel(w, label);
 						}
 					}
-					tree.setLabel(w, label);
 					if (label.isEmpty())
 						throw new IOException("Expected label at position " + pos0);
 				}

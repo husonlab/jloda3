@@ -20,6 +20,8 @@
 
 package jloda.util.progress;
 
+import jloda.util.CanceledException;
+
 /**
  * silent progress listener
  *
@@ -27,6 +29,7 @@ package jloda.util.progress;
  * Date: 26-Jun-2004
  */
 public class ProgressSilent implements ProgressListener {
+	private boolean canceled = false;
 	/**
 	 * constructor
 	 */
@@ -48,7 +51,9 @@ public class ProgressSilent implements ProgressListener {
 	/**
 	 * sets the progress
 	 */
-	public void setProgress(final long steps) {
+	public void setProgress(final long steps) throws CanceledException {
+		if (canceled)
+			throw new CanceledException();
 	}
 
 	/**
@@ -74,7 +79,9 @@ public class ProgressSilent implements ProgressListener {
 	/**
 	 * has user canceled?
 	 */
-	public void checkForCancel() {
+	public void checkForCancel() throws CanceledException {
+		if (canceled)
+			throw new CanceledException();
 	}
 
 	/**
@@ -100,7 +107,9 @@ public class ProgressSilent implements ProgressListener {
 	public void setUserCancelled(boolean userCancelled) {
 	}
 
-	public void incrementProgress() {
+	public void incrementProgress() throws CanceledException {
+		if (canceled)
+			throw new CanceledException();
 	}
 
 	@Override

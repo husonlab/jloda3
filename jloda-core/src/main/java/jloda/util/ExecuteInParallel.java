@@ -38,62 +38,81 @@ public class ExecuteInParallel {
     /**
      * run a collection of jobs and collect the results
      */
-    public static <S, T> void apply(Collection<S> jobs, FunctionWithException<S, Collection<T>> computation, Collection<T> results, int numberOfCores) throws Exception {
-        apply(jobs, computation, results, numberOfCores, new ProgressSilent());
+    public static <S, T> void apply(Collection<S> jobs, FunctionWithException<S, Collection<T>> computation, Collection<T> results, int numberOfThreads) throws Exception {
+        apply(jobs, computation, results, numberOfThreads, new ProgressSilent());
     }
 
     /**
      * run a collection of jobs and collect the results
      */
-    public static <S, T> void apply(Collection<S> jobs, FunctionWithException<S, Collection<T>> computation, Collection<T> results, int numberOfCores, ProgressListener progress) throws Exception {
-        final Single<Exception> exception = new Single<>();
-        final ConcurrentLinkedQueue<T> queue = new ConcurrentLinkedQueue<>();
-
-        final ExecutorService service = Executors.newFixedThreadPool(numberOfCores);
-        try {
-            progress.setMaximum(jobs.size());
-            progress.setProgress(0);
-            jobs.forEach(job -> service.submit(() -> {
-                if (exception.isNull()) {
-                    try {
-                        queue.addAll(computation.apply(job));
-                        progress.incrementProgress();
-                    } catch (Exception e) {
-                        exception.setIfCurrentValueIsNull(e);
-                    }
-                }
-            }));
-            service.shutdown();
-            service.awaitTermination(1000, TimeUnit.DAYS);
-        } catch (Exception e) {
-            exception.setIfCurrentValueIsNull(e);
-        } finally {
-            service.shutdownNow();
-        }
-        if (exception.isNotNull())
-            throw exception.get();
-        results.addAll(queue);
+    public static <S, T> void apply(Collection<S> jobs, FunctionWithException<S, Collection<T>> computation, Collection<T> results, int numberOfThreads, ProgressListener progress) throws Exception {
+        apply(jobs.size(), jobs, computation, results, numberOfThreads, progress);
     }
 
 
     /**
-     * run a collection of jobs
+     * run a collection of jobs and collect the results
      */
-    public static <S, T> void apply(Collection<S> jobs, ConsumerWithException<S> computation, int numberOfCores) throws Exception {
-        apply(jobs, computation, numberOfCores, new ProgressSilent());
-    }
-
-    /**
-     * run a collection of jobs
-     */
-    public static <S, T> void apply(Collection<S> jobs, ConsumerWithException<S> computation, int numberOfCores, ProgressListener progress) throws Exception {
-        progress.setMaximum(jobs.size());
+    public static <S, T> void apply(int numberOfJobs, Iterable<S> jobs, FunctionWithException<S, Collection<T>> computation, Collection<T> results, int numberOfThreads, ProgressListener progress) throws Exception {
+        progress.setMaximum(numberOfJobs);
         progress.setProgress(0);
-        if (jobs.size() == 1)
-            computation.accept(jobs.iterator().next());
-        else if (jobs.size() > 1) {
+        if (numberOfJobs == 1) {
+            results.addAll(computation.apply(jobs.iterator().next()));
+        } else if (numberOfJobs > 1) {
             final Single<Exception> exception = new Single<>();
-            final ExecutorService service = Executors.newFixedThreadPool(Math.max(1, numberOfCores));
+            final ConcurrentLinkedQueue<T> queue = new ConcurrentLinkedQueue<>();
+
+            final ExecutorService service = Executors.newFixedThreadPool(numberOfThreads);
+            try {
+                jobs.forEach(job -> service.submit(() -> {
+                    if (exception.isNull()) {
+                        try {
+                            queue.addAll(computation.apply(job));
+                            progress.incrementProgress();
+                        } catch (Exception e) {
+                            exception.setIfCurrentValueIsNull(e);
+                        }
+                    }
+                }));
+                service.shutdown();
+                service.awaitTermination(1000, TimeUnit.DAYS);
+            } catch (Exception e) {
+                exception.setIfCurrentValueIsNull(e);
+            } finally {
+                service.shutdownNow();
+            }
+            if (exception.isNotNull())
+                throw exception.get();
+            results.addAll(queue);
+        }
+        progress.reportTaskCompleted();
+    }
+
+    /**
+     * run a collection of jobs
+     */
+    public static <S, T> void apply(Collection<S> jobs, ConsumerWithException<S> computation, int numberOfThreads) throws Exception {
+        apply(jobs, computation, numberOfThreads, new ProgressSilent());
+    }
+
+    /**
+     * run a collection of jobs
+     */
+    public static <S, T> void apply(Collection<S> jobs, ConsumerWithException<S> computation, int numberOfThreads, ProgressListener progress) throws Exception {
+        apply(jobs.size(), jobs, computation, numberOfThreads, progress);
+    }
+
+    /**
+     * run a collection of jobs
+     */
+    public static <S, T> void apply(int numberOfJobs, Iterable<S> jobs, ConsumerWithException<S> computation, int numberOfThreads, ProgressListener progress) throws Exception {
+        progress.setMaximum(numberOfJobs);
+        progress.setProgress(0);
+        if (numberOfJobs == 1)
+            computation.accept(jobs.iterator().next());
+        else if (numberOfJobs > 1) {
+            final Single<Exception> exception = new Single<>();
+            final ExecutorService service = Executors.newFixedThreadPool(Math.max(1, numberOfThreads));
             try {
                 jobs.forEach(job -> service.submit(() -> {
                     if (exception.isNull()) {
