@@ -23,10 +23,7 @@ package jloda.fx.icons;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.control.ToolBar;
+import javafx.scene.control.*;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.VBox;
@@ -46,6 +43,7 @@ public class ShowIcons extends Application {
 		for (var icon : MaterialIcons.values()) {
 			var vbox = new VBox(MaterialIcons.graphic(icon, ""), new Label(icon.name()));
 			vbox.setOnMouseClicked(e -> ClipboardUtils.putString(icon.name()));
+			Tooltip.install(vbox, new Tooltip(icon.name() + ": click to copy"));
 			flowPane.getChildren().add(vbox);
 		}
 		var doneButton = new Button("Done");

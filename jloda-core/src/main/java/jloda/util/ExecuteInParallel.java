@@ -52,13 +52,24 @@ public class ExecuteInParallel {
 
     /**
      * run a collection of jobs and collect the results
+     * @param numberOfJobs number of jobs, -1 if unknown
+     * @param jobs the iterable over jobs
+     * @param computation the algorithm
+     * @param results the receiver of results
+     * @param numberOfThreads threads to use
+     * @param progress program
+     * @param <S> input type
+     * @param <T> output type
+     * @throws Exception could be cancel
      */
     public static <S, T> void apply(int numberOfJobs, Iterable<S> jobs, FunctionWithException<S, Collection<T>> computation, Collection<T> results, int numberOfThreads, ProgressListener progress) throws Exception {
+        if (numberOfJobs >= 0)
+            progress.setMaximum(numberOfJobs);
         progress.setMaximum(numberOfJobs);
         progress.setProgress(0);
         if (numberOfJobs == 1) {
             results.addAll(computation.apply(jobs.iterator().next()));
-        } else if (numberOfJobs > 1) {
+        } else if (numberOfJobs != 0) {
             final Single<Exception> exception = new Single<>();
             final ConcurrentLinkedQueue<T> queue = new ConcurrentLinkedQueue<>();
 
@@ -103,14 +114,23 @@ public class ExecuteInParallel {
     }
 
     /**
-     * run a collection of jobs
+     * run a collection of jobs and collect the results
+     * @param numberOfJobs number of jobs, -1 if unknown
+     * @param jobs the iterable over jobs
+     * @param computation the algorithm
+     * @param numberOfThreads threads to use
+     * @param progress program
+     * @param <S> input type
+     * @param <T> output type
+     * @throws Exception could be that user canceled
      */
     public static <S, T> void apply(int numberOfJobs, Iterable<S> jobs, ConsumerWithException<S> computation, int numberOfThreads, ProgressListener progress) throws Exception {
-        progress.setMaximum(numberOfJobs);
+        if (numberOfJobs >= 0)
+            progress.setMaximum(numberOfJobs);
         progress.setProgress(0);
         if (numberOfJobs == 1)
             computation.accept(jobs.iterator().next());
-        else if (numberOfJobs > 1) {
+        else if (numberOfJobs != 0) {
             final Single<Exception> exception = new Single<>();
             final ExecutorService service = Executors.newFixedThreadPool(Math.max(1, numberOfThreads));
             try {
