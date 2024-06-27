@@ -133,7 +133,7 @@ public class SaveToSVG {
 			if (node instanceof Pane pane) { // this might contain a background color
 				if (pane.getBackground() != null && pane.getBackground().getFills().size() == 1) {
 					var fill = pane.getBackground().getFills().get(0);
-					if (fill.getFill() instanceof Color color) {
+					if (fill.getFill() instanceof Color color && !color.equals(Color.WHITE) && color.getOpacity() > 0) {
 						var width = computeFinalWidth(root, pane, pane.getWidth());
 						var height = computeFinalHeight(root, pane, pane.getHeight());
 						var location = root.screenToLocal(pane.localToScreen(0, 0));

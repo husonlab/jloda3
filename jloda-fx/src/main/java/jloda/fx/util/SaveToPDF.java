@@ -164,7 +164,7 @@ public class SaveToPDF {
 						if (node instanceof Pane pane) { // this might contain a background color
 							if (pane.getBackground() != null && pane.getBackground().getFills().size() == 1) {
 								var fill = pane.getBackground().getFills().get(0);
-								if (fill.getFill() instanceof Color color && color != Color.WHITE) {
+								if (fill.getFill() instanceof Color color && !color.equals(Color.WHITE) && color.getOpacity() > 0) {
 									var width = computeFinalWidth(root, pane, pane.getWidth());
 									var height = computeFinalHeight(root, pane, pane.getHeight());
 									var location = root.screenToLocal(pane.localToScreen(0, pane.getHeight()));
@@ -433,6 +433,8 @@ public class SaveToPDF {
 	}
 
 	private static PDColor pdfNonStrokingColor(Paint paint) {
+		if (paint == null || paint instanceof Color color && color.getOpacity() == 0.0)
+			return null;
 		if (!(paint instanceof Color))
 			paint = MainWindowManager.isUseDarkTheme() ? Color.BLACK : Color.WHITE;
 
@@ -444,6 +446,8 @@ public class SaveToPDF {
 	}
 
 	private static PDColor pdfStrokingColor(Paint paint) {
+		if (paint == null || paint instanceof Color color && color.getOpacity() == 0.0)
+			return null;
 		if (!(paint instanceof Color))
 			paint = MainWindowManager.isUseDarkTheme() ? Color.WHITE : Color.BLACK;
 
