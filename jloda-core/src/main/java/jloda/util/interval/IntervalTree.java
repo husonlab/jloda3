@@ -173,7 +173,7 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 	 * Will rebuild the tree if out of sync
 	 *
 	 * @param target the interval to check
-	 * @return all intervals that intersects target
+	 * @return all intervals that intersect target
 	 */
 	public ArrayList<Interval<T>> getIntervals(Interval<T> target) {
 		buildTree();

@@ -31,6 +31,8 @@
  */
 package jloda.util.interval;
 
+import java.util.Objects;
+
 /**
  * The Interval class maintains an interval with some associated data
  *
@@ -155,5 +157,29 @@ public class Interval<T> implements Comparable<Interval<T>> {
 	 */
 	public int intersectionLength(int a, int b) {
 		return Math.min(end, Math.max(a, b)) - Math.max(start, Math.min(a, b));
+	}
+
+
+	/**
+	 * are the intervals equal and have equal data?
+	 *
+	 * @param other the other
+	 * @return true, if same intervals and equal data
+	 */
+	@Override
+	public boolean equals(Object other) {
+		if (this == other) return true;
+		return other instanceof Interval<?> interval && start == interval.start && end == interval.end &&
+				(data == null && interval.data == null || data != null && data.equals(interval.data));
+	}
+
+	/**
+	 * hash code for interval and data
+	 *
+	 * @return hash code
+	 */
+	@Override
+	public int hashCode() {
+		return Objects.hash(start, end, data);
 	}
 }
