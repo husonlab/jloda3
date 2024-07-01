@@ -19,6 +19,8 @@ module jloda_fx {
 	exports jloda.fx.graph;
 	exports jloda.fx.label;
 	exports jloda.fx.message;
+	exports jloda.fx.notifications;
+
 	exports jloda.fx.selection;
 	exports jloda.fx.shapes;
 	exports jloda.fx.undo;
@@ -32,6 +34,8 @@ module jloda_fx {
 	opens jloda.fx.control.sliderhistogram;
 	opens jloda.fx.find;
 	opens jloda.fx.message;
+	opens jloda.fx.notifications;
+
 	opens jloda.fx.icons;
 
 	opens jloda.resources.css;

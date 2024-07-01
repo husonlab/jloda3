@@ -35,6 +35,7 @@ import javafx.scene.text.Font;
 import javafx.stage.*;
 import javafx.util.Duration;
 import jloda.fx.icons.MaterialIcons;
+import jloda.fx.notifications.NotificationsWindow;
 import jloda.util.ProgramProperties;
 
 import java.text.SimpleDateFormat;
@@ -64,6 +65,8 @@ public class NotificationManager {
 	private static int maxLength = 150;
 
 	private static String title;
+
+	public static boolean useNotificationsWindow = false;
 
 	private static boolean showNotifications = ProgramProperties.get("ShowNotifications", true);
 
@@ -158,6 +161,11 @@ public class NotificationManager {
 		final String message = (message0 == null ? "null" : (message0.length() > maxLength + 3 ? (message0.substring(0, maxLength) + "...") : message0).replaceAll("\\s+", " "));
 
 		if (isShowNotifications() && ProgramProperties.isUseGUI()) {
+			if (useNotificationsWindow) {
+				NotificationsWindow.addMessage(mode, message);
+				return;
+			}
+
 			final Window window = getWindow(owner);
 			if (window != null) {
 				if (title == null || title.isEmpty()) {

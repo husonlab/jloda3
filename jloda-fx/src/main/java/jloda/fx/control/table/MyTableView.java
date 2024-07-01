@@ -104,12 +104,12 @@ public class MyTableView extends Pane {
         tableView.setEditable(true);
         tableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         tableView.getSelectionModel().setCellSelectionEnabled(true);
-        tableView.getStylesheets().add(Objects.requireNonNull(TableView.class.getResource("mytable.css")).toExternalForm());
+        tableView.getStylesheets().add(Objects.requireNonNull(MyTableView.class.getResource("mytable.css")).toExternalForm());
 
         rowCount.bind(Bindings.size(tableView.getItems()));
         colCount.bind(Bindings.size(tableView.getColumns()));
 
-        rowHeaderView.getStylesheets().add(Objects.requireNonNull(TableView.class.getResource("mytable.css")).toExternalForm());
+        rowHeaderView.getStylesheets().add(Objects.requireNonNull(MyTableView.class.getResource("mytable.css")).toExternalForm());
         rowHeaderView.setCellFactory(t -> {
             final ListCell<String> cell = new ListCell<>();
             cell.textProperty().bind(cell.itemProperty());

@@ -392,9 +392,11 @@ public class PhyloSplitsGraph extends PhyloGraph {
 	 */
 	public void setTaxon2Cycle(int taxId, int cycleIndex) {
 		var taxon2cycle = getTaxon2Cycle();
-		taxon2cycle.setElementAt(cycleIndex, taxId - 1);
-		if (taxId > taxon2cycle.size()) {
+		if (taxId <= taxon2cycle.size()) {
+			taxon2cycle.setElementAt(cycleIndex, taxId - 1);
+		} else {
 			taxon2cycle.setSize(taxId);
+			taxon2cycle.setElementAt(cycleIndex, taxId - 1);
 		}
 	}
 

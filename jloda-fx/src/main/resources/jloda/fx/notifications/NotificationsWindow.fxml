@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  ~  NotificationsWindow.fxml Copyright (C) 2024 Daniel H. Huson
+  ~  
+  ~  (Some files contain contributions from other authors, who are then mentioned separately.)
+  ~  
+  ~  This program is free software: you can redistribute it and/or modify
+  ~  it under the terms of the GNU General Public License as published by
+  ~  the Free Software Foundation, either version 3 of the License, or
+  ~  (at your option) any later version.
+  ~  
+  ~  This program is distributed in the hope that it will be useful,
+  ~  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ~  GNU General Public License for more details.
+  ~  
+  ~  You should have received a copy of the GNU General Public License
+  ~  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  -->
+
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<AnchorPane fx:id="root" prefHeight="250.0" prefWidth="400.0" xmlns="http://javafx.com/javafx/18"
+            xmlns:fx="http://javafx.com/fxml/1" fx:controller="jloda.fx.notifications.NotificationsController">
+    <children>
+        <BorderPane AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0"
+                    AnchorPane.topAnchor="0.0">
+            <center>
+                <ListView fx:id="listVIew" BorderPane.alignment="CENTER">
+                    <BorderPane.margin>
+                        <Insets left="10.0" right="10.0" top="10.0"/>
+                    </BorderPane.margin>
+                </ListView>
+            </center>
+            <bottom>
+                <AnchorPane BorderPane.alignment="CENTER">
+                    <children>
+                        <ButtonBar prefHeight="40.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0"
+                                   AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                            <buttons>
+                                <Button fx:id="hideButton" mnemonicParsing="false" text="Close"/>
+                            </buttons>
+                            <padding>
+                                <Insets left="20.0" right="20.0"/>
+                            </padding>
+                        </ButtonBar>
+                        <HBox alignment="CENTER_LEFT" spacing="20.0" AnchorPane.bottomAnchor="0.0"
+                              AnchorPane.leftAnchor="0.0" AnchorPane.topAnchor="0.0">
+                            <children>
+                                <Button fx:id="copyButton" mnemonicParsing="false" text="Copy"/>
+                                <Button fx:id="clearButton" layoutX="10.0" layoutY="10.0" mnemonicParsing="false"
+                                        text="Clear"/>
+                            </children>
+                            <padding>
+                                <Insets left="20.0" right="20.0"/>
+                            </padding>
+                        </HBox>
+                    </children>
+                </AnchorPane>
+            </bottom>
+        </BorderPane>
+    </children>
+</AnchorPane>

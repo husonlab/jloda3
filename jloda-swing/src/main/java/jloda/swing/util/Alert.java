@@ -56,4 +56,17 @@ public class Alert {
 		} else
 			System.err.println("Alert - " + message);
 	}
+
+	public static void createAlert(int type, Component parent, String message, long waitInMilliseconds) {
+		if (ProgramProperties.isUseGUI()) {
+			String label;
+			if (ProgramProperties.getProgramName() != null)
+				label = "Alert - " + ProgramProperties.getProgramName();
+			else
+				label = "Alert";
+			JOptionPane.showMessageDialog(parent, StringUtils.toMessageString(message), label, type, ProgramProperties.getProgramIcon());
+		} else
+			System.err.println("Alert - " + message);
+
+	}
 }

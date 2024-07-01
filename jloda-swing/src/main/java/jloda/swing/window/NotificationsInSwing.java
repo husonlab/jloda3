@@ -146,7 +146,7 @@ public class NotificationsInSwing {
 
         if (isShowNotifications() && ProgramProperties.isUseGUI()) {
             final Window activeWindow = getActiveWindow();
-            if (title == null || title.length() == 0) {
+            if (title == null || title.isBlank()) {
                 title = ProgramProperties.getProgramName();
             }
             {
