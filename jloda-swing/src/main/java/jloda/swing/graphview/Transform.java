@@ -601,8 +601,8 @@ public class Transform {
 	public Rectangle getPreferredRect() {
 		Rectangle rect = w2d(coordRect).getBounds();
 		rect.setRect(rect.x - getLeftMargin(), rect.y - getTopMargin(),
-				(int) rect.getBounds().getWidth() + getLeftMargin() + getRightMargin(),
-				(int) rect.getBounds().getHeight() + getBottomMargin() + getTopMargin());
+				(int) Math.round(rect.getBounds().getWidth() + getLeftMargin() + getRightMargin()),
+				(int) Math.round(rect.getBounds().getHeight() + getBottomMargin() + getTopMargin()));
 		return rect;
 	}
 

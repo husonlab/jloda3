@@ -158,15 +158,15 @@ final public class NodeView extends ViewBase {
 			}
 		} else {
 			// gap between edge of node and start of edge
-			int GAPSIZE = 2;
+			int GAPSIZE = 0;
 			int radius = Math.max(radius1, radius2) + GAPSIZE;
 			double dist = apt.distance(bpt);
 			if (dist == 0)
 				p = apt;
 			else {
 				double factor = radius / dist;
-				p = new Point((int) (apt.x + factor * (bpt.x - apt.x)),
-						(int) (apt.y + factor * (bpt.y - apt.y)));
+				p = new Point((int) Math.round(apt.x + factor * (bpt.x - apt.x)),
+						(int) Math.round(apt.y + factor * (bpt.y - apt.y)));
 			}
 		}
 		return p;
