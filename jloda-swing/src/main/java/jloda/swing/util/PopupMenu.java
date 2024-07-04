@@ -21,9 +21,9 @@
 package jloda.swing.util;
 
 import jloda.swing.commands.CommandManager;
-import jloda.swing.commands.ICommand;
 import jloda.swing.commands.TeXGenerator;
 import jloda.swing.window.IPopMenuModifier;
+import jloda.util.StringUtils;
 
 import javax.swing.*;
 
@@ -57,15 +57,15 @@ public class PopupMenu extends JPopupMenu {
 		super();
 		this.isNodePopup = isNodePopup;
 		this.isEdgePopup = isEdgePopup;
-		if (configuration != null && configuration.length() > 0) {
+		if (configuration != null && !configuration.isEmpty()) {
 			String[] tokens = configuration.split(";");
 
-			for (String token : tokens) {
+			for (var token : tokens) {
 				if (token.equals("|")) {
 					addSeparator();
 				} else {
 					JMenuItem menuItem;
-					ICommand command = commandManager.getCommand(token);
+					var command = commandManager.getCommand(token);
 					if (command == null) {
 						if (showApplicableOnly)
 							continue;
@@ -88,7 +88,16 @@ public class PopupMenu extends JPopupMenu {
 		if (menuModifier != null)
 			menuModifier.apply(this, viewer, commandManager);
 		if (ProgramProperties.get("showtex", false)) {
-			System.out.println(TeXGenerator.getPopupMenuLaTeX(configuration, commandManager));
+			var name = StringUtils.fromCamelCase(viewer.getClass().getSimpleName());
+			if (name.equals("ViewerJTable"))
+				name = "TableView";
+			else if (name.equals("ViewerJTree"))
+				name = "TreeView";
+			if (isNodePopup)
+				name += " node";
+			else if (isEdgePopup)
+				name += " edge";
+			System.out.println(TeXGenerator.getPopupMenuLaTeX(name, configuration, commandManager));
 		}
 		try {
 			commandManager.updateEnableState();

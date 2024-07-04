@@ -47,7 +47,7 @@ public class MenuBar extends JMenuBar {
 	public MenuBar(Object viewer, MenuConfiguration configuration, CommandManager commandManager) {
 		MenuCreator menuCreator = new MenuCreator(viewer, commandManager);
 		try {
-			menuCreator.buildMenuBar("main", configuration, this);
+			menuCreator.buildMenuBar(viewer.getClass().getSimpleName(), "main", configuration, this);
 		} catch (Exception e) {
 			Basic.caught(e);
 			throw new RuntimeException("Failed to build menus: " + e);

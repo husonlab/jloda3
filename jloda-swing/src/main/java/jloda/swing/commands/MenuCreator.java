@@ -26,10 +26,14 @@ import jloda.swing.util.ResourceManager;
 import jloda.swing.util.lang.Translator;
 import jloda.swing.window.IMenuModifier;
 import jloda.swing.window.MenuMnemonics;
+import jloda.util.StringUtils;
 
 import javax.swing.*;
 import java.awt.event.ActionEvent;
-import java.util.*;
+import java.util.Hashtable;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.StringTokenizer;
 
 /**
  * class for creating and managing menus
@@ -56,13 +60,18 @@ public class MenuCreator {
      * MenuBar.menuBarLabel=item;item;item...;item, where menuBarLabel must match the
      * given name and each item is of the form Menu.menuBarLabel or simply menuBarLabel,
      */
-    public void buildMenuBar(String menuBarLabel, Hashtable<String, String> descriptions, JMenuBar menuBar) throws Exception {
+    public void buildMenuBar(String windowName, String menuBarLabel, Hashtable<String, String> descriptions, JMenuBar menuBar) throws Exception {
         /*
         System.err.println("Known actions:");
         for (Iterator it = actions.keySet().iterator(); it.hasNext();) {
             System.err.println(it.next());
         }
          */
+
+        if (windowName != null && ProgramProperties.get("showtex", false)) {
+            System.out.println("% This file is auto-generated from code, please don't edit.");
+            System.out.println("\\chapter{" + StringUtils.fromCamelCase(windowName) + " menu and toolbar items}\n");
+        }
 
         menuBarLabel = MENUBAR_TAG + "." + menuBarLabel;
         if (!descriptions.containsKey(menuBarLabel))
@@ -94,21 +103,20 @@ public class MenuCreator {
     private JMenu buildMenu(String menuBarConfiguration, Hashtable<String, String> menusConfigurations, boolean addEmptyIcon) throws Exception {
         if (!menuBarConfiguration.startsWith("Menu."))
             menuBarConfiguration = "Menu." + menuBarConfiguration;
-        String description = menusConfigurations.get(menuBarConfiguration);
+        var description = menusConfigurations.get(menuBarConfiguration);
         if (description == null)
             return null;
-        List<String> menuDescription = getTokens(description);
-        if (menuDescription.size() == 0)
+        var menuDescription = getTokens(description);
+        if (menuDescription.isEmpty())
             return null;
-        boolean skipNextSeparator = false;  // avoid double separators
-        Iterator it = menuDescription.iterator();
-        String menuName = (String) it.next();
-        JMenu menu = new JMenu(Translator.get(menuName));
+        var skipNextSeparator = false;  // avoid double separators
+        var menuName = menuDescription.iterator().next();
+        var menu = new JMenu(Translator.get(menuName));
         if (addEmptyIcon)
             menu.setIcon(ResourceManager.getIcon("Empty16.gif"));
-        String[] labels = menuDescription.toArray(new String[0]);
-        for (int i = 1; i < labels.length; i++) {
-            String label = labels[i];
+        var labels = menuDescription.toArray(new String[0]);
+        for (var i = 1; i < labels.length; i++) {
+            var label = labels[i];
             if (i == labels.length - 2 && label.equals("|") && labels[i + 1].equals("Quit"))
                 skipNextSeparator = true; // avoid separator at bottom of File menu in mac version
 
@@ -119,7 +127,7 @@ public class MenuCreator {
             skipNextSeparator = false;
 
             if (label.startsWith("@")) {
-                JMenu subMenu = new JMenu(Translator.get(label));
+                var subMenu = new JMenu(Translator.get(label));
                 subMenu.setIcon(ResourceManager.getIcon("Empty16.gif"));
                 menu.add(subMenu);
             } else if (label.equals("|")) {
@@ -128,7 +136,7 @@ public class MenuCreator {
             } else {
                 if (CommandManager.getCommandsToIgnore().contains(label))
                     continue;
-                final ICommand command = commandManager.getCommand(label);
+                final var command = commandManager.getCommand(label);
                 if (command != null) {
                     label = command.getName(); // label might have been altName...
                     if (CommandManager.getCommandsToIgnore().contains(label))
