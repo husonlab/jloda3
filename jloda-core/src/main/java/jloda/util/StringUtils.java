@@ -1550,6 +1550,14 @@ public class StringUtils {
 		return text.substring(start);
 	}
 
+	public static String getTextBefore(String wordToEndBefore, String text) {
+		var end = text.indexOf(wordToEndBefore);
+		if (end == -1)
+			return text;
+		else
+			return text.substring(0, end);
+	}
+
 	/**
 	 * gets the word between left and right, or left and then end
 	 *

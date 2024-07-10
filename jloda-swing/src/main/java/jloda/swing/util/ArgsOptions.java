@@ -57,6 +57,9 @@ public class ArgsOptions {
 
     private boolean optionFound = false;
 
+    private boolean doLaTeX = false;
+    private String latexDescription = "";
+
     /**
      * constructor
      *
@@ -88,9 +91,17 @@ public class ArgsOptions {
 
         usage = new LinkedList<>();
 
+
         try {
             doHelp = (args.length > 0 && args[0].equalsIgnoreCase("help")) || getOption("-h", "--help", "Show help", false, false);
             setVerbose(getOption("-v", "--verbose", "verbose", false) && !doHelp);
+        } catch (UsageException ignored) {
+        }
+        try {
+            doLaTeX = (args.length > 0 && args[0].equalsIgnoreCase("latex")) || getOption("!latex", "!--latex", "Generate LaTeX section", false, false);
+            if (doLaTeX) {
+                doHelp = true;
+            }
         } catch (UsageException ignored) {
         }
 
@@ -187,6 +198,11 @@ public class ArgsOptions {
         if (!alreadyHasOtherComment)
             comment(OTHER);
 
+        if (doLaTeX) {
+            System.out.println(getLatexSection());
+            System.exit(0);
+        }
+
         if (verbose) {
             System.err.println("\t--verbose: true");
         }
@@ -208,7 +224,7 @@ public class ArgsOptions {
             else
                 throw new UsageException("Help");
         }
-        if (arguments.size() > 0) {
+        if (!arguments.isEmpty()) {
             StringBuilder message = new StringBuilder("Invalid, unknown or duplicate option:");
             for (String arg : arguments) {
                 message.append(" ").append(arg);
@@ -725,7 +741,7 @@ public class ArgsOptions {
 
         //String result= JOptionPane.showInputDialog(null,"Enter command-line options",oldInput);
 
-        if (result.trim().length() > 0) {
+        if (!result.trim().isEmpty()) {
             result = result.trim().replaceAll("\\s+", " ");
             return result.split(" ");
         } else
@@ -757,5 +773,19 @@ public class ArgsOptions {
         public Command(String name, String description) {
             super(name, description);
         }
+    }
+
+    public void setLatexDescription(String latexDescription) {
+        this.latexDescription = latexDescription;
+    }
+
+    public String getLatexSection() {
+        var title = StringUtils.fromCamelCase(Basic.getMainClassName()).replaceAll("2 ", " to ");
+        var toolName = title.toLowerCase().replaceAll(" to ", "2").replaceAll(" ", "-");
+        return "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+               + "%n\\section{%s}%n%n".formatted(title) +
+               "The %s commandline program. \\index{%s program}%n%n".formatted(toolName, toolName) +
+               latexDescription + "\n{\\footnotesize\n\\begin{Verbatim}[breaklines=true]\n" +
+               StringUtils.getTextBefore("AUTHOR(s)", getUsage()) + "\\end{Verbatim}}\n\n";
     }
 }

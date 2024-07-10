@@ -88,11 +88,7 @@ public class PopupMenu extends JPopupMenu {
 		if (menuModifier != null)
 			menuModifier.apply(this, viewer, commandManager);
 		if (ProgramProperties.get("showtex", false)) {
-			var name = StringUtils.fromCamelCase(viewer.getClass().getSimpleName());
-			if (name.equals("ViewerJTable"))
-				name = "TableView";
-			else if (name.equals("ViewerJTree"))
-				name = "TreeView";
+			var name = (viewer != null ? StringUtils.fromCamelCase(viewer.getClass().getSimpleName()) : "Unnamed");
 			if (isNodePopup)
 				name += " node";
 			else if (isEdgePopup)

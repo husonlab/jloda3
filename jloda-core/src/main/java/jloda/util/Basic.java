@@ -364,6 +364,20 @@ public class Basic {
         return list.stream().reduce(BinaryOperator.maxBy(Comparator.comparingInt(o -> Collections.frequency(list, o)))).orElse(null);
     }
 
+
+    public static String getMainClassName() {
+        var stackTraceElements = Thread.currentThread().getStackTrace();
+
+        for (var element : stackTraceElements) {
+            // Check if the method name is "main"
+            if (element.getMethodName().equals("main")) {
+                return element.getClassName().replaceAll(".*\\.", "");
+            }
+        }
+        return "";
+    }
+
+
     public static String getMethodName() {
         var stackTrace = Thread.currentThread().getStackTrace();
         return stackTrace[2].getMethodName();

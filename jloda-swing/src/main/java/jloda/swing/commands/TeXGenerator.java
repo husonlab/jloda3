@@ -132,6 +132,9 @@ public class TeXGenerator {
 					.filter(Objects::nonNull).toList();
 			if (!commands.isEmpty()) {
 				{
+					menuName = menuName.replace("Viewer J Table", "Table Viewer");
+					menuName = menuName.replace("Viewer J Tree", "Tree Viewer");
+
 					int count = mainAdditionalPopupMenuCount.computeIfAbsent(menuName, k -> 0);
 					mainAdditionalPopupMenuCount.put(menuName, count + 1);
 					if (count > 0)
