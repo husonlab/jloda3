@@ -780,12 +780,14 @@ public class ArgsOptions {
     }
 
     public String getLatexSection() {
-        var title = StringUtils.fromCamelCase(Basic.getMainClassName()).replaceAll("2 ", " to ");
+        var title = StringUtils.fromCamelCase(Basic.getMainClassName()).replace("A Add", "AAdd")
+                .replaceAll("\\s*3\\s*", "3").replaceAll("\\s*2\\s*", " to ");
         var toolName = title.toLowerCase().replaceAll(" to ", "2").replaceAll(" ", "-");
-        return "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
-               + "%n\\section{%s}%n%n".formatted(title) +
-               "The %s commandline program. \\index{%s program}%n%n".formatted(toolName, toolName) +
-               latexDescription + "\n{\\footnotesize\n\\begin{Verbatim}[breaklines=true]\n" +
-               StringUtils.getTextBefore("AUTHOR(s)", getUsage()) + "\\end{Verbatim}}\n\n";
+        return "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n"
+               + "\\section{%s}%n%n".formatted(title) +
+               "The \\verb^%s^ commandline program. \\index{%s program}%n%n".formatted(toolName, toolName) +
+               latexDescription + "\n\n{\\footnotesize\n\\begin{Verbatim}[breaklines=true]\n" +
+               StringUtils.getTextBefore("AUTHOR(s)", getUsage().replaceAll("Default value: /.*/", "Default value: "))
+               + "\\end{Verbatim}\n}\n\n";
     }
 }

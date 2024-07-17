@@ -50,12 +50,11 @@ public class BasicSwing {
 	 */
 	public static List<File> getAllFilesInDirectory(File rootDirectory, javax.swing.filechooser.FileFilter fileFilter, boolean recursively) {
 		final List<File> result = new LinkedList<>();
-
 		final Queue<File> queue = new LinkedList<>();
 		File[] list = rootDirectory.listFiles();
 		if (list != null) {
 			Collections.addAll(queue, list);
-			while (queue.size() > 0) {
+			while (!queue.isEmpty()) {
 				File file = queue.poll();
 				if (file.isDirectory()) {
 					if (recursively) {
@@ -85,7 +84,7 @@ public class BasicSwing {
 		File[] list = (new File(rootDirectory)).listFiles();
 		if (list != null) {
 			Collections.addAll(queue, list);
-			while (queue.size() > 0) {
+			while (!queue.isEmpty()) {
 				File file = queue.poll();
 				if (file.isDirectory()) {
 					if (recursively) {

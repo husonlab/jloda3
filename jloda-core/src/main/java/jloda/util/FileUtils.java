@@ -207,9 +207,10 @@ public class FileUtils {
 	}
 
 	public static String getFileNameWithoutZipOrGZipSuffix(String fileName) {
-		if (isZIPorGZIPFile(fileName))
-			return replaceFileSuffix(fileName, "");
-		else
+		if (fileName.toLowerCase().endsWith(".gz"))
+			fileName = fileName.substring(0, fileName.lastIndexOf(".gz"));
+		else if (fileName.toLowerCase().endsWith(".zip"))
+			fileName = fileName.substring(0, fileName.lastIndexOf(".zip"));
 			return fileName;
 	}
 
