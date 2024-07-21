@@ -51,6 +51,7 @@ public class Icebergs {
 			Shape iceberg;
 			if (shape instanceof Line line) {
 				var line1 = new Line();
+				line.setPickOnBounds(false);
 				line1.startXProperty().bind(line.startXProperty());
 				line1.startYProperty().bind(line.startYProperty());
 				line1.endXProperty().bind(line.endXProperty());
@@ -58,6 +59,7 @@ public class Icebergs {
 				iceberg = line1;
 			} else if (shape instanceof Path path) {
 				var path1 = new Path();
+				path1.setPickOnBounds(false);
 				InvalidationListener updatePath = e -> {
 					path1.getElements().clear();
 					for (var element : path.getElements()) {
@@ -125,6 +127,7 @@ public class Icebergs {
 				iceberg = polygon1;
 			} else if (shape instanceof Polyline polyline) {
 				var polyline1 = new Polyline();
+				polyline1.setPickOnBounds(false);
 				polyline1.getPoints().addAll(polyline.getPoints());
 				iceberg = polyline1;
 			} else {
