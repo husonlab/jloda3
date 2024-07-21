@@ -112,6 +112,7 @@ public class CopyLineShape {
 					copy.getElements().add(new ClosePath());
 				}
 			}
+			copy.setPickOnBounds(lineShape.isPickOnBounds());
 			return copy;
 		} else return null;
 	}
