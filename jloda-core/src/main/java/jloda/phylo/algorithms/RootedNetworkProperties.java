@@ -395,7 +395,11 @@ public class RootedNetworkProperties {
         if (phyloTree == null)
             return "null";
         else if (phyloTree.isReticulated()) {
-            var buf = new StringBuilder();
+            var buf = new StringBuilder(String.format("nodes=%,d edges=%,d leaves=%,d h=%,d",
+                    phyloTree.getNumberOfNodes(), phyloTree.getNumberOfEdges(),
+                    phyloTree.nodeStream().filter(Node::isLeaf).count(),
+                    phyloTree.nodeStream().filter(v -> v.getInDegree() > 1).mapToInt(v -> v.getInDegree() - 1).sum()));
+
             if (isTreeBased(phyloTree))
                 buf.append(" tree-based");
             else if (isTreeChild(phyloTree))
@@ -403,11 +407,10 @@ public class RootedNetworkProperties {
             if (isTemporal(phyloTree))
                 buf.append(" temporal");
             buf.append(" network");
-
-            return String.format("%d nodes, %d edges, %d ret., %d leaves, %s", phyloTree.getNumberOfNodes(), phyloTree.getNumberOfEdges(),
-                    phyloTree.nodeStream().filter(v -> v.getInDegree() > 1).count(), phyloTree.nodeStream().filter(Node::isLeaf).count(), buf);
+            return buf.toString();
         } else {
-            return String.format("%d nodes, %d edges, %d leaves", phyloTree.getNumberOfNodes(), phyloTree.getNumberOfEdges(),
+            return String.format("nodes=%d edges=%d leaves=%d",
+                    phyloTree.getNumberOfNodes(), phyloTree.getNumberOfEdges(),
                     phyloTree.nodeStream().filter(Node::isLeaf).count());
         }
     }
