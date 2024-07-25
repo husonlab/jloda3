@@ -55,8 +55,8 @@ public class PhyloGraph extends Graph {
                 if (node2taxa != null && taxon2node != null) {
                     var list = node2taxa.get(v);
                     if (list != null) {
-                        for (Integer t : list) {
-                            taxon2node.put(t, null);
+                        for (var t : list) {
+                            taxon2node.remove(t);
                         }
                     }
                 }
