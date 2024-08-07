@@ -77,6 +77,12 @@ public class RunAfterAWhile {
 		}
 	}
 
+	public static void apply(Object key, Runnable runnable, long waitingTimeMilliSeconds) {
+		synchronized (instance.keyTimeRunnableMap) {
+			instance.keyTimeRunnableMap.put(key, new Pair<>(System.currentTimeMillis() + Math.max(DELAY, waitingTimeMilliSeconds) - DELAY, runnable));
+		}
+	}
+
 	/**
 	 * The runnable will be executed after a delay, unless the same key is waiting, in which case nothing is run
 	 *
@@ -102,6 +108,7 @@ public class RunAfterAWhile {
 	public static void applyInFXThread(Object key, Runnable runnable) {
 		apply(key, () -> Platform.runLater(runnable));
 	}
+
 
 	public static void applyInFXThreadOrClearIfAlreadyWaiting(Object key, Runnable runnable) {
 		applyOrClearIfAlreadyWaiting(key, () -> Platform.runLater(runnable));

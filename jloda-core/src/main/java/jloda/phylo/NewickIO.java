@@ -587,8 +587,9 @@ public class NewickIO {
 			if (v != null)
 				e = tree.newEdge(v, w);
 
-			if (confidenceValue.isNotNull())
+			if (e != null && confidenceValue.isNotNull()) {
 				tree.setConfidence(e, confidenceValue.get());
+			}
 
 			// detect and read embedded bootstrap values:
 			pos = StringUtils.skipSpaces(str, pos);
