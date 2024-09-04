@@ -23,6 +23,7 @@ import javafx.beans.InvalidationListener;
 import javafx.beans.property.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.ObservableMap;
 import javafx.collections.ObservableSet;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
@@ -34,10 +35,12 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import jloda.fx.util.ColorSchemeManager;
 import jloda.fx.util.FuzzyBoolean;
+import jloda.fx.util.RunAfterAWhile;
 
 import java.util.function.BiConsumer;
 
@@ -75,6 +78,7 @@ public class Legend extends StackPane {
 
 	private final ObjectProperty<FuzzyBoolean> show = new SimpleObjectProperty<>(this, "show", True);
 
+	private final ObservableMap<String, Color> colorMap = FXCollections.observableHashMap();
 	private final StringProperty colorSchemeName = new SimpleStringProperty();
 	private final ObservableList<String> labels;
 	private final ObservableSet<String> active = FXCollections.observableSet();
@@ -85,8 +89,10 @@ public class Legend extends StackPane {
 	public Legend(ObservableList<String> labels, String colorSchemeName, Orientation orientation) {
 		this.labels = labels;
 		setColorSchemeName(colorSchemeName);
+
 		this.labels.addListener((InvalidationListener) e -> update());
 		this.active.addListener((InvalidationListener) e -> update());
+		this.colorMap.addListener((InvalidationListener) e -> update());
 		this.show.addListener(e -> update());
 		colorSchemeNameProperty().addListener(e -> update());
 		maxCircleRadius.addListener(e -> update());
@@ -115,76 +121,82 @@ public class Legend extends StackPane {
 	}
 
 	private void update() {
-		setVisible(getShow() != False);
+		RunAfterAWhile.applyInFXThread(this, () -> {
+			setVisible(getShow() != False);
 
-		pane.getChildren().clear();
+			pane.getChildren().clear();
 
-		var unitRadius = (getMaxCount() <= 0 ? 0 : Math.sqrt(getMaxCircleRadius() * getMaxCircleRadius() / getMaxCount()));
+			var unitRadius = (getMaxCount() <= 0 ? 0 : Math.sqrt(getMaxCircleRadius() * getMaxCircleRadius() / getMaxCount()));
 
-		if (getTitle() != null && !getTitle().isBlank()) {
-			pane.getChildren().add(new HBox(new Label(getTitle())));
-		}
-		if (getShow() != False && getScalingType() != ScalingType.none && unitRadius > 0) {
-			pane.getChildren().add(createCircleScaleBox(getScalingType(), unitRadius, 1.0));
-		}
+			if (getTitle() != null && !getTitle().isBlank()) {
+				pane.getChildren().add(new HBox(new Label(getTitle())));
+			}
+			if (getShow() != False && getScalingType() != ScalingType.none && unitRadius > 0) {
+				pane.getChildren().add(createCircleScaleBox(getScalingType(), unitRadius, 1.0));
+			}
 
-		if (getShow() == True && !getColorSchemeName().isBlank()) {
-			var orientation = (pane instanceof VBox ? Orientation.VERTICAL : Orientation.HORIZONTAL);
-			Pane labelsPane;
-			if (labels.size() <= getMaxLabelsPerLine()) {
-				labelsPane = pane;
-			} else {
-				if (orientation == Orientation.VERTICAL) {
-					labelsPane = new VBox();
-					((VBox) labelsPane).setSpacing(5);
-					var scrollPane = new ScrollPane(labelsPane);
-					scrollPane.setFocusTraversable(false);
-					scrollPane.setFitToWidth(true);
-					scrollPane.setPrefHeight(20 * (5 + 25)); // 20 items x gap x height
-					scrollPane.setMinHeight(ScrollPane.USE_PREF_SIZE);
-					scrollPane.setMaxHeight(ScrollPane.USE_PREF_SIZE);
-					scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-					scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-					scrollPane.setStyle("-fx-focus-color: transparent;-fx-faint-focus-color: transparent;-fx-control-inner-background: transparent;");
-					pane.getChildren().add(scrollPane);
+			if (getShow() == True && !getColorSchemeName().isBlank()) {
+				var orientation = (pane instanceof VBox ? Orientation.VERTICAL : Orientation.HORIZONTAL);
+				Pane labelsPane;
+				if (labels.size() <= getMaxLabelsPerLine()) {
+					labelsPane = pane;
 				} else {
-					labelsPane = new HBox();
-					((HBox) labelsPane).setSpacing(5);
-					var scrollPane = new ScrollPane(labelsPane);
-					scrollPane.setFocusTraversable(false);
-					scrollPane.setFitToHeight(true);
-					scrollPane.setPrefWidth(600);
-					scrollPane.setMinWidth(ScrollPane.USE_PREF_SIZE);
-					scrollPane.setMaxWidth(ScrollPane.USE_PREF_SIZE);
-					scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-					scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-					scrollPane.setStyle("-fx-focus-color: transparent;-fx-faint-focus-color: transparent;-fx-control-inner-background: transparent;");
-					pane.getChildren().add(scrollPane);
+					if (orientation == Orientation.VERTICAL) {
+						labelsPane = new VBox();
+						((VBox) labelsPane).setSpacing(5);
+						var scrollPane = new ScrollPane(labelsPane);
+						scrollPane.setFocusTraversable(false);
+						scrollPane.setFitToWidth(true);
+						scrollPane.setPrefHeight(20 * (5 + 25)); // 20 items x gap x height
+						scrollPane.setMinHeight(ScrollPane.USE_PREF_SIZE);
+						scrollPane.setMaxHeight(ScrollPane.USE_PREF_SIZE);
+						scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+						scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+						scrollPane.setStyle("-fx-focus-color: transparent;-fx-faint-focus-color: transparent;-fx-control-inner-background: transparent;");
+						pane.getChildren().add(scrollPane);
+					} else {
+						labelsPane = new HBox();
+						((HBox) labelsPane).setSpacing(5);
+						var scrollPane = new ScrollPane(labelsPane);
+						scrollPane.setFocusTraversable(false);
+						scrollPane.setFitToHeight(true);
+						scrollPane.setPrefWidth(600);
+						scrollPane.setMinWidth(ScrollPane.USE_PREF_SIZE);
+						scrollPane.setMaxWidth(ScrollPane.USE_PREF_SIZE);
+						scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+						scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+						scrollPane.setStyle("-fx-focus-color: transparent;-fx-faint-focus-color: transparent;-fx-control-inner-background: transparent;");
+						pane.getChildren().add(scrollPane);
+					}
 				}
-			}
 
-			var colorScheme = ColorSchemeManager.getInstance().getColorScheme(getColorSchemeName());
-			for (var i = 0; i < labels.size(); i++) {
-				if (active.contains(labels.get(i))) {
-					var shape = getColorPatchShae() == PatchShape.Circle ? new Circle(8) : new Rectangle(16, 16);
-					shape.setFill(colorScheme.get(i % colorScheme.size()));
-					var label = new Label(labels.get(i));
-					label.setOnMouseClicked(e -> {
-						if (getClickOnLabel() != null) {
-							getClickOnLabel().accept(e, label.getText());
-							e.consume();
-						}
-					});
-					shape.setOnMouseClicked(label.getOnMouseClicked());
-					var hbox = new HBox(shape, label);
-					hbox.setSpacing(3);
-					hbox.setPrefHeight(25);
-					hbox.setMinHeight(HBox.USE_PREF_SIZE);
-					hbox.setMaxHeight(HBox.USE_PREF_SIZE);
-					labelsPane.getChildren().add(hbox);
+				var colorScheme = ColorSchemeManager.getInstance().getColorScheme(getColorSchemeName());
+				for (var i = 0; i < labels.size(); i++) {
+					var name = labels.get(i);
+					if (active.contains(name)) {
+						var shape = getColorPatchShae() == PatchShape.Circle ? new Circle(8) : new Rectangle(16, 16);
+						if (colorMap.containsKey(name))
+							shape.setFill(colorMap.get(name));
+						else
+							shape.setFill(colorScheme.get(i % colorScheme.size()));
+						var label = new Label(name);
+						label.setOnMouseClicked(e -> {
+							if (getClickOnLabel() != null) {
+								getClickOnLabel().accept(e, label.getText());
+								e.consume();
+							}
+						});
+						shape.setOnMouseClicked(label.getOnMouseClicked());
+						var hbox = new HBox(shape, label);
+						hbox.setSpacing(3);
+						hbox.setPrefHeight(25);
+						hbox.setMinHeight(HBox.USE_PREF_SIZE);
+						hbox.setMaxHeight(HBox.USE_PREF_SIZE);
+						labelsPane.getChildren().add(hbox);
+					}
 				}
 			}
-		}
+		});
 	}
 
 	public ObservableSet<String> getActive() {
@@ -193,6 +205,10 @@ public class Legend extends StackPane {
 
 	public String getColorSchemeName() {
 		return colorSchemeName.get();
+	}
+
+	public ObservableMap<String, Color> getColorMap() {
+		return colorMap;
 	}
 
 	public StringProperty colorSchemeNameProperty() {
