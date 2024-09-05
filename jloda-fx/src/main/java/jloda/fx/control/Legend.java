@@ -19,6 +19,7 @@
 
 package jloda.fx.control;
 
+import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
 import javafx.beans.property.*;
 import javafx.collections.FXCollections;
@@ -28,6 +29,7 @@ import javafx.collections.ObservableSet;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.input.MouseEvent;
@@ -38,10 +40,15 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
+import jloda.fx.util.BasicFX;
 import jloda.fx.util.ColorSchemeManager;
 import jloda.fx.util.FuzzyBoolean;
 import jloda.fx.util.RunAfterAWhile;
+import jloda.util.ProgramExecutorService;
+import jloda.util.TriConsumer;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.BiConsumer;
 
 import static jloda.fx.util.FuzzyBoolean.False;
@@ -78,6 +85,8 @@ public class Legend extends StackPane {
 
 	private final ObjectProperty<FuzzyBoolean> show = new SimpleObjectProperty<>(this, "show", True);
 
+	private final BooleanProperty editable = new SimpleBooleanProperty(this, "editable", false);
+
 	private final ObservableMap<String, Color> colorMap = FXCollections.observableHashMap();
 	private final StringProperty colorSchemeName = new SimpleStringProperty();
 	private final ObservableList<String> labels;
@@ -85,6 +94,8 @@ public class Legend extends StackPane {
 	private final Pane pane;
 
 	private BiConsumer<MouseEvent, String> clickOnLabel;
+
+	private TriConsumer<String, Map<String, Color>, Map<String, Color>> updateColors;
 
 	public Legend(ObservableList<String> labels, String colorSchemeName, Orientation orientation) {
 		this.labels = labels;
@@ -170,20 +181,16 @@ public class Legend extends StackPane {
 					}
 				}
 
-				var colorScheme = ColorSchemeManager.getInstance().getColorScheme(getColorSchemeName());
 				for (var i = 0; i < labels.size(); i++) {
 					var name = labels.get(i);
 					if (active.contains(name)) {
 						var shape = getColorPatchShae() == PatchShape.Circle ? new Circle(8) : new Rectangle(16, 16);
-						if (colorMap.containsKey(name))
-							shape.setFill(colorMap.get(name));
-						else
-							shape.setFill(colorScheme.get(i % colorScheme.size()));
+						var color = getColorForName(name);
+						shape.setFill(color);
 						var label = new Label(name);
 						label.setOnMouseClicked(e -> {
 							if (getClickOnLabel() != null) {
 								getClickOnLabel().accept(e, label.getText());
-								e.consume();
 							}
 						});
 						shape.setOnMouseClicked(label.getOnMouseClicked());
@@ -192,11 +199,55 @@ public class Legend extends StackPane {
 						hbox.setPrefHeight(25);
 						hbox.setMinHeight(HBox.USE_PREF_SIZE);
 						hbox.setMaxHeight(HBox.USE_PREF_SIZE);
+
+						if (isEditable()) {
+							hbox.setOnMouseClicked(e -> {
+								if (e.isStillSincePress()) {
+									var oldColorPicker = BasicFX.findOneRecursively(hbox, ColorPicker.class);
+									if (oldColorPicker != null) {
+										hbox.getChildren().remove(oldColorPicker);
+									} else {
+										var colorPicker = new ColorPicker(color);
+										hbox.getChildren().add(colorPicker);
+										colorPicker.setOnAction(event -> {
+											var selectedColor = colorPicker.getValue();
+											hbox.getChildren().remove(colorPicker);
+											if (!color.equals(selectedColor)) {
+												var oldColor = colorMap.get(name);
+												colorMap.put(name, selectedColor);
+												if (updateColors != null) {
+													var oldMap = new HashMap<>(colorMap);
+													var newMap = new HashMap<>(colorMap);
+													oldMap.put(name, oldColor);
+													newMap.put(name, selectedColor);
+													updateColors.accept(name, oldMap, newMap);
+												}
+											}
+										});
+										ProgramExecutorService.submit(10000, () -> Platform.runLater(() -> hbox.getChildren().remove(colorPicker)));
+									}
+								}
+								e.consume();
+							});
+						}
+
 						labelsPane.getChildren().add(hbox);
 					}
 				}
 			}
 		});
+	}
+
+	public Color getColorForName(String name) {
+		var colorScheme = ColorSchemeManager.getInstance().getColorScheme(getColorSchemeName());
+		if (colorMap.get(name) == null) {
+			var i = labels.indexOf(name);
+			if (i == -1)
+				return Color.WHITE;
+			else
+				colorMap.put(name, colorScheme.get(i % colorScheme.size()));
+		}
+		return colorMap.get(name);
 	}
 
 	public ObservableSet<String> getActive() {
@@ -356,6 +407,26 @@ public class Legend extends StackPane {
 
 	public void setClickOnLabel(BiConsumer<MouseEvent, String> clickOnLabel) {
 		this.clickOnLabel = clickOnLabel;
+	}
+
+	public boolean isEditable() {
+		return editable.get();
+	}
+
+	public BooleanProperty editableProperty() {
+		return editable;
+	}
+
+	public void setEditable(boolean editable) {
+		this.editable.set(editable);
+	}
+
+	public TriConsumer<String, Map<String, Color>, Map<String, Color>> getUpdateColors() {
+		return updateColors;
+	}
+
+	public void setUpdateColors(TriConsumer<String, Map<String, Color>, Map<String, Color>> updateColors) {
+		this.updateColors = updateColors;
 	}
 }
 
