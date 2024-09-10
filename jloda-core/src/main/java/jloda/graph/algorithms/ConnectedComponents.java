@@ -21,8 +21,12 @@
 package jloda.graph.algorithms;
 
 import jloda.graph.Graph;
+import jloda.graph.GraphTraversals;
 import jloda.graph.Node;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -49,14 +53,41 @@ public class ConnectedComponents {
 	}
 
 	/**
-	 * visit all nodes in a connected component
+	 * collect all nodes in a connected component
 	 */
 	public static void collect(Node v, Set<Node> used) {
 		used.add(v);
-		for (var e : v.adjacentEdges()) {
-			var w = e.getOpposite(v);
-			if (!used.contains(w))
-				collect(w, used);
+		GraphTraversals.traverseReachable(v, e -> true, used::add);
+	}
+
+	/**
+	 * get the containing connected component
+	 *
+	 * @param v node
+	 * @return connected component
+	 */
+	public static Set<Node> component(Node v) {
+		var set = new HashSet<Node>();
+		collect(v, set);
+		return set;
+	}
+
+	/**
+	 * get all connected components
+	 *
+	 * @param graph
+	 * @return connected components
+	 */
+	public static Collection<Set<Node>> components(Graph graph) {
+		var components = new ArrayList<Set<Node>>();
+		var seen = new HashSet<Node>();
+		for (var v : graph.nodes()) {
+			if (!seen.contains(v)) {
+				var component = component(v);
+				components.add(component);
+				seen.addAll(component);
+			}
 		}
+		return components;
 	}
 }

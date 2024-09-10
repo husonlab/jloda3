@@ -1,5 +1,5 @@
 /*
- * GraphTraversals.java Copyright (C) 2024 Daniel H. Huson
+ *  GraphTraversals.java Copyright (C) 2024 Daniel H. Huson
  *
  *  (Some files contain contributions from other authors, who are then mentioned separately.)
  *
@@ -15,13 +15,9 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
-package jloda.fx.graph;
-
-import jloda.graph.Edge;
-import jloda.graph.Node;
+package jloda.graph;
 
 import java.util.Stack;
 import java.util.function.Consumer;
