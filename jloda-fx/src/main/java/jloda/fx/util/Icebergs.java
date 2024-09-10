@@ -49,6 +49,7 @@ public class Icebergs {
 			throw new RuntimeException("create(): not valid on iceberg");
 		else {
 			Shape iceberg;
+			var hasVolume = false;
 			if (shape instanceof Line line) {
 				var line1 = new Line();
 				line.setPickOnBounds(false);
@@ -116,15 +117,18 @@ public class Icebergs {
 				var circle1 = new Circle();
 				circle1.radiusProperty().bind(circle.radiusProperty());
 				iceberg = circle1;
+				hasVolume = true;
 			} else if (shape instanceof Rectangle rectangle) {
 				var rectangle1 = new Rectangle();
 				rectangle1.widthProperty().bind(rectangle.widthProperty());
 				rectangle1.heightProperty().bind(rectangle.heightProperty());
 				iceberg = rectangle1;
+				hasVolume = true;
 			} else if (shape instanceof Polygon polygon) {
 				var polygon1 = new Polygon();
 				polygon1.getPoints().addAll(polygon.getPoints());
 				iceberg = polygon1;
+				hasVolume = true;
 			} else if (shape instanceof Polyline polyline) {
 				var polyline1 = new Polyline();
 				polyline1.setPickOnBounds(false);
@@ -137,6 +141,7 @@ public class Icebergs {
 				rectangle.xProperty().bind(rectangle.widthProperty().multiply(-0.5));
 				rectangle.yProperty().bind(rectangle.heightProperty().multiply(-0.5));
 				iceberg = rectangle;
+				hasVolume = true;
 			} // todo: add polylines and polygons
 
 			iceberg.setUserData(shape.getUserData());
@@ -178,9 +183,13 @@ public class Icebergs {
 			});
 			iceberg.setFill(Color.TRANSPARENT);
 			iceberg.setStroke(Color.TRANSPARENT);
-
-			iceberg.setStyle("-fx-stroke-width: 5;-fx-stroke: transparent;-fx-fill: transparent;");
-
+			if (hasVolume) {
+				iceberg.setStrokeWidth(5);
+				iceberg.setStyle("-fx-stroke-width: 5;-fx-stroke: transparent;-fx-fill: transparent;");
+			} else {
+				iceberg.setStrokeWidth(30);
+				iceberg.setStyle("-fx-stroke-width: 30;-fx-stroke: transparent;-fx-fill: transparent;");
+			}
 			iceberg.setId("iceberg");
 			return iceberg;
 		}
