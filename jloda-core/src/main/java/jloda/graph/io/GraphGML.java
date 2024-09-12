@@ -231,7 +231,8 @@ public class GraphGML {
 
 	public static String asUnquotedString(NexusStreamParser np) throws IOExceptionWithLineNumber {
 		if (np.peekMatchIgnoreCase("`")) {
-			np.setPunctuationCharacters("(),;:={}`");
+			np.pushPunctuationCharacters("`");
+			np.pushSpaceCharacters("\t");
 			try {
 				np.matchIgnoreCase("`");
 				var words = new ArrayList<String>();
@@ -240,18 +241,26 @@ public class GraphGML {
 					words.add(np.getWordRespectCase());
 				}
 				np.matchIgnoreCase("`");
-				return StringUtils.toString(words, " ");
+				return StringUtils.toString(words, "");
 			} finally {
-				np.setPunctuationCharacters("(),;:=\"{}`");
+				np.popPunctuationCharacters();
+				np.popSpaceCharacters();
 			}
 		} else if (np.peekMatchIgnoreCase("\"")) {
 			np.matchIgnoreCase("\"");
-			var words = new ArrayList<String>();
-			while (!np.peekMatchIgnoreCase("\"") && np.ttype != TT_EOF) {
-				words.add(np.getWordRespectCase());
+			try {
+				np.pushPunctuationCharacters("\"");
+				np.pushSpaceCharacters("\t");
+				var words = new ArrayList<String>();
+				while (!np.peekMatchIgnoreCase("\"") && np.ttype != TT_EOF) {
+					words.add(np.getWordRespectCase());
+				}
+				np.matchIgnoreCase("\"");
+				return StringUtils.toString(words, "");
+			} finally {
+				np.popPunctuationCharacters();
+				np.popSpaceCharacters();
 			}
-			np.matchIgnoreCase("\"");
-			return StringUtils.toString(words, " ");
 		}
 		return np.getWordRespectCase();
 	}
