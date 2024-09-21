@@ -9,12 +9,6 @@
 
     <name>JLODA library</name>
 
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <gluonfx.maven.plugin.version>1.0.21</gluonfx.maven.plugin.version>
-        <gluonfx.target>host</gluonfx.target>
-    </properties>
-
     <modules>
         <module>jloda-core</module>
         <module>jloda-connect</module>
