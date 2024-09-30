@@ -25,6 +25,10 @@ import jloda.graph.Node;
 import jloda.graph.NodeIntArray;
 import jloda.graph.NodeSet;
 import jloda.util.Counter;
+import jloda.util.Pair;
+
+import java.util.Collection;
+import java.util.Collections;
 
 public class IsDAG {
 	/**
@@ -34,31 +38,50 @@ public class IsDAG {
 	 * @return true, if graph is DAG
 	 */
 	public static boolean apply(Graph graph) {
+		return apply(graph, Collections.emptyList());
+	}
+
+	/**
+	 * determines whether given graph is a DAG
+	 *
+	 * @param graph           the graph
+	 * @param additionalEdges edges not in the current graph
+	 * @return true, if graph is DAG
+	 */
+	public static boolean apply(Graph graph, Collection<Pair<Node, Node>> additionalEdges) {
+		additionalEdges = additionalEdges.stream().filter(p -> !p.getFirst().isChild(p.getSecond())).toList();
+
 		var time = new Counter(0);
 		try (var discovered = graph.newNodeSet(); var departure = graph.newNodeIntArray()) {
 			for (var v : graph.nodes()) {
 				if (!discovered.contains(v)) {
-					applyRec(v, discovered, departure, time);
+					applyRec(v, discovered, departure, additionalEdges, time);
 				}
 			}
 
 			for (var v : graph.nodes()) {
-				for (var u : v.children()) {
-					if (departure.get(v) <= departure.get(u))
+				for (var w : v.children()) {
+					if (departure.get(v) <= departure.get(w))
 						return false;
 				}
+			}
+			for (var pair : additionalEdges) {
+				var v = pair.getFirst();
+				var w = pair.getSecond();
+				if (departure.get(v) <= departure.get(w))
+					return false;
 			}
 		}
 		return true;
 	}
 
-	private static void applyRec(Node v, NodeSet discovered, NodeIntArray departure, Counter time) {
+	private static void applyRec(Node v, NodeSet discovered, NodeIntArray departure, Collection<Pair<Node, Node>> additionalEdges, Counter time) {
 		discovered.add(v);
 
-		for (var u : v.children()) {
-			if (!discovered.contains(u))
-				applyRec(u, discovered, departure, time);
-		}
+		v.childrenStream().filter(w -> !discovered.contains(w)).forEach(w -> applyRec(w, discovered, departure, additionalEdges, time));
+
+		additionalEdges.stream().filter(p -> p.getFirst() == v).map(Pair::getSecond)
+				.filter(w -> !discovered.contains(w)).forEach(w -> applyRec(w, discovered, departure, additionalEdges, time));
 		departure.set(v, (int) time.getAndIncrement());
 	}
 }

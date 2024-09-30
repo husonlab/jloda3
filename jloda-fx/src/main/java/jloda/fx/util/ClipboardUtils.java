@@ -31,10 +31,11 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.DataFormat;
 import javafx.util.Duration;
 import jloda.util.FileUtils;
-import jloda.util.StringUtils;
 import jloda.util.TriConsumer;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -180,14 +181,28 @@ public class ClipboardUtils {
 	}
 
 	public static String getTextFilesContentOrString() {
+		return getTextFilesContentOrString(Integer.MAX_VALUE);
+	}
+
+	public static String getTextFilesContentOrString(int maxChars) {
 		if (hasFiles()) {
 			var files = ClipboardUtils.getFiles();
 			var buf = new StringBuilder();
-			for (var file : files) {
-				if (FileUtils.fileExistsAndIsNonEmpty(file) && isTextFile(file)) {
-					try {
-						buf.append(StringUtils.toString(FileUtils.getLinesFromFile(file.getPath()), "\n"));
-					} catch (IOException ignored) {
+			int count = 0;
+			readFiles:
+			{
+				for (var file : files) {
+					if (FileUtils.fileExistsAndIsNonEmpty(file) && isTextFile(file)) {
+						try (var r = new BufferedReader(new FileReader(file))) {
+							int c;
+							while ((c = r.read()) != -1) {
+								buf.append((char) c);
+								count++;
+								if (count == maxChars)
+									break readFiles;
+							}
+						} catch (IOException ignored) {
+						}
 					}
 				}
 			}
@@ -195,12 +210,24 @@ public class ClipboardUtils {
 		} else if (hasString()) {
 			var string = ClipboardUtils.getString().trim();
 			if (FileUtils.fileExistsAndIsNonEmpty(string) && isTextFile(new File(string))) {
-				try {
-					string = StringUtils.toString(FileUtils.getLinesFromFile(string), "\n");
+				var buf = new StringBuilder();
+				try (var r = new BufferedReader(new FileReader(string))) {
+					var count = 0;
+					int c;
+					while ((c = r.read()) != -1) {
+						buf.append((char) c);
+						count++;
+						if (count == maxChars)
+							break;
+					}
 				} catch (IOException ignored) {
 				}
+				return buf.toString();
+			} else {
+				if (string.length() > maxChars)
+					string = string.substring(0, maxChars);
+				return string;
 			}
-			return string;
 		} else
 			return null;
 	}
