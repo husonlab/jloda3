@@ -92,7 +92,8 @@ public class UndoManager {
     public void doAndAdd(String name, Runnable undo, Runnable redo) {
         if (redo != null)
             redo.run();
-        add(name, undo, redo);
+        if (undo != null || redo != null)
+            add(name, undo, redo);
     }
 
     public void add(String name, Runnable undo, Runnable redo) {
