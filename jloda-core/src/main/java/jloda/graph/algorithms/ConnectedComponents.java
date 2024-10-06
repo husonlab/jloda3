@@ -25,8 +25,8 @@ import jloda.graph.GraphTraversals;
 import jloda.graph.Node;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -78,7 +78,7 @@ public class ConnectedComponents {
 	 * @param graph
 	 * @return connected components
 	 */
-	public static Collection<Set<Node>> components(Graph graph) {
+	public static List<Set<Node>> components(Graph graph) {
 		var components = new ArrayList<Set<Node>>();
 		var seen = new HashSet<Node>();
 		for (var v : graph.nodes()) {

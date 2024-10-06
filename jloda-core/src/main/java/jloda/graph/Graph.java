@@ -113,6 +113,8 @@ public class Graph extends GraphBase implements INamed {
         var v = new Node(this, info);
         v.setId(recycledId);
         maxNodeId--; // count back down
+        if (recycledId > maxNodeId)
+            maxNodeId = recycledId;
         return v;
     }
 
@@ -221,6 +223,8 @@ public class Graph extends GraphBase implements INamed {
         final Edge e = new Edge(this, v, w, obj);
         e.setId(recycledId);
         maxEdgeId--;
+        if (recycledId > maxEdgeId)
+            maxEdgeId = recycledId;
         return e;
     }
 
