@@ -205,22 +205,6 @@ public class RootedNetworkProperties {
         calculation.accept(root);
     }
 
-    /**
-     * determines all visible nodes that are unavoidable in any path from the root to at least one leaf
-     */
-    public static NodeSet computeAllVisibleNodesOld(PhyloTree graph) {
-        var result = graph.newNodeSet();
-        if (isNonEmptyDAG(graph)) {
-
-            var leaves = graph.nodeStream().filter(v -> v.getOutDegree() == 0).collect(Collectors.toSet());
-            var stableNodes = computeAllLowestStableAncestors(graph, leaves);
-
-            for (var root : findRoots(graph))
-                computeAllVisibleNodesRec(root, stableNodes, result);
-        }
-        return result;
-    }
-
     private static void computeAllVisibleNodesRec(Node v, NodeSet stableNodes, NodeSet result) {
         if (stableNodes.contains(v))
             result.add(v);
@@ -280,6 +264,7 @@ public class RootedNetworkProperties {
 
         if (isNonEmptyDAG(graph)) {
             try (NodeArray<Set<Node>> below = graph.newNodeArray()) {
+                var other = query.stream().filter(v -> v.getInDegree() == 1).map(Node::getParent).collect(Collectors.toSet());
                 var remainingQuery = graph.newNodeSet();
                 for (var root : findRoots(graph)) {
                     labelByDescendantsRec(root, query, below);
@@ -289,6 +274,7 @@ public class RootedNetworkProperties {
                         computeAllStableAncestorsRec(root, remainingQuery, below, result);
                     }
                 }
+                result.addAll(other);
             }
         }
         return result;
