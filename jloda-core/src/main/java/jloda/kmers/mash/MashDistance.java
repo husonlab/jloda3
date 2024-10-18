@@ -107,4 +107,16 @@ public class MashDistance {
 	public static double computeJaccardIndex(MashSketch sketch1, MashSketch sketch2) {
 		return (double) computeIntersection(sketch1, sketch2) / (double) Math.min(sketch1.getSketchSize(), sketch2.getSketchSize());
 	}
+
+	/*
+	public static void main (String[] args) {
+		var s=1000;
+		var k=21;
+
+		System.err.printf("Differences-distance for s=%d and k=%d%n", s,k);
+		for(var diff=0;diff<=s;diff++) {
+			System.err.printf("%s\t%f%n", diff,compute((double)(s-diff)/s, k));
+		}
+	}
+	*/
 }
