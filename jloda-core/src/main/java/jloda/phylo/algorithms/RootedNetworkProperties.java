@@ -262,19 +262,26 @@ public class RootedNetworkProperties {
     public static NodeSet computeAllLowestStableAncestors(PhyloTree graph, Collection<Node> query) {
         var result = graph.newNodeSet();
 
-        if (isNonEmptyDAG(graph)) {
+        var queryReticulatedNodes = new ArrayList<Node>();
+        for (var v : query) {
+            if (v.getInDegree() == 1) {
+                result.add(v.getParent());
+            } else {
+                queryReticulatedNodes.add(v);
+            }
+        }
+
+        if (!queryReticulatedNodes.isEmpty()) {
             try (NodeArray<Set<Node>> below = graph.newNodeArray()) {
-                var other = query.stream().filter(v -> v.getInDegree() == 1).map(Node::getParent).collect(Collectors.toSet());
                 var remainingQuery = graph.newNodeSet();
                 for (var root : findRoots(graph)) {
-                    labelByDescendantsRec(root, query, below);
+                    labelByDescendantsRec(root, queryReticulatedNodes, below);
                     if (below.get(root) != null) {
                         remainingQuery.clear();
-                        remainingQuery.setAll(query);
+                        remainingQuery.setAll(queryReticulatedNodes);
                         computeAllStableAncestorsRec(root, remainingQuery, below, result);
                     }
                 }
-                result.addAll(other);
             }
         }
         return result;

@@ -9,6 +9,31 @@
 
     <name>JLODA library</name>
 
+    <description>A Java library for X</description>
+
+    <url>https://github.com/husonlab/loda3</url>
+
+    <licenses>
+        <license>
+            <name>GNU GENERAL PUBLIC LICENSE</name>
+            <url>https://www.gnu.org/licenses/gpl-3.0.html</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>husonlab</id>
+            <name>Daniel Huson</name>
+            <email>daniel@husonlab.org</email>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git://github.com/husonlab/loda3.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com:husonlab/loda3.git</developerConnection>
+        <url>https://github.com/husonlab/loda3</url>
+    </scm>
+
     <modules>
         <module>jloda-core</module>
         <module>jloda-connect</module>

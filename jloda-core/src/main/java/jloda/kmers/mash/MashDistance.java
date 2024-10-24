@@ -113,10 +113,11 @@ public class MashDistance {
 		var s=1000;
 		var k=21;
 
-		System.err.printf("Differences-distance for s=%d and k=%d%n", s,k);
+		System.err.printf("# s=%d and k=%d%n", s,k);
+		System.err.println("#diff <tab> shared <tab> distance");
 		for(var diff=0;diff<=s;diff++) {
-			System.err.printf("%s\t%f%n", diff,compute((double)(s-diff)/s, k));
+			System.err.printf("%d\t%d\t%s%n", diff,s-diff,compute((double)(s-diff)/s, k));
 		}
 	}
-	*/
+	 */
 }
