@@ -198,6 +198,14 @@ public class BitSetUtils {
 		return array;
 	}
 
+	public static int[] asArray(BitSet bits) {
+		final var array = new int[bits.cardinality()];
+		var count = 0;
+		for (var t : members(bits))
+			array[count++] = t;
+		return array;
+	}
+
 	public static int min(BitSet bits) {
 		return bits.nextSetBit(0);
 	}
