@@ -190,13 +190,10 @@
     -fx-border-width: 0.5px;
 }
 
-.check-menu-item .check-box .mark {
+.check-box {
     -fx-mark-color: white;
 }
 
-.check-menu-item:focused .check-box .mark,
-.check-menu-item:armed .check-box .mark,
-.check-menu-item:selected .check-box .mark,
-.check-menu-item:focused:selected .check-box .mark {
+.check-menu-item {
     -fx-mark-color: white;
 }

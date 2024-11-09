@@ -2,6 +2,7 @@ module jloda_fx {
 	requires javafx.controls;
 	requires javafx.graphics;
 	requires javafx.fxml;
+	requires com.google.zxing;
 
 	requires java.desktop;
 
@@ -27,6 +28,8 @@ module jloda_fx {
 	exports jloda.fx.util;
 	exports jloda.fx.window;
 	exports jloda.fx.icons;
+
+	exports jloda.fx.qr;
 
 	opens jloda.fx.colorscale;
 	opens jloda.fx.label;
