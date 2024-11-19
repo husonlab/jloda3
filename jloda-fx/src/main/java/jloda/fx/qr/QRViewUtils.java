@@ -22,51 +22,58 @@ package jloda.fx.qr;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.qrcode.QRCodeWriter;
 import javafx.application.Platform;
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.ReadOnlyBooleanProperty;
-import javafx.beans.property.ReadOnlyObjectProperty;
+import javafx.beans.property.ReadOnlyProperty;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import jloda.fx.util.BasicFX;
 import jloda.fx.util.ClipboardUtils;
-import jloda.fx.util.DraggableLabel;
 import jloda.util.Basic;
 import jloda.util.ProgramExecutorService;
 import jloda.util.StringUtils;
 
-import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * utilities for setting up a QR view
  * Daniel Huson, 2.2024
  */
 public class QRViewUtils {
+	private static double mouseX;
+	private static double mouseY;
+
 	/**
 	 * setup QR code view
 	 *
 	 * @param anchorPane          container
-	 * @param source              the source property, usually either phylotree or block of splits
-	 * @param stringFunction      creates the string for the given source
+	 * @param updateProperty      triggers a call to the string supplier
+	 * @param stringSupplier      supplies the string
 	 * @param qrImageViewProperty this will contain the qr image view
 	 * @param show                show or hide the image
-	 * @param <T>                 source type
 	 */
-	public static <T> void setup(AnchorPane anchorPane, ReadOnlyObjectProperty<T> source, Function<T, String> stringFunction, ObjectProperty<ImageView> qrImageViewProperty, ReadOnlyBooleanProperty show) {
+	public static void setup(AnchorPane anchorPane, ReadOnlyProperty<?> updateProperty, Supplier<String> stringSupplier, ObjectProperty<ImageView> qrImageViewProperty, BooleanProperty show) {
 		var qrImageView = new ImageView();
 		qrImageViewProperty.set(qrImageView);
 
-		qrImageView.setId("qr");
 		qrImageView.setPreserveRatio(true);
 		qrImageView.setFitHeight(256);
+
+		var root = new StackPane(qrImageView);
+		root.setId("qr");
 
 		var copyMenuItem = new MenuItem("Copy");
 		var smallMenuItem = new RadioMenuItem("Small");
 		var mediumMenuItem = new RadioMenuItem("Medium");
 		var largeMenuItem = new RadioMenuItem("Large");
+		var closeMenuItem = new MenuItem("Close");
+		closeMenuItem.setOnAction(e -> show.set(false));
+
 		var group = new ToggleGroup();
 		group.getToggles().addAll(smallMenuItem, mediumMenuItem, largeMenuItem);
 		group.selectedToggleProperty().addListener((v, o, n) -> {
@@ -83,41 +90,55 @@ public class QRViewUtils {
 		});
 		group.selectToggle(mediumMenuItem);
 
-		var contextMenu = new ContextMenu(copyMenuItem, new SeparatorMenuItem(), smallMenuItem, mediumMenuItem, largeMenuItem);
+		var contextMenu = new ContextMenu(copyMenuItem, new SeparatorMenuItem(), smallMenuItem, mediumMenuItem, largeMenuItem, new SeparatorMenuItem(), closeMenuItem);
 
 		qrImageView.setOnContextMenuRequested(e -> {
-			var sourceValue = source.get();
-			if (sourceValue != null) {
-				var stringValue = stringFunction.apply(sourceValue);
+			var stringValue = stringSupplier.get();
 				if (stringValue != null) {
 					copyMenuItem.setOnAction(a -> ClipboardUtils.put(stringValue, qrImageView.getImage(), null));
 					contextMenu.show(qrImageView, e.getScreenX(), e.getScreenY());
 					ProgramExecutorService.submit(3000, () -> Platform.runLater(contextMenu::hide));
 				}
-			}
 		});
 
-		AnchorPane.setBottomAnchor(qrImageView, 20.0);
-		AnchorPane.setLeftAnchor(qrImageView, 20.0);
-		DraggableLabel.makeDraggable(qrImageView);
+		AnchorPane.setBottomAnchor(root, 20.0);
+		AnchorPane.setLeftAnchor(root, 20.0);
+
+		qrImageView.setOnMousePressed(e -> {
+			mouseX = e.getScreenX();
+			mouseY = e.getScreenY();
+		});
+
+		qrImageView.setOnMouseDragged(e -> {
+			var dx = e.getScreenX() - mouseX;
+			var dy = e.getScreenY() - mouseY;
+
+			if (AnchorPane.getLeftAnchor(root) + dx >= 16 && AnchorPane.getLeftAnchor(root) + dx + root.getWidth() <= anchorPane.getWidth() - 16)
+				AnchorPane.setLeftAnchor(root, AnchorPane.getLeftAnchor(root) + dx);
+			if (AnchorPane.getBottomAnchor(root) - dy >= 16 && AnchorPane.getBottomAnchor(root) - dy <= anchorPane.getHeight() - root.getHeight() - 16)
+				AnchorPane.setBottomAnchor(root, AnchorPane.getBottomAnchor(root) - dy);
+			mouseX = e.getScreenX();
+			mouseY = e.getScreenY();
+		});
+
 
 		show.addListener((v, o, n) -> {
 			anchorPane.getChildren().removeAll(BasicFX.findRecursively(anchorPane, a -> a.getId() != null && a.getId().equals("qr")));
 			if (n) {
-				var string = stringFunction.apply(source.get());
+				var string = stringSupplier.get();
 				if (string != null)
 					Tooltip.install(qrImageView, new Tooltip(StringUtils.abbreviateDotDotDot(string, 100)));
 				else Tooltip.install(qrImageView, null);
 				qrImageView.setImage(createImage(string, 1024, 1024));
-				anchorPane.getChildren().add(1, qrImageView);
+				anchorPane.getChildren().add(1, root);
 			}
 		});
 
-		source.addListener((v, o, n) -> {
+		updateProperty.addListener((v, o, n) -> {
 			if (n == null)
 				qrImageView.setImage(null);
-			else if (anchorPane.getChildren().contains(qrImageView)) {
-				var string = stringFunction.apply(n);
+			else if (anchorPane.getChildren().contains(root)) {
+				var string = stringSupplier.get();
 				if (string != null)
 					Tooltip.install(qrImageView, new Tooltip(StringUtils.abbreviateDotDotDot(string, 100)));
 				else Tooltip.install(qrImageView, null);
