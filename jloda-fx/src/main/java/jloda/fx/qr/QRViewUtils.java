@@ -22,6 +22,7 @@ package jloda.fx.qr;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.qrcode.QRCodeWriter;
 import javafx.application.Platform;
+import javafx.beans.InvalidationListener;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyProperty;
@@ -134,9 +135,10 @@ public class QRViewUtils {
 			}
 		});
 
-		updateProperty.addListener((v, o, n) -> {
-			if (n == null)
+		InvalidationListener listener = e -> {
+			if (!show.get()) {
 				qrImageView.setImage(null);
+			}
 			else if (anchorPane.getChildren().contains(root)) {
 				var string = stringSupplier.get();
 				if (string != null)
@@ -144,7 +146,9 @@ public class QRViewUtils {
 				else Tooltip.install(qrImageView, null);
 				qrImageView.setImage(createImage(string, 1024, 1024));
 			}
-		});
+		};
+		updateProperty.addListener(listener);
+		show.addListener(listener);
 	}
 
 	public static Image createImage(String text, int width, int height) {

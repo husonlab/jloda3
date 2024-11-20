@@ -115,7 +115,7 @@ public class Icebergs {
 				iceberg = path1;
 			} else if (shape instanceof Circle circle) {
 				var circle1 = new Circle();
-				circle1.radiusProperty().bind(circle.radiusProperty());
+				circle1.radiusProperty().bind(Bindings.createDoubleBinding(() -> Math.max(10, circle.getRadius()), circle.radiusProperty()));
 				iceberg = circle1;
 				hasVolume = true;
 			} else if (shape instanceof Rectangle rectangle) {
@@ -136,8 +136,8 @@ public class Icebergs {
 				iceberg = polyline1;
 			} else {
 				var rectangle = new Rectangle();
-				rectangle.widthProperty().bind(Bindings.createDoubleBinding(() -> 1.1 * shape.getBoundsInLocal().getWidth(), shape.boundsInLocalProperty()));
-				rectangle.heightProperty().bind(Bindings.createDoubleBinding(() -> 1.1 * shape.getBoundsInLocal().getHeight(), shape.boundsInLocalProperty()));
+				rectangle.widthProperty().bind(Bindings.createDoubleBinding(() -> Math.max(10, 1.1 * shape.getBoundsInLocal().getWidth()), shape.boundsInLocalProperty()));
+				rectangle.heightProperty().bind(Bindings.createDoubleBinding(() -> Math.max(10, 1.1 * shape.getBoundsInLocal().getHeight()), shape.boundsInLocalProperty()));
 				rectangle.xProperty().bind(rectangle.widthProperty().multiply(-0.5));
 				rectangle.yProperty().bind(rectangle.heightProperty().multiply(-0.5));
 				iceberg = rectangle;
@@ -187,8 +187,8 @@ public class Icebergs {
 				iceberg.setStrokeWidth(5);
 				iceberg.setStyle("-fx-stroke-width: 5;-fx-stroke: transparent;-fx-fill: transparent;");
 			} else {
-				iceberg.setStrokeWidth(30);
-				iceberg.setStyle("-fx-stroke-width: 30;-fx-stroke: transparent;-fx-fill: transparent;");
+				iceberg.setStrokeWidth(20);
+				iceberg.setStyle("-fx-stroke-width: 20;-fx-stroke: transparent;-fx-fill: transparent;");
 			}
 			iceberg.setId("iceberg");
 			return iceberg;

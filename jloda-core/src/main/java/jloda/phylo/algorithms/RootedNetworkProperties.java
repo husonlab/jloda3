@@ -344,7 +344,7 @@ public class RootedNetworkProperties {
     }
 
     /**
-     * is the a temporal network?
+     * is the tree a temporal network?
      *
      * @return true, if temporal
      */
