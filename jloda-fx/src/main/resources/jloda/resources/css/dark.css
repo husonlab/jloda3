@@ -41,7 +41,6 @@
 
 .text-field {
     -fx-prompt-text-fill: gray;
-    -fx-text-fill: white;
 }
 
 .button {

@@ -21,12 +21,10 @@
 package jloda.phylo.algorithms;
 
 import jloda.graph.*;
+import jloda.graph.algorithms.BiconnectedComponents;
 import jloda.graph.algorithms.CutPoints;
 import jloda.phylo.PhyloTree;
-import jloda.util.BitSetUtils;
-import jloda.util.CanceledException;
-import jloda.util.IteratorUtils;
-import jloda.util.Single;
+import jloda.util.*;
 import jloda.util.progress.ProgressSilent;
 
 import java.util.*;
@@ -254,6 +252,22 @@ public class RootedNetworkProperties {
             parentsOfBelow.addAll(parentsOfBelowV);
         }
     }
+
+    public static NodeSet computeAllLowestStableAncestors2(PhyloTree graph, Collection<Node> query) {
+        var nodes = graph.newNodeSet();
+
+        nodes.addAll(query.stream().filter(v -> v.getInDegree() == 1).map(Node::getParent).toList());
+        var reticulateNodes = query.stream().filter(v -> v.getInDegree() > 1).toList();
+
+        for (var component : BiconnectedComponents.apply(graph)) {
+            if (CollectionUtils.intersects(component, reticulateNodes)) {
+                component.stream().filter(v -> v.getInDegree() == 0 || !component.containsAll(IteratorUtils.asSet(v.parents()))).forEach(nodes::add);
+
+            }
+        }
+        return nodes;
+    }
+
 
     /**
      * determines all stable nodes for the given query set. For each node in the query set, this
