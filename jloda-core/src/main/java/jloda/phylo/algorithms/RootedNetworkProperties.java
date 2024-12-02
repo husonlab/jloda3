@@ -253,7 +253,7 @@ public class RootedNetworkProperties {
         }
     }
 
-    public static NodeSet computeAllLowestStableAncestors2(PhyloTree graph, Collection<Node> query) {
+    public static NodeSet computeAllLowestStableAncestors(PhyloTree graph, Collection<Node> query) {
         var nodes = graph.newNodeSet();
 
         nodes.addAll(query.stream().filter(v -> v.getInDegree() == 1).map(Node::getParent).toList());
@@ -262,99 +262,9 @@ public class RootedNetworkProperties {
         for (var component : BiconnectedComponents.apply(graph)) {
             if (CollectionUtils.intersects(component, reticulateNodes)) {
                 component.stream().filter(v -> v.getInDegree() == 0 || !component.containsAll(IteratorUtils.asSet(v.parents()))).forEach(nodes::add);
-
             }
         }
         return nodes;
-    }
-
-
-    /**
-     * determines all stable nodes for the given query set. For each node in the query set, this
-     * is the set of nodes that lies on all paths to that member of the query set
-     */
-    public static NodeSet computeAllLowestStableAncestors(PhyloTree graph, Collection<Node> query) {
-        var result = graph.newNodeSet();
-
-        var queryReticulatedNodes = new ArrayList<Node>();
-        for (var v : query) {
-            if (v.getInDegree() == 1) {
-                result.add(v.getParent());
-            } else {
-                queryReticulatedNodes.add(v);
-            }
-        }
-
-        if (!queryReticulatedNodes.isEmpty()) {
-            try (NodeArray<Set<Node>> below = graph.newNodeArray()) {
-                var remainingQuery = graph.newNodeSet();
-                for (var root : findRoots(graph)) {
-                    labelByDescendantsRec(root, queryReticulatedNodes, below);
-                    if (below.get(root) != null) {
-                        remainingQuery.clear();
-                        remainingQuery.setAll(queryReticulatedNodes);
-                        computeAllStableAncestorsRec(root, remainingQuery, below, result);
-                    }
-                }
-            }
-        }
-        return result;
-    }
-
-    /**
-     * label by all queries below
-     *
-     * @param v     current node
-     * @param query set of query nodes
-     * @param below will contain for each node, the set of query nodes on or below it
-     * @return query nodes on or below v
-     */
-    private static Set<Node> labelByDescendantsRec(Node v, Collection<Node> query, NodeArray<Set<Node>> below) {
-        Set<Node> belowV = null;
-
-        for (var w : v.children()) {
-            var belowW = labelByDescendantsRec(w, query, below);
-            if (belowW != null) {
-                if (belowV == null)
-                    belowV = new HashSet<>();
-                belowV.addAll(belowW);
-            }
-        }
-        if (query.contains(v)) {
-            if (belowV == null)
-                belowV = new HashSet<>();
-            belowV.add(v);
-        }
-        below.put(v, belowV);
-        return belowV;
-    }
-
-    /**
-     * recursively determines all stable nodes
-     */
-    private static void computeAllStableAncestorsRec(Node v, Set<Node> remainingQuery, NodeArray<Set<Node>> below, NodeSet result) {
-        if (!remainingQuery.isEmpty()) {
-            var count = new HashMap<Node, Integer>();
-            for (var w : v.children()) {
-                var belowW = below.get(w);
-                if (belowW != null) {
-                    for (var u : belowW) {
-                        if (remainingQuery.contains(u)) {
-                            count.merge(u, 1, Integer::sum);
-                        }
-                    }
-                }
-            }
-            for (var u : count.keySet()) {
-                if (count.get(u) > 1) {
-                    result.add(v);
-                    remainingQuery.remove(u);
-                }
-            }
-            for (var w : v.children()) {
-                computeAllStableAncestorsRec(w, remainingQuery, below, result);
-            }
-        }
     }
 
     /**
