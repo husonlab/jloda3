@@ -39,6 +39,8 @@ public class FastQFileFilter {
 
 	public static boolean accepts(File selectedFile) {
 		for (String ex : getInstance().getExtensions()) {
+			if (ex.startsWith("*"))
+				ex = ex.substring(1);
 			if (selectedFile.getName().toLowerCase().endsWith(ex))
 				return true;
 		}

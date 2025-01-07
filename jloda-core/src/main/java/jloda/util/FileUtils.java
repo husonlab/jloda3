@@ -27,6 +27,7 @@ import java.io.*;
 import java.net.URL;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -775,5 +776,14 @@ public class FileUtils {
 
 	public static String getFileName(String directory, String name) {
 		return (new File(directory, name)).getPath();
+	}
+
+
+	public static boolean isPossibleDirectory(String dir) {
+		var path = Paths.get(dir);
+		if (Files.isDirectory(path) && Files.isWritable(path))
+			return true;
+		var parent = path.getParent();
+		return parent != null && Files.exists(parent) && Files.isDirectory(parent) && Files.isWritable(parent);
 	}
 }
