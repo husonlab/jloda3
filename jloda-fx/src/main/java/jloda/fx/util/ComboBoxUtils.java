@@ -108,7 +108,5 @@ public class ComboBoxUtils {
 			} catch (NumberFormatException ignored) {
 			}
 		});
-
 	}
-
 }

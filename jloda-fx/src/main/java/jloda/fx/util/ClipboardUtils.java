@@ -37,7 +37,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.util.List;
 
@@ -232,13 +231,37 @@ public class ClipboardUtils {
 			return null;
 	}
 
+	public static Image getImageFileContentOrImage() {
+		if (hasFiles()) {
+			var file = ClipboardUtils.getFiles().get(0);
+			if (FileUtils.fileExistsAndIsNonEmpty(file) && isImageFile(file)) {
+				return new Image(file.toURI().toString());
+			}
+		}
+		if (hasImage())
+			return getImage();
+		else return null;
+	}
+
 	public static boolean isTextFile(File file) {
-		var path = FileSystems.getDefault().getPath(file.getParent(), file.getName());
 		try {
-			var mimeType = Files.probeContentType(path);
+			var mimeType = Files.probeContentType(file.toPath());
 			return mimeType == null || mimeType.startsWith("text/");
 		} catch (IOException e) {
 			return false;
 		}
 	}
+
+	public static boolean isImageFile(File file) {
+		if (file == null || !file.exists()) {
+			return false;
+		}
+		try {
+			var mimeType = Files.probeContentType(file.toPath());
+			return mimeType != null && mimeType.startsWith("image/");
+		} catch (IOException e) {
+			return false;
+		}
+	}
+
 }
