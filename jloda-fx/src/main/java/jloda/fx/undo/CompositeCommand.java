@@ -69,4 +69,8 @@ public class CompositeCommand extends UndoableRedoableCommand {
         else
             return !commands.isEmpty();
     }
+
+    public void clear() {
+        commands.clear();
+    }
 }
