@@ -74,7 +74,7 @@ public class AutoCompleteComboBox {
 
 				ObservableList<T> list = FXCollections.observableArrayList();
 				for (var item : items) {
-					if (item.toString().toLowerCase().startsWith(comboBox.getEditor().getText().toLowerCase())) {
+					if (item.toString().toLowerCase().contains(comboBox.getEditor().getText().toLowerCase())) {
 						list.add(item);
 					}
 				}
