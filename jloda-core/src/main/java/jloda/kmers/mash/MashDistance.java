@@ -77,8 +77,12 @@ public class MashDistance {
 		int i = 0;
 		int j = 0;
 		while (true) {
-			final long value1 = sketch1.getValue(i);
-			final long value2 = sketch2.getValue(j);
+			var value1 = sketch1.getValue(i);
+			if (value1 == null)
+				break; // too few values
+			var value2 = sketch2.getValue(j);
+			if (value2 == null)
+				break; // too few values
 
 			if (value1 < value2) {
 				if (++i == sketchSize1)

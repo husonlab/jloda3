@@ -37,222 +37,222 @@ import java.util.TreeSet;
  * Daniel Huson, 1.2019
  */
 public class MashSketch {
-    public static final int MAGIC_INT = 1213415757; // 1213415757
+	public static final int MAGIC_INT = 1213415757; // 1213415757
 
-    private final int sketchSize;
-    private final int kSize;
-    private final String name;
-    private final boolean isNucleotides;
+	private final int sketchSize;
+	private final int kSize;
+	private final String name;
+	private final boolean isNucleotides;
 
-    private long[] hashValues;
-    private byte[][] kmers;
+	private long[] hashValues;
+	private byte[][] kmers;
 
-    /**
-     * construct a new sketch
-     */
-    public MashSketch(int sketchSize, int kMerSize, String name, boolean isNucleotides) {
-        this.sketchSize = sketchSize;
-        this.kSize = kMerSize;
-        this.name = name;
-        this.isNucleotides = isNucleotides;
-    }
+	/**
+	 * construct a new sketch
+	 */
+	public MashSketch(int sketchSize, int kMerSize, String name, boolean isNucleotides) {
+		this.sketchSize = sketchSize;
+		this.kSize = kMerSize;
+		this.name = name;
+		this.isNucleotides = isNucleotides;
+	}
 
-    /**
-     * compute a mash sketch
-     */
-    public static MashSketch compute(String name, Collection<byte[]> sequences, boolean isNucleotides, int sketchSize, int kMerSize, int seed, boolean filterUniqueKMers, ProgressListener progress) {
-        return compute(name, sequences, isNucleotides, sketchSize, kMerSize, seed, filterUniqueKMers, false, progress);
-    }
+	/**
+	 * compute a mash sketch
+	 */
+	public static MashSketch compute(String name, Collection<byte[]> sequences, boolean isNucleotides, int sketchSize, int kMerSize, int seed, boolean filterUniqueKMers, ProgressListener progress) {
+		return compute(name, sequences, isNucleotides, sketchSize, kMerSize, seed, filterUniqueKMers, false, progress);
+	}
 
-    /**
-     * compute a mash sketch
-     */
-    public static MashSketch compute(String name, Collection<byte[]> sequences, boolean isNucleotides, int sketchSize, int kMerSize, int seed, boolean filterUniqueKMers, boolean saveKMers, ProgressListener progress) {
-        final MashSketch sketch = new MashSketch(sketchSize, kMerSize, name, isNucleotides);
+	/**
+	 * compute a mash sketch
+	 */
+	public static MashSketch compute(String name, Collection<byte[]> sequences, boolean isNucleotides, int sketchSize, int kMerSize, int seed, boolean filterUniqueKMers, boolean saveKMers, ProgressListener progress) {
+		final MashSketch sketch = new MashSketch(sketchSize, kMerSize, name, isNucleotides);
 
-        final TreeSet<Long> sortedSet = new TreeSet<>();
-        sortedSet.add(Long.MAX_VALUE);
+		final TreeSet<Long> sortedSet = new TreeSet<>();
+		sortedSet.add(Long.MAX_VALUE);
 
-        final Map<Long, byte[]> hash2kmer = saveKMers ? new HashMap<>() : null;
+		final Map<Long, byte[]> hash2kmer = saveKMers ? new HashMap<>() : null;
 
-        final BloomFilter bloomFilter;
-        if (filterUniqueKMers)
-            bloomFilter = new BloomFilter(sequences.stream().mapToInt(s -> s.length).sum(), 500000000);
-        else
-            bloomFilter = null;
+		final BloomFilter bloomFilter;
+		if (filterUniqueKMers)
+			bloomFilter = new BloomFilter(sequences.stream().mapToInt(s -> s.length).sum(), 500000000);
+		else
+			bloomFilter = null;
 
-        try {
-            final byte[] kMer = new byte[kMerSize]; // will reuse
-            final byte[] kMerReverseComplement = new byte[kMerSize]; // will reuse
+		try {
+			final byte[] kMer = new byte[kMerSize]; // will reuse
+			final byte[] kMerReverseComplement = new byte[kMerSize]; // will reuse
 
-            for (byte[] sequence : sequences) {
-                final int top = sequence.length - kMerSize + 1;
-                for (int offset = 0; offset < top; offset++) {
-                    if (isNucleotides) {
-                        final int ambiguousPos = StringUtils.lastIndexOf(sequence, offset, kMerSize, 'N'); // don't use k-mers with ambiguity letters
-                        if (ambiguousPos != -1) {
-                            offset = ambiguousPos; // skip to last ambiguous so that increment will move past
-                            continue;
-                        }
-                    }
+			for (byte[] sequence : sequences) {
+				final int top = sequence.length - kMerSize + 1;
+				for (int offset = 0; offset < top; offset++) {
+					if (isNucleotides) {
+						final int ambiguousPos = StringUtils.lastIndexOf(sequence, offset, kMerSize, 'N'); // don't use k-mers with ambiguity letters
+						if (ambiguousPos != -1) {
+							offset = ambiguousPos; // skip to last ambiguous so that increment will move past
+							continue;
+						}
+					}
 
-                    SequenceUtils.getSegment(sequence, offset, kMerSize, kMer);
+					SequenceUtils.getSegment(sequence, offset, kMerSize, kMer);
 
-                    final byte[] kMerUse;
-                    if (isNucleotides) {
-                        SequenceUtils.getReverseComplement(sequence, offset, kMerSize, kMerReverseComplement);
+					final byte[] kMerUse;
+					if (isNucleotides) {
+						SequenceUtils.getReverseComplement(sequence, offset, kMerSize, kMerReverseComplement);
 
-                        if (SequenceUtils.compare(kMer, kMerReverseComplement) <= 0) {
-                            kMerUse = kMer;
-                        } else {
-                            kMerUse = kMerReverseComplement;
-                        }
-                    } else
-                        kMerUse = kMer;
+						if (SequenceUtils.compare(kMer, kMerReverseComplement) <= 0) {
+							kMerUse = kMer;
+						} else {
+							kMerUse = kMerReverseComplement;
+						}
+					} else
+						kMerUse = kMer;
 
-                    if (bloomFilter != null && bloomFilter.add(kMerUse)) {
-                        continue; // first time we have seen this k-mer
-                    }
+					if (bloomFilter != null && bloomFilter.add(kMerUse)) {
+						continue; // first time we have seen this k-mer
+					}
 
-                    final long hash = MurmurHash.hash64(kMerUse, 0, kMerSize, seed);
+					final long hash = MurmurHash.hash64(kMerUse, 0, kMerSize, seed);
 
-                    if (hash < sortedSet.last()) {
-                        if (hash2kmer == null) {
-                            if (sortedSet.add(hash) && sortedSet.size() > sketchSize)
-                                sortedSet.pollLast();
-                        } else {
-                            if (sortedSet.add(hash)) {
-                                hash2kmer.put(hash, kMerUse.clone());
-                                if (sortedSet.size() > sketchSize) {
-                                    Long removedHash = sortedSet.pollLast();
-                                    if (removedHash != null)
-                                        hash2kmer.remove(removedHash);
-                                }
-                            }
-                        }
-                    }
-                    progress.checkForCancel();
-                }
-            }
-            {
-                if (sortedSet.contains(Long.MAX_VALUE)) {
-                    sortedSet.remove(Long.MAX_VALUE);
-                    System.err.printf("Warning: Computing sketch %s: Too few k-mers: %,d of %,d%n", sketch.getName(), sortedSet.size(), sketchSize);
-                }
-                sketch.hashValues = new long[sortedSet.size()];
-                int pos = 0;
-                for (Long value : sortedSet)
-                    sketch.hashValues[pos++] = value;
-            }
-            progress.incrementProgress();
-        } catch (CanceledException ignored) {
-        }
+					if (hash < sortedSet.last()) {
+						if (hash2kmer == null) {
+							if (sortedSet.add(hash) && sortedSet.size() > sketchSize)
+								sortedSet.pollLast();
+						} else {
+							if (sortedSet.add(hash)) {
+								hash2kmer.put(hash, kMerUse.clone());
+								if (sortedSet.size() > sketchSize) {
+									Long removedHash = sortedSet.pollLast();
+									if (removedHash != null)
+										hash2kmer.remove(removedHash);
+								}
+							}
+						}
+					}
+					progress.checkForCancel();
+				}
+			}
+			{
+				if (sortedSet.contains(Long.MAX_VALUE)) {
+					sortedSet.remove(Long.MAX_VALUE);
+					System.err.printf("Warning: Computing sketch %s: Too few k-mers: %,d of %,d%n", sketch.getName(), sortedSet.size(), sketchSize);
+				}
+				sketch.hashValues = new long[sortedSet.size()];
+				var pos = 0;
+				for (var value : sortedSet)
+					sketch.hashValues[pos++] = value;
+			}
+			progress.incrementProgress();
+		} catch (CanceledException ignored) {
+		}
 
-        if (saveKMers && hash2kmer != null) {
-            sketch.kmers = new byte[hash2kmer.size()][];
-            int i = 0;
-            for (byte[] kmer : hash2kmer.values()) {
-                sketch.kmers[i++] = kmer;
-            }
-        }
-        progress.reportTaskCompleted();
-        return sketch;
-    }
+		if (saveKMers && hash2kmer != null) {
+			sketch.kmers = new byte[hash2kmer.size()][];
+			int i = 0;
+			for (byte[] kmer : hash2kmer.values()) {
+				sketch.kmers[i++] = kmer;
+			}
+		}
+		progress.reportTaskCompleted();
+		return sketch;
+	}
 
-    public String getHeader() {
-        return String.format("##ComputeMashSketch name='%s' sketchSize=%d kSize=%d type=%s\n", name, sketchSize, kSize, isNucleotides ? "nucl" : "aa");
-    }
+	public String getHeader() {
+		return String.format("##ComputeMashSketch name='%s' sketchSize=%d kSize=%d type=%s\n", name, sketchSize, kSize, isNucleotides ? "nucl" : "aa");
+	}
 
-    public String toString() {
-        return String.format("name='%s' sketchSize=%d kSize=%d type=%s", name, sketchSize, kSize, isNucleotides ? "nucl" : "aa");
-    }
+	public String toString() {
+		return String.format("name='%s' sketchSize=%d kSize=%d type=%s", name, sketchSize, kSize, isNucleotides ? "nucl" : "aa");
+	}
 
-    public int getSketchSize() {
-        return sketchSize;
-    }
+	public int getSketchSize() {
+		return sketchSize;
+	}
 
-    public int getkSize() {
-        return kSize;
-    }
+	public int getkSize() {
+		return kSize;
+	}
 
-    public String getName() {
-        return name;
-    }
+	public String getName() {
+		return name;
+	}
 
-    public boolean isNucleotides() {
-        return isNucleotides;
-    }
+	public boolean isNucleotides() {
+		return isNucleotides;
+	}
 
-    public static boolean canCompare(MashSketch a, MashSketch b) {
-        return a.getSketchSize() == b.getSketchSize() && a.getkSize() == b.getkSize() && a.isNucleotides() == b.isNucleotides();
-    }
+	public static boolean canCompare(MashSketch a, MashSketch b) {
+		return a.getSketchSize() == b.getSketchSize() && a.getkSize() == b.getkSize() && a.isNucleotides() == b.isNucleotides();
+	}
 
-    public String getString() {
-        return String.format("s=%d k=%d:%s", sketchSize, kSize, StringUtils.toString(getValues(), ","));
-    }
+	public String getString() {
+		return String.format("s=%d k=%d:%s", sketchSize, kSize, StringUtils.toString(getValues(), ","));
+	}
 
-    public static MashSketch parse(String string) throws IOException {
-        int sketchSize = NumberUtils.parseInt(StringUtils.getWordAfter("s=", string));
-        int kMerSize = NumberUtils.parseInt(StringUtils.getWordAfter("k=", string));
-        final String[] numbers = StringUtils.split(StringUtils.getWordAfter(":", string), ',');
+	public static MashSketch parse(String string) throws IOException {
+		int sketchSize = NumberUtils.parseInt(StringUtils.getWordAfter("s=", string));
+		int kMerSize = NumberUtils.parseInt(StringUtils.getWordAfter("k=", string));
+		final String[] numbers = StringUtils.split(StringUtils.getWordAfter(":", string), ',');
 
-        if (numbers.length != sketchSize)
-            throw new IOException("Expected sketch size " + sketchSize + ", found: " + numbers.length);
+		if (numbers.length != sketchSize)
+			throw new IOException("Expected sketch size " + sketchSize + ", found: " + numbers.length);
 
-        final MashSketch sketch = new MashSketch(sketchSize, kMerSize, "", true);
-        sketch.hashValues = new long[numbers.length];
-        for (int i = 0; i < numbers.length; i++) {
-            sketch.hashValues[i] = NumberUtils.parseLong(numbers[i]);
-        }
-        return sketch;
-    }
+		final MashSketch sketch = new MashSketch(sketchSize, kMerSize, "", true);
+		sketch.hashValues = new long[numbers.length];
+		for (int i = 0; i < numbers.length; i++) {
+			sketch.hashValues[i] = NumberUtils.parseLong(numbers[i]);
+		}
+		return sketch;
+	}
 
-    public byte[] getBytes() {
-        ByteOutputBuffer bytes = new ByteOutputBuffer();
-        bytes.writeIntLittleEndian(MAGIC_INT);
-        bytes.writeIntLittleEndian(sketchSize);
-        bytes.writeIntLittleEndian(kSize);
-        for (int i = 0; i < sketchSize; i++) {
-            bytes.writeLongLittleEndian(hashValues[i]);
-        }
-        return bytes.copyBytes();
-    }
+	public byte[] getBytes() {
+		ByteOutputBuffer bytes = new ByteOutputBuffer();
+		bytes.writeIntLittleEndian(MAGIC_INT);
+		bytes.writeIntLittleEndian(sketchSize);
+		bytes.writeIntLittleEndian(kSize);
+		for (int i = 0; i < sketchSize; i++) {
+			bytes.writeLongLittleEndian(hashValues[i]);
+		}
+		return bytes.copyBytes();
+	}
 
-    public static MashSketch parse(byte[] bytes) throws IOException {
-        final ByteInputBuffer buffer = new ByteInputBuffer(bytes);
+	public static MashSketch parse(byte[] bytes) throws IOException {
+		final ByteInputBuffer buffer = new ByteInputBuffer(bytes);
 
-        if (buffer.readIntLittleEndian() != MAGIC_INT)
-            throw new IOException("Incorrect magic number");
-        int sketchSize = buffer.readIntLittleEndian();
-        int kMerSize = buffer.readIntLittleEndian();
+		if (buffer.readIntLittleEndian() != MAGIC_INT)
+			throw new IOException("Incorrect magic number");
+		int sketchSize = buffer.readIntLittleEndian();
+		int kMerSize = buffer.readIntLittleEndian();
 
-        final MashSketch sketch = new MashSketch(sketchSize, kMerSize, "", true);
-        sketch.hashValues = new long[sketchSize];
-        for (int i = 0; i < sketchSize; i++) {
-            sketch.hashValues[i] = buffer.readLongLittleEndian();
-        }
-        return sketch;
-    }
+		final MashSketch sketch = new MashSketch(sketchSize, kMerSize, "", true);
+		sketch.hashValues = new long[sketchSize];
+		for (int i = 0; i < sketchSize; i++) {
+			sketch.hashValues[i] = buffer.readLongLittleEndian();
+		}
+		return sketch;
+	}
 
-    public String getKMersString() {
-        final StringBuilder buf = new StringBuilder();
-        if (kmers != null) {
-            for (byte[] kmer : kmers) {
-                buf.append(StringUtils.toString(kmer)).append("\n");
-            }
-        }
-        return buf.toString();
-    }
+	public String getKMersString() {
+		final StringBuilder buf = new StringBuilder();
+		if (kmers != null) {
+			for (byte[] kmer : kmers) {
+				buf.append(StringUtils.toString(kmer)).append("\n");
+			}
+		}
+		return buf.toString();
+	}
 
-    public byte[][] getKmers() {
-        return kmers;
-    }
+	public byte[][] getKmers() {
+		return kmers;
+	}
 
-    public long[] getValues() {
-        return hashValues;
-    }
+	public long[] getValues() {
+		return hashValues;
+	}
 
-    public long getValue(int i) {
-        return hashValues[i];
-    }
+	public Long getValue(int i) {
+		return i < hashValues.length ? hashValues[i] : null;
+	}
 }
