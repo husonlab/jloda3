@@ -69,7 +69,8 @@ public class MashDistance {
 	}
 
 	public static int computeIntersection(MashSketch sketch1, MashSketch sketch2) {
-		final int sketchSize = sketch1.getSketchSize();
+		final int sketchSize1 = sketch1.getSketchSize();
+		final int sketchSize2 = sketch2.getSketchSize();
 
 		int intersectionSize = 0;
 		int mergeSize = 0;
@@ -80,19 +81,19 @@ public class MashDistance {
 			final long value2 = sketch2.getValue(j);
 
 			if (value1 < value2) {
-				if (++i == sketchSize)
+				if (++i == sketchSize1)
 					break;
 			} else if (value1 > value2) {
-				if (++j == sketchSize)
+				if (++j == sketchSize2)
 					break;
 			} else {
 				intersectionSize++;
-				if (++i == sketchSize)
+				if (++i == sketchSize1)
 					break;
-				if (++j == sketchSize)
+				if (++j == sketchSize2)
 					break;
 			}
-			if (++mergeSize == sketchSize) {
+			if (++mergeSize == Math.min(sketchSize1, sketchSize2)) {
 				break;
 			}
 		}

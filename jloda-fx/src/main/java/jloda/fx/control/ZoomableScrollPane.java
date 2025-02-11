@@ -20,10 +20,7 @@
 
 package jloda.fx.control;
 
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleBooleanProperty;
-import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.*;
 import javafx.geometry.BoundingBox;
 import javafx.geometry.Bounds;
 import javafx.geometry.Orientation;
@@ -51,8 +48,9 @@ public class ZoomableScrollPane extends ScrollPane {
 	private final Group zoomNode;
 	private final StackPane outerNode;
 
-	private double zoomX = 1;
-	private double zoomY = 1;
+	private final DoubleProperty zoomX = new SimpleDoubleProperty(this, "zoomX", 1.0);
+	private final DoubleProperty zoomY = new SimpleDoubleProperty(this, "zoomY", 1.0);
+
 	private double zoomFactorX = 1;
 	private double zoomFactorY = 1;
 
@@ -74,8 +72,8 @@ public class ZoomableScrollPane extends ScrollPane {
 		setContent(outerNode);
 
 		updateScaleMethod = new SimpleObjectProperty<>(() -> {
-			ZoomableScrollPane.this.content.setScaleX(zoomX);
-			ZoomableScrollPane.this.content.setScaleY(zoomY);
+			ZoomableScrollPane.this.content.setScaleX(getZoomX());
+			ZoomableScrollPane.this.content.setScaleY(getZoomY());
 		});
 
 		// if setContent() is used to update content, then adjust accordingly:
@@ -112,10 +110,18 @@ public class ZoomableScrollPane extends ScrollPane {
 	}
 
 	public double getZoomX() {
-		return zoomX;
+		return zoomX.get();
 	}
 
 	public double getZoomY() {
+		return zoomY.get();
+	}
+
+	public ReadOnlyDoubleProperty zoomXProperty() {
+		return zoomX;
+	}
+
+	public ReadOnlyDoubleProperty zoomYProperty() {
 		return zoomY;
 	}
 
@@ -178,8 +184,9 @@ public class ZoomableScrollPane extends ScrollPane {
 		zoomFactorX = factorX;
 		zoomFactorY = factorY;
 
-		zoomX *= zoomFactorX;
-		zoomY *= zoomFactorY;
+		zoomX.set(zoomX.get() * zoomFactorX);
+		zoomY.set(zoomY.get() * zoomFactorY);
+
 
 		final Bounds innerBounds = zoomNode.getLayoutBounds();
 		final Bounds viewportBounds = getViewportBounds();
@@ -240,10 +247,10 @@ public class ZoomableScrollPane extends ScrollPane {
 	}
 
 	public void resetZoom() {
-		zoomFactorX = 1 / zoomX;
-		zoomFactorY = 1 / zoomY;
-		zoomX = 1;
-		zoomY = 1;
+		zoomFactorX = 1.0 / getZoomX();
+		zoomFactorY = 1.0 / getZoomY();
+		zoomX.set(1.0);
+		zoomY.set(1.0);
 		updateScale();
 	}
 
