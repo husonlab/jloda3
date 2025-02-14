@@ -21,9 +21,11 @@
 package jloda.phylo;
 
 import jloda.graph.Edge;
-import jloda.graph.EdgeArray;
 import jloda.graph.Node;
 import jloda.graph.NodeArray;
+import jloda.graph.NodeSet;
+import jloda.graph.algorithms.BiconnectedComponents;
+import jloda.util.CollectionUtils;
 import jloda.util.IteratorUtils;
 
 import java.util.*;
@@ -67,7 +69,8 @@ public class LSAUtils {
 
 	/**
 	 * performs a pre-order traversal at node v using the LSA tree, if defined. Makes sure that a node is visited only once
-	 * its parents both in the LSA and in the network have been visited
+	 * its parents both in the LSA and in the network have been visited.
+	 * Assumes the lsa children mapping has been set inside tree
 	 *
 	 * @param tree   the tree or network (with embedded LSA tree)
 	 * @param v      the root node
@@ -77,18 +80,30 @@ public class LSAUtils {
 		if (!tree.isReticulated())
 			tree.preorderTraversal(v, method);
 		else {
-			try (var visited = tree.newNodeSet()) {
-				var queue = new LinkedList<Node>();
-				queue.add(v);
-				while (!queue.isEmpty()) {
-					v = queue.pop();
-					if (visited.containsAll(IteratorUtils.asList(v.parents()))) {
-						method.accept(v);
-						visited.add(v);
-						tree.lsaChildren(v).forEach(queue::add);
-					} else
-						queue.add(v);
-				}
+			preorderTraversalLSA(v, tree.getLSAChildrenMap(), method);
+		}
+	}
+
+	/**
+	 * performs a pre-order traversal at node v using the LSA children map. Makes sure that a node is visited only once
+	 * its parents both in the LSA and in the network have been visited
+	 *
+	 * @param v           the root node
+	 * @param lsaChildren the node to list of children in the LSA tree
+	 * @param method      method to apply
+	 */
+	public static void preorderTraversalLSA(Node v, Map<Node, List<Node>> lsaChildren, Consumer<Node> method) {
+		try (var visited = v.getOwner().newNodeSet()) {
+			var queue = new LinkedList<Node>();
+			queue.add(v);
+			while (!queue.isEmpty()) {
+				v = queue.pop();
+				if (visited.containsAll(IteratorUtils.asList(v.parents()))) {
+					method.accept(v);
+					visited.add(v);
+					queue.addAll(lsaChildren.get(v));
+				} else
+					queue.add(v);
 			}
 		}
 	}
@@ -104,12 +119,24 @@ public class LSAUtils {
 		if (!tree.isReticulated())
 			tree.postorderTraversal(v, method);
 		else {
-			for (var w : tree.lsaChildren(v)) {
-				postorderTraversalLSA(tree, w, method);
-			}
-			method.accept(v);
+			postorderTraversalLSA(v,tree.getLSAChildrenMap(), method);
 		}
 	}
+
+	/**
+	 * performs a post-order traversal at node v, using the LSA tree, if defined
+	 *
+	 * @param v           the root node
+	 * @param lsaChildren the node to list of children in the LSA tree
+	 * @param method      method to apply
+	 */
+	public static void postorderTraversalLSA(Node v, Map<Node, List<Node>> lsaChildren, Consumer<Node> method) {
+		for (var w : lsaChildren.get(v)) {
+			postorderTraversalLSA(w, lsaChildren, method);
+		}
+		method.accept(v);
+	}
+
 
 	public static void breathFirstTraversalLSA(PhyloTree tree, Node v, int level, BiConsumer<Integer, Node> method) {
 		method.accept(level, v);
@@ -122,8 +149,29 @@ public class LSAUtils {
 	 * given a reticulate network, returns a mapping of each LSA node to its children in the LSA tree
 	 *
 	 * @param tree             the tree
-	 * @param reticulation2LSA is returned here
 	 */
+	public static NodeArray<List<Node>> computeLSAChildrenMap(PhyloTree tree) {
+		try (NodeArray<Node> reticulation2LSA = tree.newNodeArray()) {
+			return computeLSAChildrenMap(tree, reticulation2LSA);
+		}
+	}
+
+	public static void setLSAChildrenMap(PhyloTree tree) {
+		try (NodeArray<Node> reticulation2LSA = tree.newNodeArray();
+			 var lsaChildrenMap = computeLSAChildrenMap(tree, reticulation2LSA)) {
+			for (var v : tree.nodes()) {
+				tree.getLSAChildrenMap().put(v, lsaChildrenMap.get(v));
+			}
+		}
+	}
+
+	/**
+	 * given a reticulate network, returns a mapping of each LSA node to its children in the LSA tree
+	 *
+	 * @param tree             the tree
+	 * @param reticulation2LSA is returned here
+		 * @return node to childen map
+		 */
 	public static NodeArray<List<Node>> computeLSAChildrenMap(PhyloTree tree, NodeArray<Node> reticulation2LSA) {
 		final NodeArray<List<Node>> lsaChildrenMap = tree.newNodeArray();
 		tree.getLSAChildrenMap().clear();
@@ -133,14 +181,15 @@ public class LSAUtils {
 			computeReticulation2LSA(tree, reticulation2LSA);
 
 			for (var v : tree.nodes()) {
-				var children = v.outEdgesStream(false).filter(e -> !tree.isReticulateEdge(e))
-						.map(Edge::getTarget).collect(Collectors.toList());
+				var children = v.outEdgesStream(false).map(Edge::getTarget)
+						.filter(target -> target.getInDegree() == 1).collect(Collectors.toList());
 				tree.getLSAChildrenMap().put(v, children);
+				lsaChildrenMap.put(v,children);
 			}
 			for (var v : tree.nodes()) {
 				var lsa = reticulation2LSA.get(v);
 				if (lsa != null)
-					tree.getLSAChildrenMap().get(lsa).add(v);
+					lsaChildrenMap.get(lsa).add(v);
 			}
 		}
 		return lsaChildrenMap;
@@ -152,110 +201,44 @@ public class LSAUtils {
 	 * @param tree             the rooted network
 	 * @param reticulation2LSA the reticulation to LSA mapping
 	 */
-	private static void computeReticulation2LSA(PhyloTree tree, NodeArray<Node> reticulation2LSA) {
+	public static void computeReticulation2LSA(PhyloTree tree, NodeArray<Node> reticulation2LSA) {
 		reticulation2LSA.clear();
 
-		try (NodeArray<BitSet> ret2PathSet = tree.newNodeArray(); NodeArray<EdgeArray<BitSet>> ret2Edge2PathSet = tree.newNodeArray();
-			 NodeArray<Set<Node>> node2below = tree.newNodeArray()) {
-			computeReticulation2LSARec(tree, tree.getRoot(), ret2PathSet, ret2Edge2PathSet, node2below, reticulation2LSA);
-		}
-	}
-
-	/**
-	 * recursively compute the mapping of reticulate nodes to their lsa nodes
-	 */
-	private static void computeReticulation2LSARec(PhyloTree tree, Node v, NodeArray<BitSet> ret2PathSet, NodeArray<EdgeArray<BitSet>> ret2Edge2PathSet,
-												   NodeArray<Set<Node>> node2below, NodeArray<Node> reticulation2LSA) {
-		if (v.getInDegree() > 1) // this is a reticulate node, add paths to node and incoming edges
-		{
-			// setup new paths for this node:
-			try (EdgeArray<BitSet> edge2PathSet = tree.newEdgeArray()) {
-				ret2Edge2PathSet.put(v, edge2PathSet);
-				var pathsForR = new BitSet();
-				ret2PathSet.put(v, pathsForR);
-				//  assign a different path number to each in-edge:
-				var pathNum = 0;
+		var reticulateNodes = tree.nodeStream().filter(v -> v.getInDegree() >= 2).toList();
+		try (var lsaNodes = computeAllLowestStableAncestors(tree, reticulateNodes)) {
+			for (var v : reticulateNodes) {
+				var stack = new Stack<Node>();
 				for (var e : v.inEdges()) {
-					pathNum++;
-					pathsForR.set(pathNum);
-					var pathsForEdge = new BitSet();
-					pathsForEdge.set(pathNum);
-					edge2PathSet.put(e, pathsForEdge);
+					stack.push(e.getSource());
 				}
-			}
-		}
-
-		var reticulationsBelow = new HashSet<Node>(); // set of all reticulate nodes below v
-		node2below.put(v, reticulationsBelow);
-
-		// visit all children and determine all reticulations below this node
-		for (var w : v.children()) {
-			if (node2below.get(w) == null) // if we haven't processed child yet, do it:
-				computeReticulation2LSARec(tree, w, ret2PathSet, ret2Edge2PathSet, node2below, reticulation2LSA);
-			reticulationsBelow.addAll(node2below.get(w));
-			if (w.getInDegree() > 1)
-				reticulationsBelow.add(w);
-		}
-
-		// check whether this is the lsa for any of the reticulations below v
-		// look at all reticulations below v:
-		var toDelete = new ArrayList<Node>();
-		for (var r : reticulationsBelow) {
-			// determine which paths from the reticulation lead to this node
-			var edge2PathSet = ret2Edge2PathSet.get(r);
-			var paths = new BitSet();
-			for (var f : v.outEdges()) {
-				var eSet = edge2PathSet.get(f);
-				if (eSet != null)
-					paths.or(eSet);
-
-			}
-			var alive = ret2PathSet.get(r);
-			if (paths.equals(alive)) // if the set of paths equals all alive paths, v is lsa of r
-			{
-				reticulation2LSA.put(r, v);
-				toDelete.add(r); // we don't need to consider this reticulation any more
-			}
-		}
-		// don't need to consider reticulations for which lsa has been found:
-		for (var u : toDelete)
-			reticulationsBelow.remove(u);
-
-		// all paths are pulled up the first in-edge
-		if (v.getInDegree() >= 1) {
-			for (var r : reticulationsBelow) {
-				// determine which paths from the reticulation lead to this node
-				var edge2PathSet = ret2Edge2PathSet.get(r);
-
-				var newSet = new BitSet();
-				for (Edge e : v.outEdges()) {
-					var pathSet = edge2PathSet.get(e);
-					if (pathSet != null)
-						newSet.or(pathSet);
-				}
-				edge2PathSet.put(v.getFirstInEdge(), newSet);
-			}
-		}
-		// open new paths on all additional in-edges:
-		if (v.getInDegree() >= 2) {
-			for (var r : reticulationsBelow) {
-				var existingPathsForR = ret2PathSet.get(r);
-
-				var edge2PathSet = ret2Edge2PathSet.get(r);
-				// start with the second in edge:
-				var first = true;
-				for (var e : v.inEdges()) {
-					if (first)
-						first = false;
-					else {
-						var pathsForEdge = new BitSet();
-						var pathNum = existingPathsForR.nextClearBit(1);
-						existingPathsForR.set(pathNum);
-						pathsForEdge.set(pathNum);
-						edge2PathSet.put(e, pathsForEdge);
+				while (!stack.isEmpty()) {
+					var w = stack.pop();
+					if (lsaNodes.contains(w)) {
+						reticulation2LSA.put(v, w);
+						break;
+					} else {
+						for (var e : w.inEdges()) {
+							stack.push(e.getSource());
+						}
 					}
 				}
 			}
 		}
+	}
+
+	public static NodeSet computeAllLowestStableAncestors(PhyloTree graph, Collection<Node> query) {
+		if (query == null)
+			query = graph.nodeStream().filter(v -> v.getInDegree() >= 2).toList();
+		var nodes = graph.newNodeSet();
+
+		nodes.addAll(query.stream().filter(v -> v.getInDegree() == 1).map(Node::getParent).toList());
+		var reticulateNodes = query.stream().filter(v -> v.getInDegree() > 1).toList();
+
+		for (var component : BiconnectedComponents.apply(graph)) {
+			if (CollectionUtils.intersects(component, reticulateNodes)) {
+				component.stream().filter(v -> v.getInDegree() == 0 || !component.containsAll(IteratorUtils.asSet(v.parents()))).forEach(nodes::add);
+			}
+		}
+		return nodes;
 	}
 }

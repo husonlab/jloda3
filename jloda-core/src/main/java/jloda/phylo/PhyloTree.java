@@ -41,6 +41,7 @@ public class PhyloTree extends PhyloSplitsGraph {
 	private Node root = null;
 
 	private volatile EdgeSet reticulateEdges;
+	// todo: remove lsaChildrenMap
 	private volatile NodeArray<List<Node>> lsaChildrenMap; // keep track of children in LSA tree in network
 	private volatile EdgeSet transferAcceptorEdges;
 
