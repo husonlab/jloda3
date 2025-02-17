@@ -166,12 +166,45 @@ public class LSAUtils {
 	}
 
 	/**
+	 * computes the  reticulate node to LSA mapping
+	 *
+	 * @param lsaChildren
+	 * @return mapping
+	 */
+	public static Map<Node, Node> computeReticulation2LSA(NodeArray<List<Node>> lsaChildren) {
+		var tree = (PhyloTree) lsaChildren.getOwner();
+		var lsaNodes = new HashSet<Node>();
+		for (var v : lsaChildren.keySet()) {
+			for (var w : tree.lsaChildren(v)) {
+				if (!v.isChild(w))
+					lsaNodes.add(v);
+			}
+		}
+		var reticulation2LSA = new HashMap<Node, Node>();
+		for (var r : tree.nodeStream().filter(v -> v.getInDegree() >= 2).toList()) {
+			var p = r.getParent();
+			while (p != null) {
+				if (lsaNodes.contains(p)) {
+					reticulation2LSA.put(r, p);
+					break;
+				} else p = p.getParent();
+			}
+		}
+		if (false) {
+			for (var r : tree.nodeStream().filter(v -> v.getInDegree() == 1).toList()) {
+				reticulation2LSA.put(r, r.getParent());
+			}
+		}
+		return reticulation2LSA;
+	}
+
+	/**
 	 * given a reticulate network, returns a mapping of each LSA node to its children in the LSA tree
 	 *
 	 * @param tree             the tree
 	 * @param reticulation2LSA is returned here
-		 * @return node to childen map
-		 */
+	 * @return node to children map
+	 */
 	public static NodeArray<List<Node>> computeLSAChildrenMap(PhyloTree tree, NodeArray<Node> reticulation2LSA) {
 		final NodeArray<List<Node>> lsaChildrenMap = tree.newNodeArray();
 		tree.getLSAChildrenMap().clear();
@@ -236,7 +269,27 @@ public class LSAUtils {
 
 		for (var component : BiconnectedComponents.apply(graph)) {
 			if (CollectionUtils.intersects(component, reticulateNodes)) {
-				component.stream().filter(v -> v.getInDegree() == 0 || !component.containsAll(IteratorUtils.asSet(v.parents()))).forEach(nodes::add);
+				var top = component.stream().filter(v -> v.getInDegree() == 0 || !component.containsAll(IteratorUtils.asSet(v.parents()))).findFirst().orElse(graph.getRoot());
+				for (var v : reticulateNodes) {
+					var above = new HashSet<Node>();
+					var stack = new Stack<Node>();
+					stack.push(v);
+					while (!stack.isEmpty()) {
+						var w = stack.pop();
+						above.add(w);
+						if (w != top) {
+							stack.addAll(IteratorUtils.asList(w.parents()));
+						}
+					}
+					var w = top;
+					while (w != v && CollectionUtils.intersection(above, IteratorUtils.asSet(w.children())).size() == 1) {
+						w = CollectionUtils.intersection(above, IteratorUtils.asSet(w.children())).iterator().next();
+					}
+					nodes.add(w);
+				}
+
+				if (false)
+					component.stream().filter(v -> v.getInDegree() == 0 || !component.containsAll(IteratorUtils.asSet(v.parents()))).forEach(nodes::add);
 			}
 		}
 		return nodes;
