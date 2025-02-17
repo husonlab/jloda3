@@ -25,7 +25,6 @@ import jloda.util.progress.ProgressSilent;
 
 import java.io.*;
 import java.net.URL;
-import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -34,6 +33,7 @@ import java.util.stream.Collectors;
 import java.util.zip.*;
 
 public class FileUtils {
+	public static final String PREFIX_TO_INDICATE_TO_PARSE_FILENAME_STRING = "!!!";
 	private static final Set<File> usedFiles = new HashSet<>();
 
 	/**
@@ -308,7 +308,9 @@ public class FileUtils {
 	 * append a file
 	 */
 	public static void appendFile(File source, File dest) throws IOException {
-		try (FileChannel sourceChannel = new FileInputStream(source).getChannel(); RandomAccessFile raf = new RandomAccessFile(dest, "rw"); FileChannel destChannel = raf.getChannel()) {
+		try (var sourceChannel = new FileInputStream(source).getChannel();
+			 var raf = new RandomAccessFile(dest, "rw");
+			 var destChannel = raf.getChannel()) {
 			destChannel.transferFrom(sourceChannel, raf.length(), sourceChannel.size());
 		}
 	}
@@ -325,7 +327,9 @@ public class FileUtils {
 	 * Can also be an URL or an URL ending on .gz
 	 */
 	public static InputStream getInputStreamPossiblyZIPorGZIP(String fileName) throws IOException {
-		if (fileName.endsWith("stdin"))
+		if (fileName.startsWith(PREFIX_TO_INDICATE_TO_PARSE_FILENAME_STRING))
+			return new StringInputStream(fileName.substring(PREFIX_TO_INDICATE_TO_PARSE_FILENAME_STRING.length()));
+		else if (fileName.endsWith("stdin"))
 			return System.in;
 		else if (fileName.endsWith("stdin-gz"))
 			return new GZIPInputStream(System.in);
@@ -352,7 +356,9 @@ public class FileUtils {
 	 * opens a file or gzipped file for reading. Can also be stdin or an URL
 	 */
 	public static InputStream getInputStreamPossiblyGZIP(InputStream ins, String fileName) throws IOException {
-		if (fileName.endsWith("stdin"))
+		if (fileName.startsWith(PREFIX_TO_INDICATE_TO_PARSE_FILENAME_STRING))
+			return new StringInputStream(fileName.substring(PREFIX_TO_INDICATE_TO_PARSE_FILENAME_STRING.length()));
+		else if (fileName.endsWith("stdin"))
 			return System.in;
 		else if (fileName.endsWith("stdin-gz"))
 			return new GZIPInputStream(System.in);

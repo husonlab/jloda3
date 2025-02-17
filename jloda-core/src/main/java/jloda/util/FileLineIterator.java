@@ -32,7 +32,7 @@ import java.util.stream.StreamSupport;
  * Daniel Huson, 3.2012
  */
 public class FileLineIterator implements ICloseableIterator<String> {
-    public static final String PREFIX_TO_INDICATE_TO_PARSE_FILENAME_STRING = "!!!";
+    public static final String PREFIX_TO_INDICATE_TO_PARSE_FILENAME_STRING = FileUtils.PREFIX_TO_INDICATE_TO_PARSE_FILENAME_STRING;
     private final BufferedReader reader;
     private String nextLine = null;
     private long lineNumber = 0;
@@ -79,7 +79,7 @@ public class FileLineIterator implements ICloseableIterator<String> {
         this.fileName = fileName;
 
         if (fileName.startsWith(PREFIX_TO_INDICATE_TO_PARSE_FILENAME_STRING)) {
-            reader = new BufferedReader(new StringReader(fileName.substring(3)));
+            reader = new BufferedReader(new StringReader(fileName.substring(PREFIX_TO_INDICATE_TO_PARSE_FILENAME_STRING.length())));
             endOfLineBytes = 1;
             maxProgress = fileName.length() - PREFIX_TO_INDICATE_TO_PARSE_FILENAME_STRING.length();
         } else if (fileName.equals("stdin")) {
@@ -123,7 +123,7 @@ public class FileLineIterator implements ICloseableIterator<String> {
         this.fileName = fileName;
 
         if (fileName.startsWith(PREFIX_TO_INDICATE_TO_PARSE_FILENAME_STRING)) {
-            reader = new BufferedReader(new StringReader(fileName.substring(3)));
+            reader = new BufferedReader(new StringReader(fileName.substring(PREFIX_TO_INDICATE_TO_PARSE_FILENAME_STRING.length())));
             endOfLineBytes = 1;
             maxProgress = fileName.length() - PREFIX_TO_INDICATE_TO_PARSE_FILENAME_STRING.length();
         } else {
