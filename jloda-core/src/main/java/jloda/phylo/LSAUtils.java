@@ -69,8 +69,7 @@ public class LSAUtils {
 
 	/**
 	 * performs a pre-order traversal at node v using the LSA tree, if defined. Makes sure that a node is visited only once
-	 * its parents both in the LSA and in the network have been visited.
-	 * Assumes the lsa children mapping has been set inside tree
+	 * its parents both in the LSA and in the network have been visited
 	 *
 	 * @param tree   the tree or network (with embedded LSA tree)
 	 * @param v      the root node
@@ -80,30 +79,18 @@ public class LSAUtils {
 		if (!tree.isReticulated())
 			tree.preorderTraversal(v, method);
 		else {
-			preorderTraversalLSA(v, tree.getLSAChildrenMap(), method);
-		}
-	}
-
-	/**
-	 * performs a pre-order traversal at node v using the LSA children map. Makes sure that a node is visited only once
-	 * its parents both in the LSA and in the network have been visited
-	 *
-	 * @param v           the root node
-	 * @param lsaChildren the node to list of children in the LSA tree
-	 * @param method      method to apply
-	 */
-	public static void preorderTraversalLSA(Node v, Map<Node, List<Node>> lsaChildren, Consumer<Node> method) {
-		try (var visited = v.getOwner().newNodeSet()) {
-			var queue = new LinkedList<Node>();
-			queue.add(v);
-			while (!queue.isEmpty()) {
-				v = queue.pop();
-				if (visited.containsAll(IteratorUtils.asList(v.parents()))) {
-					method.accept(v);
-					visited.add(v);
-					queue.addAll(lsaChildren.get(v));
-				} else
-					queue.add(v);
+			try (var visited = tree.newNodeSet()) {
+				var queue = new LinkedList<Node>();
+				queue.add(v);
+				while (!queue.isEmpty()) {
+					v = queue.pop();
+					if (visited.containsAll(IteratorUtils.asList(v.parents()))) {
+						method.accept(v);
+						visited.add(v);
+						tree.lsaChildren(v).forEach(queue::add);
+					} else
+						queue.add(v);
+				}
 			}
 		}
 	}
@@ -119,83 +106,18 @@ public class LSAUtils {
 		if (!tree.isReticulated())
 			tree.postorderTraversal(v, method);
 		else {
-			postorderTraversalLSA(v,tree.getLSAChildrenMap(), method);
+			for (var w : tree.lsaChildren(v)) {
+				postorderTraversalLSA(tree, w, method);
+			}
+			method.accept(v);
 		}
 	}
-
-	/**
-	 * performs a post-order traversal at node v, using the LSA tree, if defined
-	 *
-	 * @param v           the root node
-	 * @param lsaChildren the node to list of children in the LSA tree
-	 * @param method      method to apply
-	 */
-	public static void postorderTraversalLSA(Node v, Map<Node, List<Node>> lsaChildren, Consumer<Node> method) {
-		for (var w : lsaChildren.get(v)) {
-			postorderTraversalLSA(w, lsaChildren, method);
-		}
-		method.accept(v);
-	}
-
 
 	public static void breathFirstTraversalLSA(PhyloTree tree, Node v, int level, BiConsumer<Integer, Node> method) {
 		method.accept(level, v);
 		for (var w : tree.lsaChildren(v)) {
 			breathFirstTraversalLSA(tree, w, level + 1, method);
 		}
-	}
-
-	/**
-	 * given a reticulate network, returns a mapping of each LSA node to its children in the LSA tree
-	 *
-	 * @param tree             the tree
-	 */
-	public static NodeArray<List<Node>> computeLSAChildrenMap(PhyloTree tree) {
-		try (NodeArray<Node> reticulation2LSA = tree.newNodeArray()) {
-			return computeLSAChildrenMap(tree, reticulation2LSA);
-		}
-	}
-
-	public static void setLSAChildrenMap(PhyloTree tree) {
-		try (NodeArray<Node> reticulation2LSA = tree.newNodeArray();
-			 var lsaChildrenMap = computeLSAChildrenMap(tree, reticulation2LSA)) {
-			for (var v : tree.nodes()) {
-				tree.getLSAChildrenMap().put(v, lsaChildrenMap.get(v));
-			}
-		}
-	}
-
-	/**
-	 * computes the  reticulate node to LSA mapping
-	 *
-	 * @param lsaChildren
-	 * @return mapping
-	 */
-	public static Map<Node, Node> computeReticulation2LSA(NodeArray<List<Node>> lsaChildren) {
-		var tree = (PhyloTree) lsaChildren.getOwner();
-		var lsaNodes = new HashSet<Node>();
-		for (var v : lsaChildren.keySet()) {
-			for (var w : tree.lsaChildren(v)) {
-				if (!v.isChild(w))
-					lsaNodes.add(v);
-			}
-		}
-		var reticulation2LSA = new HashMap<Node, Node>();
-		for (var r : tree.nodeStream().filter(v -> v.getInDegree() >= 2).toList()) {
-			var p = r.getParent();
-			while (p != null) {
-				if (lsaNodes.contains(p)) {
-					reticulation2LSA.put(r, p);
-					break;
-				} else p = p.getParent();
-			}
-		}
-		if (false) {
-			for (var r : tree.nodeStream().filter(v -> v.getInDegree() == 1).toList()) {
-				reticulation2LSA.put(r, r.getParent());
-			}
-		}
-		return reticulation2LSA;
 	}
 
 	/**
@@ -217,7 +139,7 @@ public class LSAUtils {
 				var children = v.outEdgesStream(false).map(Edge::getTarget)
 						.filter(target -> target.getInDegree() == 1).collect(Collectors.toList());
 				tree.getLSAChildrenMap().put(v, children);
-				lsaChildrenMap.put(v,children);
+				lsaChildrenMap.put(v, children);
 			}
 			for (var v : tree.nodes()) {
 				var lsa = reticulation2LSA.get(v);
