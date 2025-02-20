@@ -130,6 +130,31 @@ public class LSAUtils {
 	}
 
 	/**
+	 * Sets the rooted networks node to LSA childern or transfer acceptor target map.
+	 * This maps each node to its children, any LSA children or any attached transfer acceptor target nodes
+	 * This is used to draw a network that includes transfer edges
+	 *
+	 * @param tree the rooted network
+	 */
+	public static void setLSAChildrenAndTransfersMap(PhyloTree tree) {
+		computeLSAChildrenMap(tree, tree.getLSAChildrenMap());
+		// modify node to LSA mapping so that acceptor edges replace LSA edges
+		try (NodeArray<Node> reticulation2LSAMap = tree.newNodeArray()) {
+			LSAUtils.computeReticulation2LSA(tree, reticulation2LSAMap);
+			for (var v : tree.nodes()) {
+				var acceptor = IteratorUtils.asStream(v.inEdges()).filter(tree::isTransferAcceptorEdge).findAny().orElse(null);
+				if (acceptor != null) {
+					var lsa = reticulation2LSAMap.get(v);
+					if (lsa != acceptor.getSource()) {
+						tree.getLSAChildrenMap().get(lsa).remove(v);
+						tree.getLSAChildrenMap().get(acceptor.getSource()).add(v);
+					}
+				}
+			}
+		}
+	}
+
+	/**
 	 * computes the node to LSA children map
 	 *
 	 * @param tree           the rooted network
