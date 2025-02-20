@@ -120,16 +120,51 @@ public class LSAUtils {
 		}
 	}
 
+
 	/**
-	 * given a reticulate network, returns a mapping of each LSA node to its children in the LSA tree
-	 *
-	 * @param tree             the tree
-	 * @param reticulation2LSA is returned here
-	 * @return node to children map
+	 * sets the node to LSA children mapping for a phylogenetic rooted network
+	 * @param tree the network
 	 */
-	public static NodeArray<List<Node>> computeLSAChildrenMap(PhyloTree tree, NodeArray<Node> reticulation2LSA) {
-		final NodeArray<List<Node>> lsaChildrenMap = tree.newNodeArray();
-		tree.getLSAChildrenMap().clear();
+	public static void setLSAChildrenMap(PhyloTree tree) {
+		computeLSAChildrenMap(tree, tree.getLSAChildrenMap());
+	}
+
+	/**
+	 * computes the node to LSA children map
+	 *
+	 * @param tree           the rooted network
+	 * @param lsaChildrenMap the map
+	 */
+	public static void computeLSAChildrenMap(PhyloTree tree, Map<Node, List<Node>> lsaChildrenMap) {
+		try (NodeArray<Node> reticulation2LSA = tree.newNodeArray()) {
+			computeLSAChildrenMap(tree, lsaChildrenMap, reticulation2LSA);
+		}
+	}
+
+	/**
+	 * computes the node to LSA children map
+	 *
+	 * @param tree the rooted network
+	 * @return the map
+	 */
+	public static NodeArray<List<Node>> computeLSAChildrenMap(PhyloTree tree) {
+		try (NodeArray<Node> reticulation2LSA = tree.newNodeArray()) {
+			NodeArray<List<Node>> lsaChildrenMap = tree.newNodeArray();
+			computeLSAChildrenMap(tree, lsaChildrenMap, reticulation2LSA);
+			return lsaChildrenMap;
+		}
+	}
+
+	/**
+	 * given a rooted network, returns a mapping of each LSA node to its children in the LSA tree
+	 *
+	 * @param tree             the network
+	 * @param lsaChildrenMap   the node to LSA-tree children map
+	 * @param reticulation2LSA the reticulation node to LSA node mapping
+	 */
+	public static void computeLSAChildrenMap(PhyloTree tree, Map<Node, List<Node>> lsaChildrenMap, Map<Node, Node> reticulation2LSA) {
+		lsaChildrenMap.clear();
+		reticulation2LSA.clear();
 
 		if (tree.getRoot() != null) {
 			// first we compute the reticulate node to lsa node mapping:
@@ -138,7 +173,6 @@ public class LSAUtils {
 			for (var v : tree.nodes()) {
 				var children = v.outEdgesStream(false).map(Edge::getTarget)
 						.filter(target -> target.getInDegree() == 1).collect(Collectors.toList());
-				tree.getLSAChildrenMap().put(v, children);
 				lsaChildrenMap.put(v, children);
 			}
 			for (var v : tree.nodes()) {
@@ -147,7 +181,6 @@ public class LSAUtils {
 					lsaChildrenMap.get(lsa).add(v);
 			}
 		}
-		return lsaChildrenMap;
 	}
 
 	/**
@@ -156,7 +189,7 @@ public class LSAUtils {
 	 * @param tree             the rooted network
 	 * @param reticulation2LSA the reticulation to LSA mapping
 	 */
-	public static void computeReticulation2LSA(PhyloTree tree, NodeArray<Node> reticulation2LSA) {
+	public static void computeReticulation2LSA(PhyloTree tree, Map<Node,Node> reticulation2LSA) {
 		reticulation2LSA.clear();
 
 		var reticulateNodes = tree.nodeStream().filter(v -> v.getInDegree() >= 2).toList();
