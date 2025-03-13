@@ -262,11 +262,13 @@ public class CollectionUtils {
 		return result;
 	}
 
-	public static <T> ArrayList<T> concatenate(Collection<T> a, Collection<T> b) {
-		final ArrayList<T> result = new ArrayList<>(a);
-		result.addAll(b);
+	@SafeVarargs
+	public static <T> ArrayList<T> concatenate(Collection<T>... list) {
+		final ArrayList<T> result = new ArrayList<>();
+		for (var a : list) {
+			result.addAll(a);
+		}
 		return result;
-
 	}
 
 	/**

@@ -181,7 +181,7 @@ public class PhyloGraph extends Graph {
     }
 
     public boolean hasEdgeWeights() {
-        return edgeWeights != null;
+        return edgeWeights != null && !edgeWeights.isEmpty();
     }
 
     /**
@@ -216,7 +216,7 @@ public class PhyloGraph extends Graph {
     }
 
     public boolean hasEdgeConfidences() {
-        return edgeConfidences != null;
+        return edgeConfidences != null && !edgeConfidences.isEmpty();
     }
 
     /**
@@ -251,7 +251,7 @@ public class PhyloGraph extends Graph {
     }
 
     public boolean hasEdgeProbabilities() {
-        return edgeProbabilities != null;
+        return edgeProbabilities != null && !edgeProbabilities.isEmpty();
     }
 
     /**
