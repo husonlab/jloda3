@@ -627,4 +627,25 @@ public class PngEncoderFX extends Object {
 		crcValue = crc.getValue();
 		bytePos = writeInt4((int) crcValue, bytePos);
 	}
+
+	/**
+	 * returns the encoding on an image, without encoding alpha
+	 *
+	 * @param image the image
+	 * @return bytes
+	 */
+	public static byte[] encode(Image image) {
+		return (new PngEncoderFX(image)).pngEncode(false);
+	}
+
+	/**
+	 * returns the encoding on an image, optionally encoding alpha
+	 *
+	 * @param image       the image
+	 * @param encodeAlpha encode alpha?
+	 * @return bytes
+	 */
+	public static byte[] encode(Image image, boolean encodeAlpha) {
+		return (new PngEncoderFX(image)).pngEncode(encodeAlpha);
+	}
 }
