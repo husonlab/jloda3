@@ -131,6 +131,7 @@ public class SplashScreen {
 			instance.stage.setX((screenBounds.getWidth() - instance.stage.getWidth()) / 2);
 			instance.stage.setY((screenBounds.getHeight() - instance.stage.getHeight()) / 2);
 			instance.stage.show();
+			Platform.runLater(instance.stage::toFront);
 			ProgramExecutorService.getInstance().submit(() -> {
 				try {
 					Thread.sleep(duration.toMillis());
