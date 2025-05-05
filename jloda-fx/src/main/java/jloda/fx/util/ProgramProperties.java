@@ -23,6 +23,7 @@ package jloda.fx.util;
 import javafx.beans.property.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.scene.control.Spinner;
 import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 
@@ -103,6 +104,18 @@ public class ProgramProperties extends jloda.util.ProgramProperties {
 				property.set(get(label, defaultValue));
 			}
 			property.addListener((v, o, n) -> put(label, property.get()));
+		} catch (Exception ignore) {
+		}
+	}
+
+	public static <T> void track(String label, Spinner<T> spinner, Function<String, T> function, T defaultValue) {
+		try {
+			var string = ProgramProperties.get(label, defaultValue.toString());
+			if (string != null) {
+				spinner.getValueFactory().setValue(function.apply(string));
+			}
+			spinner.valueProperty().addListener((v, o, n) -> put(label, n == null ? null : n.toString()));
+
 		} catch (Exception ignore) {
 		}
 	}
