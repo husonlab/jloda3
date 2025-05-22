@@ -674,7 +674,7 @@ public class PhyloTree extends PhyloSplitsGraph {
 	 * @param acceptor is acceptor
 	 */
 	public void setTransferAcceptor(Edge e, boolean acceptor) {
-		setReticulate(e, acceptor);
+		setReticulate(e, !acceptor);
 		if (acceptor)
 			getTransferAcceptorEdges().add(e);
 		else if (transferAcceptorEdges != null)
