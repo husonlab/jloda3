@@ -22,6 +22,7 @@ package jloda.fx.window;
 
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 import jloda.util.NumberUtils;
 import jloda.util.ProgramProperties;
@@ -33,10 +34,10 @@ import java.io.IOException;
  * Daniel Huson, 3.2019
  */
 public class WindowGeometry {
-	final private DoubleProperty x = new SimpleDoubleProperty(20);
-	final private DoubleProperty y = new SimpleDoubleProperty(20);
-	final private DoubleProperty width = new SimpleDoubleProperty(20);
-	final private DoubleProperty height = new SimpleDoubleProperty(20);
+	final private DoubleProperty x = new SimpleDoubleProperty(50);
+	final private DoubleProperty y = new SimpleDoubleProperty(50);
+	final private DoubleProperty width = new SimpleDoubleProperty(800);
+	final private DoubleProperty height = new SimpleDoubleProperty(800);
 
 	public WindowGeometry() {
 	}
@@ -65,16 +66,23 @@ public class WindowGeometry {
 	}
 
 	public void setFromStage(Stage stage) {
-		setX(stage.getX());
-		setY(stage.getY());
-		setWidth(stage.getWidth());
-		setHeight(stage.getHeight());
+		if (stage.isShowing() && isPlausible(stage.getX(), stage.getY())) {
+			setX(stage.getX());
+			setY(stage.getY());
+			setWidth(stage.getWidth());
+			setHeight(stage.getHeight());
+		}
 	}
 
 	public static void setToStage(Stage stage) {
 		var wg = loadFromProperties();
-		stage.setX(wg.getX());
-		stage.setY(wg.getY());
+		if (isPointVisibleOnAnyScreen(wg.getX(), wg.getY())) {
+			stage.setX(wg.getX());
+			stage.setY(wg.getY());
+		} else {
+			stage.setX(50);
+			stage.setY(50);
+		}
 		stage.setWidth(wg.getWidth());
 		stage.setHeight(wg.getHeight());
 	}
@@ -141,10 +149,12 @@ public class WindowGeometry {
 	}
 
 	public static void listenToStage(Stage stage) {
-		stage.xProperty().addListener(e -> update(stage.getX(), null, null, null));
-		stage.yProperty().addListener(e -> update(null, stage.getY(), null, null));
-		stage.widthProperty().addListener(e -> update(null, null, stage.getWidth(), null));
-		stage.heightProperty().addListener(e -> update(null, null, null, stage.getHeight()));
+		if (stage.isShowing() && isPlausible(stage.getX(), stage.getY())) {
+			stage.xProperty().addListener(e -> update(stage.getX(), null, null, null));
+			stage.yProperty().addListener(e -> update(null, stage.getY(), null, null));
+			stage.widthProperty().addListener(e -> update(null, null, stage.getWidth(), null));
+			stage.heightProperty().addListener(e -> update(null, null, null, stage.getHeight()));
+		}
 	}
 
 	private static void update(Double x, Double y, Double width, Double height) {
@@ -158,5 +168,18 @@ public class WindowGeometry {
 		if (height != null)
 			wg.setHeight(height);
 		saveToProperties(wg);
+	}
+
+	private static boolean isPlausible(double x, double y) {
+		return x > -10000 && y > -10000;
+	}
+
+	private static boolean isPointVisibleOnAnyScreen(double x, double y) {
+		for (var screen : Screen.getScreens()) {
+			if (screen.getVisualBounds().contains(x, y)) {
+				return true;
+			}
+		}
+		return false;
 	}
 }
