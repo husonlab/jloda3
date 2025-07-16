@@ -51,6 +51,8 @@ public class ArgsOptions {
 
     private boolean hasMessageWindow = true;
 
+    private boolean silent = false;
+
 
     /**
      * constructor
@@ -221,7 +223,7 @@ public class ArgsOptions {
             System.err.println("\t--verbose: true");
         }
 
-        if (!doHelp) {
+        if (!doHelp && !silent) {
             if (version != null)
                 System.err.println("Version   " + version);
             if (authors != null)
@@ -231,14 +233,14 @@ public class ArgsOptions {
         }
 
 
-        if (doHelp) {
+        if (doHelp && !silent) {
             System.err.println(getUsage());
             if (!isHasMessageWindow())
                 System.exit(0);
             else
                 throw new UsageException("Help");
         }
-        if (!arguments.isEmpty()) {
+        if (!arguments.isEmpty() && !silent) {
             final StringBuilder buf = new StringBuilder("Invalid, unknown or duplicate option:");
             for (String arg : arguments) {
                 buf.append(" ").append(arg);
@@ -789,5 +791,13 @@ public class ArgsOptions {
         public Command(String name, String description) {
             super(name, description);
         }
+    }
+
+    public boolean isSilent() {
+        return silent;
+    }
+
+    public void setSilent(boolean silent) {
+        this.silent = silent;
     }
 }
