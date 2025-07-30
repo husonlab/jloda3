@@ -20,8 +20,10 @@
 
 package jloda.util;
 
+import java.util.Objects;
+
 /**
- * two dimensional point with user data
+ * two-dimensional point with user data
  *
  * @param <T> Daniel Huson, 3.2019
  */
@@ -85,5 +87,17 @@ public class APoint2D<T> {
 
     public double distance(APoint2D<?> other) {
         return Math.sqrt((x - other.x) * (x - other.x) + (y - other.y) * (y - other.y));
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof APoint2D<?> that)) return false;
+        return Double.compare(x, that.x) == 0 && Double.compare(y, that.y) == 0 && Objects.equals(userData, that.userData);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(x, y, userData);
     }
 }

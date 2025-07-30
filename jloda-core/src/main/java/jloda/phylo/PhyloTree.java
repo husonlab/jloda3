@@ -674,7 +674,6 @@ public class PhyloTree extends PhyloSplitsGraph {
 	 * @param acceptor is acceptor
 	 */
 	public void setTransferAcceptor(Edge e, boolean acceptor) {
-		setReticulate(e, !acceptor);
 		if (acceptor)
 			getTransferAcceptorEdges().add(e);
 		else if (transferAcceptorEdges != null)
@@ -740,7 +739,7 @@ public class PhyloTree extends PhyloSplitsGraph {
 	 * traverse of a tree. Use this to ensure that each node is visited only once
 	 */
 	public boolean okToDescendDownThisEdgeInTraversal(Edge e) {
-		if (!isReticulateEdge(e))
+		if (e.getSource().getInDegree() < 2)
 			return true;
 		else {
 			return e == e.getTarget().inEdgesStream(false).filter(this::isReticulateEdge).findFirst().orElse(null);

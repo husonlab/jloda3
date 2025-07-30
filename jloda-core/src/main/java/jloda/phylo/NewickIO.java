@@ -636,10 +636,9 @@ public class NewickIO {
 			if (e != null) {
 				if (PhyloTree.SUPPORT_RICH_NEWICK) {
 					if (label != null && PhyloTreeNetworkIOUtils.isReticulateNode(label)) {
+						tree.setReticulate(e, true);
 						if (PhyloTreeNetworkIOUtils.isReticulateAcceptorEdge(label)) {
 							tree.setTransferAcceptor(e, true);
-						} else {
-							tree.setReticulate(e, true);
 						}
 					}
 				} else {
@@ -741,11 +740,10 @@ public class NewickIO {
 								tree.setConfidence(f, tree.getConfidence(e));
 							if (tree.hasEdgeProbabilities() && tree.getEdgeProbabilities().containsKey(e))
 								tree.setProbability(f, tree.getProbability(e));
-							if (tree.isTransferAcceptorEdge(e)) {
-								tree.setTransferAcceptor(f, true);
-							}
 							if (tree.isReticulateEdge(e))
 								tree.setReticulate(f, true);
+							if (tree.isTransferAcceptorEdge(e))
+								tree.setTransferAcceptor(f, true);
 							tree.setLabel(f, tree.getLabel(e));
 						}
 						tree.deleteNode(v);
