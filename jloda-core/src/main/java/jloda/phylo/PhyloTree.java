@@ -721,6 +721,8 @@ public class PhyloTree extends PhyloSplitsGraph {
 	/**
 	 * determines whether it is ok to descend an edge in a recursive
 	 * traverse of a tree. Use this to ensure that each node is visited only once
+	 * @param e the edge
+	 * @param v the node adjacent to the edge, if e is a reticulate edge, then will only return true if v is source
 	 *
 	 * @return true, if we should descend this edge, false else
 	 */
@@ -739,11 +741,8 @@ public class PhyloTree extends PhyloSplitsGraph {
 	 * traverse of a tree. Use this to ensure that each node is visited only once
 	 */
 	public boolean okToDescendDownThisEdgeInTraversal(Edge e) {
-		if (e.getSource().getInDegree() < 2)
-			return true;
-		else {
-			return e == e.getTarget().inEdgesStream(false).filter(this::isReticulateEdge).findFirst().orElse(null);
-		}
+		var t = e.getTarget();
+		return t.getInDegree() < 2 || e == t.getFirstInEdge();
 	}
 
 	/**
