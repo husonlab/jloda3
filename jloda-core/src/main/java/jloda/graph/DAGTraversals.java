@@ -28,9 +28,8 @@ import java.util.function.Function;
  * Daniel Huson, 2.2025
  */
 public class DAGTraversals {
-
 	/**
-	 * does a post order traversal of a rooted DAG
+	 * does a post order traversal of a rooted DAG, exploring all paths, thus visiting nodes below reticulate nodes multiple times
 	 *
 	 * @param v        the root node
 	 * @param children provides the children
@@ -44,7 +43,24 @@ public class DAGTraversals {
 	}
 
 	/**
-	 * does a pre order traversal of a rooted DAG
+	 * perform a post-order traversal
+	 *
+	 * @param v                     root node
+	 * @param consumer              consumer for the current node
+	 * @param visitEachNodeOnlyOnce if true, visits each node only once, otherwise explores all paths
+	 */
+	public static void postOrderTraversal(Node v, Consumer<Node> consumer, boolean visitEachNodeOnlyOnce) {
+		for (var e : v.outEdges()) {
+			var w = e.getTarget();
+			if (!visitEachNodeOnlyOnce || w.getInDegree() < 2 || e == w.getFirstInEdge()) {
+				postOrderTraversal(w, consumer, visitEachNodeOnlyOnce);
+			}
+		}
+		consumer.accept(v);
+	}
+
+	/**
+	 * does a pre-order traversal of a rooted DAG, exploring all paths, that is, exploring all paths, thus visiting nodes below reticulate nodes multiple
 	 *
 	 * @param v        the root node
 	 * @param children provides the children
@@ -57,4 +73,20 @@ public class DAGTraversals {
 		}
 	}
 
+	/**
+	 * perform a pre-order traversal
+	 *
+	 * @param v                     root node
+	 * @param consumer              consumer for the current node
+	 * @param visitEachNodeOnlyOnce if true, visits each node only once, otherwise explores all paths
+	 */
+	public static void preOrderTraversal(Node v, Consumer<Node> consumer, boolean visitEachNodeOnlyOnce) {
+		consumer.accept(v);
+		for (var e : v.outEdges()) {
+			var w = e.getTarget();
+			if (!visitEachNodeOnlyOnce || w.getInDegree() < 2 || e == w.getFirstInEdge()) {
+				preOrderTraversal(w, consumer,visitEachNodeOnlyOnce);
+			}
+		}
+	}
 }
