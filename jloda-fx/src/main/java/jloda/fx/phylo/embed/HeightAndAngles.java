@@ -31,12 +31,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * computes the y-coordinates for the rectangular layout
+ * computes the y-coordinates for the isRectangular layout
  */
 public class HeightAndAngles {
 
 	/**
-	 * compute the y-coordinates for the parallel (rectangular) view
+	 * compute the y-coordinates for the parallel (isRectangular) view
 	 *
 	 * @param tree          the phylogeny
 	 * @param nodeHeightMap the node height map
@@ -48,7 +48,7 @@ public class HeightAndAngles {
 	}
 
 	/**
-	 * compute the y-coordinates for a parallel (rectangular) view
+	 * compute the y-coordinates for a parallel (isRectangular) view
 	 *
 	 * @param tree                        the phylogeny
 	 * @param root                        the root
@@ -80,7 +80,7 @@ public class HeightAndAngles {
 	}
 
 	/**
-	 * compute the angles for a radial (circular) view
+	 * compute the angles for a radial (isCircular) view
 	 *
 	 * @param tree       the phylogeny
 	 * @param angles     the node angle map
@@ -92,7 +92,7 @@ public class HeightAndAngles {
 	}
 
 	/**
-	 * compute the angles for a radial (circular) view
+	 * compute the angles for a radial (isCircular) view
 	 *
 	 * @param tree       the phylogeny
 	 * @param root       the root noe

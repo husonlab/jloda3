@@ -37,12 +37,14 @@ import static jloda.fx.phylo.embed.OptimizeLayout.computeCost;
 
 
 /**
- * computes the rectangular layout for a rooted tree or network
+ * computes the isRectangular layout for a rooted tree or network
  * Daniel Huson, 12.2021, 3.2025
+ * @deprecated to be replaced by LayoutRootedPhylogeny
  */
+@Deprecated
 public class RectangularPhylogenyLayout {
 	/**
-	 * compute rectangular tree or network layout
+	 * compute isRectangular tree or network layout
 	 *
 	 * @param tree      the phylogeny
 	 * @param toScale   draw edges to scale
@@ -54,7 +56,7 @@ public class RectangularPhylogenyLayout {
 	}
 
 	/**
-	 * compute rectangular tree or network layout
+	 * compute isRectangular tree or network layout
 	 *
 	 * @param tree      the phylogeny
 	 * @param toScale   draw edges to scale
@@ -76,16 +78,6 @@ public class RectangularPhylogenyLayout {
 			if (toScale) {
 				setCoordinatesPhylogram(tree, yCoord, points);
 			} else {
-				var combiningNodes = 0.0;
-				var transferNodes = 0.0;
-				for (var v : tree.nodes()) {
-					if (v.getInDegree() > 1) {
-						if (v.inEdgesStream(false).anyMatch(tree::isTransferAcceptorEdge)) {
-							transferNodes += 1;
-						} else combiningNodes += 1;
-					}
-				}
-				if (transferNodes > combiningNodes) {
 					var longestPath = new HashMap<Node, Double>();
 					longestPath.put(tree.getRoot(), 0.0);
 					computeLongestPathsRec(tree, tree.getRoot(), longestPath);
@@ -107,24 +99,6 @@ public class RectangularPhylogenyLayout {
 							break;
 					}
 
-					if (false) {
-						for (var i = 0; i < 5; i++) {
-							var changed = false;
-							for (var e : tree.edges()) {
-								if (tree.isTransferEdge(e)) {
-									var longestPathSource = longestPath.get(e.getSource());
-									var longestPathTarget = longestPath.get(e.getTarget());
-									if (longestPathTarget <= longestPathSource) {
-										longestPath.put(e.getSource(), longestPathSource - 0.05);
-										changed = true;
-									}
-								}
-							}
-							if (!changed)
-								break;
-						}
-					}
-
 					var max = longestPath.values().stream().mapToDouble(d -> d).max().orElse(0.0);
 					for (var v : tree.nodes()) {
 						if (v.isLeaf())
@@ -132,41 +106,6 @@ public class RectangularPhylogenyLayout {
 						else
 							points.put(v, new Point2D(longestPath.get(v), yCoord.get(v)));
 					}
-				} else {
-					try (var levels = tree.newNodeIntArray()) {
-						// compute levels: max length of path from node to a leaf
-						tree.postorderTraversal(v -> {
-							if (v.isLeaf())
-								levels.put(v, 0);
-							else {
-								var level = 0;
-								if (true) {
-									for (var e : v.outEdges()) {
-										var w = e.getTarget();
-
-										if (tree.isTransferEdge(e))
-											level = Math.max(level, levels.get(w) - 1);
-										else
-											level = Math.max(level, levels.get(w));
-									}
-								} else {
-									for (var w : v.children()) {
-										level = Math.max(level, levels.get(w));
-									}
-								}
-								var prev = (levels.get(v) != null ? levels.get(v) : 0);
-								if (level + 1 > prev)
-									levels.set(v, level + 1);
-							}
-						});
-						for (var v : tree.nodes()) {
-							var dx = 0.0;
-							if (v.getInDegree() <= 1 && v.outEdgesStream(false).filter(tree::isTransferEdge).count() == v.getOutDegree() - 1)
-								dx = 0.01 * levels.get(v);
-							points.put(v, new Point2D(-(levels.get(v) + dx), yCoord.get(v)));
-						}
-					}
-				}
 			}
 			if (how != OptimizeLayout.How.None) {
 				if (originalScore == Integer.MAX_VALUE) {
@@ -183,7 +122,7 @@ public class RectangularPhylogenyLayout {
 		}
 	}
 
-	private static void computeLongestPathsRec(PhyloTree tree, Node v, HashMap<Node, Double> longestPath) {
+	public static void computeLongestPathsRec(PhyloTree tree, Node v, HashMap<Node, Double> longestPath) {
 		var vDist = longestPath.get(v);
 		for (var f : v.outEdges()) {
 			var w = f.getTarget();

@@ -52,7 +52,7 @@ public class DAGTraversals {
 	public static void postOrderTraversal(Node v, Consumer<Node> consumer, boolean visitEachNodeOnlyOnce) {
 		for (var e : v.outEdges()) {
 			var w = e.getTarget();
-			if (!visitEachNodeOnlyOnce || w.getInDegree() < 2 || e == w.getFirstInEdge()) {
+			if (!visitEachNodeOnlyOnce || e == w.getFirstInEdge()) {
 				postOrderTraversal(w, consumer, visitEachNodeOnlyOnce);
 			}
 		}
@@ -84,7 +84,7 @@ public class DAGTraversals {
 		consumer.accept(v);
 		for (var e : v.outEdges()) {
 			var w = e.getTarget();
-			if (!visitEachNodeOnlyOnce || w.getInDegree() < 2 || e == w.getFirstInEdge()) {
+			if (!visitEachNodeOnlyOnce || e == w.getFirstInEdge()) {
 				preOrderTraversal(w, consumer,visitEachNodeOnlyOnce);
 			}
 		}

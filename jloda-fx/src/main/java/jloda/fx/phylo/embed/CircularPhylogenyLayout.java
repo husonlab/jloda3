@@ -34,13 +34,15 @@ import java.util.Map;
 import java.util.Random;
 
 /**
- * compute a circular layout
+ * compute a isCircular layout
  * Daniel Huson, 12.2021, 3.2025
+ * @deprecated to be replaced by LayoutRootedPhylogeny
  */
+@Deprecated
 public class CircularPhylogenyLayout {
 
 	/**
-	 * compute layout for a circular cladogram
+	 * compute layout for a isCircular cladogram
 	 */
 	public static void apply(PhyloTree tree, boolean toScale, Averaging averaging, boolean optimize, Map<Node, Double> nodeAngleMap, Map<Node, Point2D> points) {
 		if (!tree.hasLSAChildrenMap())
@@ -105,6 +107,8 @@ public class CircularPhylogenyLayout {
 				nodeAngleMap = new HashMap<>();
 
 			HeightAndAngles.computeAngles(tree, nodeAngleMap, averaging, true);
+
+
 			for (var v : tree.nodes()) {
 				points.put(v, GeometryUtilsFX.computeCartesian(nodeRadiusMap.get(v), nodeAngleMap.get(v)));
 			}
