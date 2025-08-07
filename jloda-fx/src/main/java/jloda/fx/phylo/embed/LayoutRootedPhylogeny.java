@@ -57,6 +57,8 @@ public enum LayoutRootedPhylogeny {
 	 * @param nodePointMap the node layout points
 	 */
 	public static void apply(PhyloTree network, LayoutRootedPhylogeny layout, Averaging averaging, boolean optimize, Random random, Map<Node, Double> nodeAngleMap, Map<Node, Point2D> nodePointMap) {
+		if (!network.hasLSAChildrenMap())
+			LSAUtils.setLSAChildrenAndTransfersMap(network);
 		applyRec(network, layout, averaging, optimize, random, nodeAngleMap, nodePointMap);
 
 		if (layout.isCircular()) {
@@ -91,9 +93,6 @@ public enum LayoutRootedPhylogeny {
 	 */
 	private static void applyRec(PhyloTree network, LayoutRootedPhylogeny layout, Averaging averaging, boolean optimize, Random random, Map<Node, Double> nodeAngleMap, Map<Node, Point2D> nodePointMap) {
 		OptimizeLayout.How how = (optimize ? (layout.isCircular() ? OptimizeLayout.How.Circular : OptimizeLayout.How.Rectangular) : OptimizeLayout.How.None);
-
-		if (!network.hasLSAChildrenMap())
-			LSAUtils.setLSAChildrenAndTransfersMap(network);
 
 		var originalScore = (how != OptimizeLayout.How.None ? computeCost(network, network.getLSAChildrenMap(), nodePointMap, how) : Integer.MAX_VALUE);
 
