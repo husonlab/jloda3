@@ -130,4 +130,8 @@ public class AService<T> extends Service<T> {
 			service.setOnFailed(e -> runOnFailed.accept(service.getException()));
 		service.start();
 	}
+
+	public void setProgressBarShowStopButton(boolean show) {
+		progressPane.showStopButtonProperty().set(show);
+	}
 }

@@ -21,9 +21,7 @@
 package jloda.fx.control;
 
 import javafx.application.Platform;
-import javafx.beans.property.ReadOnlyBooleanProperty;
-import javafx.beans.property.ReadOnlyDoubleProperty;
-import javafx.beans.property.ReadOnlyStringProperty;
+import javafx.beans.property.*;
 import javafx.concurrent.Service;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -47,6 +45,7 @@ import static java.lang.Thread.MAX_PRIORITY;
  */
 public class ProgressPane extends StackPane {
     private boolean removed;
+    private final BooleanProperty showStopButton = new SimpleBooleanProperty(this, "showStopButton", true);
 
     /**
      * a progress pane with cancel button
@@ -73,6 +72,7 @@ public class ProgressPane extends StackPane {
         progressBar.setPrefHeight(label.getPrefHeight());
         var stopButton = new Button();
         stopButton.setLayoutX(-10);
+        stopButton.visibleProperty().bind(showStopButton);
         MaterialIcons.setIcon(stopButton, MaterialIcons.cancel);
 
         stopButton.setMaxHeight(label.getPrefHeight());
@@ -116,5 +116,9 @@ public class ProgressPane extends StackPane {
         });
         thread.setPriority(MAX_PRIORITY - 1);
         thread.start();
+    }
+
+    public BooleanProperty showStopButtonProperty() {
+        return showStopButton;
     }
 }
