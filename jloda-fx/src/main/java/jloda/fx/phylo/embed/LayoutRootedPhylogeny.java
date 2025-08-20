@@ -53,18 +53,24 @@ public class LayoutRootedPhylogeny {
 	 * @param nodePointMap the node layout points
 	 */
 	public static void apply(PhyloTree network, Layout layout, Scaling scaling, Averaging averaging, boolean optimize, Random random, Map<Node, Double> nodeAngleMap, Map<Node, Point2D> nodePointMap) {
-		if (!network.hasLSAChildrenMap())
+		if (network.getRoot() != null && (!network.hasLSAChildrenMap() || network.getLSAChildrenMap().isEmpty() || network.getLSAChildrenMap().get(network.getRoot()).isEmpty())) {
 			LSAUtils.setLSAChildrenAndTransfersMap(network);
+		}
+
+		if (layout == Layout.Radial && averaging == Averaging.ChildAverage) {
+			averaging = Averaging.LeafAverage; // leaf averaging not valid for radial layout
+		}
 
 
 		if (optimize) {
 			nodeAngleMap.clear();
 			nodePointMap.clear();
 
+			LayoutRectangularCladogram.apply(network, averaging, nodePointMap);
+
 			var optimizeHow = (layout == Layout.Rectangular ? OptimizeLayout.How.Rectangular : OptimizeLayout.How.Circular);
 			var originalScore = computeCost(network, network.getLSAChildrenMap(), nodePointMap, optimizeHow);
 
-			LayoutRectangularCladogram.apply(network, averaging, nodePointMap);
 
 			if (originalScore == Integer.MAX_VALUE) {
 				originalScore = computeCost(network, network.getLSAChildrenMap(), nodePointMap, optimizeHow);
