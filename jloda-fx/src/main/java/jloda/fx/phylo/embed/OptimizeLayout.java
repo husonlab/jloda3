@@ -28,7 +28,7 @@ import jloda.util.SimulatedAnnealingMinLA;
 import jloda.util.Single;
 
 import java.util.*;
-import java.util.concurrent.atomic.LongAdder;
+import java.util.concurrent.atomic.DoubleAdder;
 
 import static jloda.graph.DAGTraversals.postOrderTraversal;
 import static jloda.graph.DAGTraversals.preOrderTraversal;
@@ -50,7 +50,7 @@ public class OptimizeLayout {
 		var originalOrdering = new ArrayList<>(lsaChildren.get(v));
 		var crossEdges = computeCrossEdges(v, originalOrdering, lsaChildren);
 		if (!crossEdges.isEmpty()) {
-			var originalCost = Integer.MAX_VALUE;
+			var originalCost = Double.MAX_VALUE;
 			var bestOrdering = new Single<List<Node>>(originalOrdering);
 			var bestCost = new Single<>(originalCost);
 
@@ -115,7 +115,7 @@ public class OptimizeLayout {
 				span = yMax - yMin + 1;
 			}
 
-			var cost = new LongAdder();
+			var cost = new DoubleAdder();
 			preOrderTraversal(tree.getRoot(), lsaChildren::get, v -> {
 				var ordering = lsaChildren.get(v);
 				var crossEdges = computeCrossEdges(v, ordering, lsaChildren);
@@ -137,7 +137,7 @@ public class OptimizeLayout {
 	 * @param points      the current points (proposed new order has not been applied)
 	 * @return the total y extent of all
 	 */
-	private static int computeCost(Node v, double span, List<Node> newOrdering, Collection<List<Edge>> crossEdges, Map<Node, List<Node>> lsaChildren, Map<Node, Point2D> points, How how) {
+	private static double computeCost(Node v, double span, List<Node> newOrdering, Collection<List<Edge>> crossEdges, Map<Node, List<Node>> lsaChildren, Map<Node, Point2D> points, How how) {
 		var delta = computeDelta(newOrdering, lsaChildren, points);
 		var nodeIndexMap = computeNodeIndexMap(newOrdering, lsaChildren);
 
@@ -145,7 +145,7 @@ public class OptimizeLayout {
 		var fromAbove = new int[n];
 		var fromBelow = new int[n];
 
-		var cost = 0;
+		var cost = 0.0;
 		for (var edges : crossEdges) {
 			for (var e : edges) {
 				Node p;
@@ -170,11 +170,11 @@ public class OptimizeLayout {
 					if (false) {
 						if (v.getOwner() instanceof PhyloTree tree && tree.hasEdgeConfidences() && tree.getEdgeConfidences().containsKey(e)) {
 							var confidence = Math.max(1, tree.getConfidence(e));
-							cost += (int) (confidence * 1000 * d);
+							cost += confidence * 1000 * d;
 						}
 
 					} else {
-						cost += (int) (1000 * d);
+						cost += 1000 * d;
 					}
 
 					if (qIndex != -1) {
@@ -261,7 +261,7 @@ public class OptimizeLayout {
 		return nodeIndex;
 	}
 
-	private static Collection<List<Edge>> computeCrossEdges(Node v, List<Node> ordering, Map<Node, List<Node>> lsaChildren) {
+	public static Collection<List<Edge>> computeCrossEdges(Node v, List<Node> ordering, Map<Node, List<Node>> lsaChildren) {
 		var tree = (PhyloTree) v.getOwner();
 		var nodeIndexMap = computeNodeIndexMap(ordering, lsaChildren);
 

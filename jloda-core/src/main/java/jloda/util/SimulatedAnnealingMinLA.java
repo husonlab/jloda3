@@ -45,16 +45,16 @@ public class SimulatedAnnealingMinLA<T> {
 	 * @param costFunction the cost function
 	 * @return the best found ordering and its cost
 	 */
-	public Pair<List<T>, Integer> apply(List<T> ordering, Random rand, Function<List<T>, Integer> costFunction) {
+	public Pair<List<T>, Double> apply(List<T> ordering, Random rand, Function<List<T>, Double> costFunction) {
 		var currentOrdering = new ArrayList<>(ordering);
 		var n = currentOrdering.size();
 
 		var currentCost = costFunction.apply(currentOrdering);
 		if (currentCost == 0)
-			return new Pair<>(currentOrdering, 0);
+			return new Pair<>(currentOrdering, 0.0);
 
 		var bestOrdering = new ArrayList<>(ordering);
-		int bestCost = currentCost;
+		var bestCost = currentCost;
 		if (false)
 			System.err.println("Original cost: " + bestCost);
 

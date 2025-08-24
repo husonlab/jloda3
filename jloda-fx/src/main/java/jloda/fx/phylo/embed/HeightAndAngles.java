@@ -19,24 +19,26 @@
 
 package jloda.fx.phylo.embed;
 
+import jloda.graph.Edge;
 import jloda.graph.Node;
 import jloda.graph.NodeArray;
 import jloda.phylo.LSAUtils;
 import jloda.phylo.PhyloTree;
 import jloda.util.Pair;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
 /**
- * computes the y-coordinates for the isRectangular layout
+ * computes the y-coordinates for the rectangular left-to-right layout
+ * Daniel Huson, 2025
  */
 public class HeightAndAngles {
 
 	/**
-	 * compute the y-coordinates for the parallel (isRectangular) view
+	 * compute the y-coordinates for the rectangular left-to-right view
 	 *
 	 * @param tree          the phylogeny
 	 * @param nodeHeightMap the node height map
@@ -48,34 +50,50 @@ public class HeightAndAngles {
 	}
 
 	/**
-	 * compute the y-coordinates for a parallel (isRectangular) view
+	 * compute the y-coordinates for a rectangular left-to-right view
 	 *
 	 * @param tree                        the phylogeny
 	 * @param root                        the root
-	 * @param heights                     the node height map
+	 * @param nodeHeightMap                     the node height map
 	 * @param averaging                   the averaging strategy
 	 * @param fixSpacingBetweenTrueLeaves should spaces between true leaves be fixed
 	 */
-	public static void apply(PhyloTree tree, Node root, Map<Node, Double> heights, Averaging averaging, boolean fixSpacingBetweenTrueLeaves) {
-		var leafOrder = new LinkedList<Node>();
-		computeYCoordinateOfLeavesRec(tree, root, 0, heights, leafOrder);
+	public static void apply(PhyloTree tree, Node root, Map<Node, Double> nodeHeightMap, Averaging averaging, boolean fixSpacingBetweenTrueLeaves) {
+		var leafOrder = new ArrayList<Node>();
+		computeYCoordinateOfLeavesRec(tree, root, 0, nodeHeightMap, leafOrder);
 		if (fixSpacingBetweenTrueLeaves && tree.getNumberReticulateEdges() > 0)
-			fixSpacingBetweenTrueLeaves(leafOrder, heights);
+			fixSpacingBetweenTrueLeaves(leafOrder, nodeHeightMap);
 		if (averaging == Averaging.ChildAverage) {
-			computeHeightInternalNodesAsChildAverageRec(tree, root, heights);
+			computeHeightInternalNodesAsChildAverageRec(tree, root, nodeHeightMap);
 		} else {
 			try (NodeArray<Pair<Double, Double>> minMaxBelowMap = tree.newNodeArray()) {
-				tree.nodeStream().filter(tree::isLsaLeaf).forEach(v -> minMaxBelowMap.put(v, new Pair<>(heights.get(v), heights.get(v))));
+				tree.nodeStream().filter(tree::isLsaLeaf).forEach(v -> minMaxBelowMap.put(v, new Pair<>(nodeHeightMap.get(v), nodeHeightMap.get(v))));
 
 				LSAUtils.postorderTraversalLSA(tree, tree.getRoot(), v -> {
 					if (!tree.isLsaLeaf(v)) {
 						var min = minMaxBelowMap.get(tree.getFirstChildLSA(v)).getFirst();
 						var max = minMaxBelowMap.get(tree.getLastChildLSA(v)).getSecond();
-						heights.put(v, 0.5 * (min + max));
+						nodeHeightMap.put(v, 0.5 * (min + max));
 						minMaxBelowMap.put(v, new Pair<>(min, max));
 					}
 				});
 			}
+		}
+
+		if (false) { //this is an unnecessary fix to accommodate transfer acceptor edges
+			tree.postorderTraversal(v -> {
+				var transferAcceptorEdges = v.outEdgesStream(false).filter(tree::isTransferAcceptorEdge).toList();
+				if (!transferAcceptorEdges.isEmpty()) {
+					var min = v.outEdgesStream(false).map(Edge::getTarget).mapToDouble(nodeHeightMap::get).min().orElse(0);
+					var max = v.outEdgesStream(false).map(Edge::getTarget).mapToDouble(nodeHeightMap::get).max().orElse(0);
+					for (var e : transferAcceptorEdges) {
+						var value = nodeHeightMap.get(e.getTarget());
+						min = Math.min(min, value);
+						max = Math.max(max, value);
+					}
+					nodeHeightMap.put(v, (min + max) * 0.5);
+				}
+			});
 		}
 	}
 
@@ -83,12 +101,12 @@ public class HeightAndAngles {
 	 * compute the angles for a radial (isCircular) view
 	 *
 	 * @param tree       the phylogeny
-	 * @param angles     the node angle map
+	 * @param nodeAngleMap     the node angle map
 	 * @param averaging  the averaging strategy
 	 * @param fixSpacing should spaces between true leaves be fixed
 	 */
-	public static void computeAngles(PhyloTree tree, Map<Node, Double> angles, Averaging averaging, boolean fixSpacing) {
-		computeAngles(tree, tree.getRoot(), angles, averaging, fixSpacing);
+	public static void computeAngles(PhyloTree tree, Map<Node, Double> nodeAngleMap, Averaging averaging, boolean fixSpacing) {
+		computeAngles(tree, tree.getRoot(), nodeAngleMap, averaging, fixSpacing);
 	}
 
 	/**
@@ -96,15 +114,15 @@ public class HeightAndAngles {
 	 *
 	 * @param tree       the phylogeny
 	 * @param root       the root noe
-	 * @param angles     the node angle map
+	 * @param nodeAngleMap     the node angle map
 	 * @param averaging  the averaging strategy
 	 * @param fixSpacing should spaces between true leaves be fixed
 	 */
-	public static void computeAngles(PhyloTree tree, Node root, Map<Node, Double> angles, Averaging averaging, boolean fixSpacing) {
-		HeightAndAngles.apply(tree, root, angles, averaging, fixSpacing);
-		var max = angles.values().stream().mapToDouble(a -> a).max().orElse(0);
+	public static void computeAngles(PhyloTree tree, Node root, Map<Node, Double> nodeAngleMap, Averaging averaging, boolean fixSpacing) {
+		HeightAndAngles.apply(tree, root, nodeAngleMap, averaging, fixSpacing);
+		var max = nodeAngleMap.values().stream().mapToDouble(a -> a).max().orElse(0);
 		var factor = 360.0 / max;
-		angles.replaceAll((v, value) -> value * factor);
+		nodeAngleMap.replaceAll((v, value) -> value * factor);
 	}
 
 	/**
@@ -148,9 +166,9 @@ public class HeightAndAngles {
 	}
 
 	/**
-	 * fix spacing so that space between any two true leaves is 100
+	 * fix spacing so that space between any two true leaves is 1
 	 */
-	private static void fixSpacingBetweenTrueLeaves(Collection<Node> lsaTreeLeafOrder, Map<Node, Double> yCoord) {
+	private static void fixSpacingBetweenTrueLeaves(Collection<Node> lsaTreeLeafOrder, Map<Node, Double> nodeHeightMap) {
 		var nodes = lsaTreeLeafOrder.toArray(new Node[0]);
 		double leafPos = 0;
 		for (int lastTrueLeaf = -1; lastTrueLeaf < nodes.length; ) {
@@ -164,12 +182,12 @@ public class HeightAndAngles {
 				double value = leafPos;
 				for (int i = lastTrueLeaf + 1; i < nextTrueLeaf; i++) {
 					value += add;
-					yCoord.put(nodes[i], value);
+					nodeHeightMap.put(nodes[i], value);
 				}
 			}
 			// assign whole positions to actual leaves:
 			if (nextTrueLeaf < nodes.length) {
-				yCoord.put(nodes[nextTrueLeaf], ++leafPos);
+				nodeHeightMap.put(nodes[nextTrueLeaf], ++leafPos);
 			}
 			lastTrueLeaf = nextTrueLeaf;
 		}

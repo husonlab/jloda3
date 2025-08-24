@@ -52,7 +52,7 @@ public class LayoutRootedPhylogeny {
 	 * @param nodeAngleMap when a circular layout is requested, will return the angle associated with each node
 	 * @param nodePointMap the node layout points
 	 */
-	public static void apply(PhyloTree network, Layout layout, Scaling scaling, Averaging averaging, boolean optimize, Random random, Map<Node, Double> nodeAngleMap, Map<Node, Point2D> nodePointMap) {
+	public static void apply(PhyloTree network, Layout layout, Scaling scaling, Averaging averaging, boolean optimizeReticulateEdges, Random random, Map<Node, Double> nodeAngleMap, Map<Node, Point2D> nodePointMap) {
 		if (network.getRoot() != null && (!network.hasLSAChildrenMap() || network.getLSAChildrenMap().isEmpty() || network.getLSAChildrenMap().get(network.getRoot()).isEmpty())) {
 			LSAUtils.setLSAChildrenAndTransfersMap(network);
 		}
@@ -62,7 +62,7 @@ public class LayoutRootedPhylogeny {
 		}
 
 
-		if (optimize) {
+		if (optimizeReticulateEdges && network.hasReticulateEdges()) {
 			nodeAngleMap.clear();
 			nodePointMap.clear();
 
@@ -71,10 +71,6 @@ public class LayoutRootedPhylogeny {
 			var optimizeHow = (layout == Layout.Rectangular ? OptimizeLayout.How.Rectangular : OptimizeLayout.How.Circular);
 			var originalScore = computeCost(network, network.getLSAChildrenMap(), nodePointMap, optimizeHow);
 
-
-			if (originalScore == Integer.MAX_VALUE) {
-				originalScore = computeCost(network, network.getLSAChildrenMap(), nodePointMap, optimizeHow);
-			}
 			if (originalScore > 0) {
 				DAGTraversals.preOrderTraversal(network.getRoot(), network.getLSAChildrenMap(), v -> OptimizeLayout.optimizeOrdering(v, network.getLSAChildrenMap(), nodePointMap, random, optimizeHow));
 				if (false) {
