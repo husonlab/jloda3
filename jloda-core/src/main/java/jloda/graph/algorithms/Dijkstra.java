@@ -21,95 +21,104 @@
 package jloda.graph.algorithms;
 
 
-import jloda.graph.*;
+import jloda.graph.Edge;
+import jloda.graph.Graph;
+import jloda.graph.Node;
+import jloda.graph.NodeArray;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.function.Function;
 
 /**
  * Dijkstras algorithm for single source shortest path, non-negative edge lengths
  *
  * @author huson
- * Date: 11-Dec-2004
+ * Date: 11-Dec-2004, 9.2025
  */
 public class Dijkstra {
     /**
-     * compute single source shortest path from source to sink, non-negative edge weights
+     * Dijkstra’s algorithm (single-source shortest path).
      *
-     * @param graph with adjacentEdges labeled by Integers
-     * @return shortest path from source to sink
+     * @param graph the graph
+     * @param source start node
+     * @param sink target node
+     * @param weights function mapping an edge to a weight (non-negative)
+     * @param undirected if true, treat edges as undirected (use both outEdges and inEdges)
+     * @return list of nodes forming the shortest path [source ... sink]
      */
-    public static List<Node> compute(final Graph graph, Node source, Node sink, Function<Edge, Number> weights) {
-        try (NodeArray<Node> predecessor = graph.newNodeArray()) {
-            var dist = graph.newNodeDoubleArray();
-            var priorityQueue = newFullQueue(graph, dist);
+    public static List<Node> compute(final Graph graph, Node source, Node sink,
+                                     Function<Edge, Number> weights, boolean undirected) {
+        try (NodeArray<Node> predecessor = graph.newNodeArray();
+             var dist = graph.newNodeDoubleArray()) {
 
-            // init:
             for (var v : graph.nodes()) {
-                dist.put(v, 1000000.0);
+                dist.put(v, Double.POSITIVE_INFINITY);
                 predecessor.put(v, null);
             }
             dist.put(source, 0.0);
 
-            // main loop:
-            while (!priorityQueue.isEmpty()) {
-                var size = priorityQueue.size();
-                var u = priorityQueue.first();
-                priorityQueue.remove(u);
-                if (priorityQueue.size() != size - 1)
-                    throw new RuntimeException("remove u=" + u + " failed: size=" + size);
+            // map node id → node
+            var nodes = new HashMap<Integer, Node>();
+            graph.nodes().forEach(v -> nodes.put(v.getId(), v));
 
-                for (var e : u.outEdges()) {
-                    var weight = weights.apply(e).doubleValue();
+            var pq = new PriorityQueue<double[]>(Comparator.comparingDouble(a -> a[0]));
+            pq.add(new double[]{0.0, source.getId()});
+
+            while (!pq.isEmpty()) {
+                var top = pq.poll();
+                var d = top[0];
+                var uId = (int) top[1];
+                var u = nodes.get(uId);
+                if (d > dist.get(u)) continue; // stale
+
+                // gather neighbors
+                Iterable<Edge> edges = u.outEdges();
+                if (undirected) {
+                    // concat outEdges + inEdges
+                    edges = concat(u.outEdges(), u.inEdges());
+                }
+
+                for (var e : edges) {
+                    var w = weights.apply(e).doubleValue();
+                    if (w < 0)
+                        throw new IllegalArgumentException("Dijkstra requires non-negative weights");
                     var v = e.getOpposite(u);
-                    if (dist.get(v) > dist.get(u) + weight) {
-                        // priorty of v changes, so must re-and to queue:
-                        priorityQueue.remove(v);
-                        dist.put(v, dist.get(u) + weight);
-                        priorityQueue.add(v);
+                    var nd = dist.get(u) + w;
+                    if (nd < dist.get(v)) {
+                        dist.put(v, nd);
                         predecessor.put(v, u);
+                        pq.add(new double[]{nd, v.getId()});
                     }
                 }
             }
-            System.err.println("done main loop");
-            var result = new ArrayList<Node>();
-            var v = sink;
-            while (v != source) {
-                if (v == null)
-                    throw new RuntimeException("No path from sink back to source");
-                System.err.println("v: " + v);
-                if (v != sink)
-                    result.add(0, v);
-                v = predecessor.get(v);
+
+            // reconstruct full path
+            var path = new ArrayList<Node>();
+            var cur = sink;
+            if (Double.isInfinite(dist.get(cur)))
+                throw new RuntimeException("No path from source to sink");
+            while (cur != null) {
+                path.add(0, cur);
+                if (cur == source) break;
+                cur = predecessor.get(cur);
             }
-            System.err.println("# Dijkstra: " + result.size());
-            return result;
+            return path;
         }
     }
 
-    /**
-     * setups the priority queue
-     *
-     * @return full priority queue
-     * @
-     */
-    static public SortedSet<Node> newFullQueue(final Graph graph, final NodeDoubleArray dist) {
-        var queue = new TreeSet<Node>((v1, v2) -> {
-            var weight1 = dist.get(v1);
-            var weight2 = dist.get(v2);
-            //System.out.println("weight1 " + weight1 + " weight2 " + weight2);
-            //System.out.println("graph.getId(v1) " + graph.getId(v1) + " graph.getId(v2) " + graph.getId(v2));
-            if (weight1 < weight2)
-                return -1;
-            else if (weight1 > weight2)
-                return 1;
-            else return Integer.compare(v1.getId(), v2.getId());
-        });
-        for (var v : graph.nodes())
-            queue.add(v);
-        return queue;
+    // Simple helper to concatenate two Iterables
+    private static <T> Iterable<T> concat(Iterable<T> a, Iterable<T> b) {
+        return () -> new Iterator<T>() {
+            final Iterator<T> itA = a.iterator();
+            final Iterator<T> itB = b.iterator();
+
+            public boolean hasNext() {
+                return itA.hasNext() || itB.hasNext();
+            }
+
+            public T next() {
+                return itA.hasNext() ? itA.next() : itB.next();
+            }
+        };
     }
 }

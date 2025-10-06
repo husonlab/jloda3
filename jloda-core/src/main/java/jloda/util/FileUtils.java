@@ -740,9 +740,15 @@ public class FileUtils {
 	}
 
 	public static void deleteFileIfExists(String fileName) {
-		final File file = new File(fileName);
-		if (file.exists())
-			file.delete();
+		deleteFileIfExists(new File(fileName));
+	}
+
+	public static void deleteFileIfExists(File... files) {
+
+		for (var file : files) {
+			if (file.exists())
+				file.delete();
+		}
 	}
 
 	public static boolean clearDirectory(String directory, boolean removeDirectory) {

@@ -291,6 +291,15 @@ public class RootedNetworkProperties {
         }
     }
 
+	public static int distanceFromTreeBased(PhyloTree tree) {
+		try (EdgeSet matching = OffspringGraphMatching.compute(tree, new ProgressSilent())) {
+			return OffspringGraphMatching.discrepancy(tree, matching);
+		} catch (CanceledException neverHappens) {
+			return 0;
+		}
+	}
+
+
     /**
      * compute an info string
      *
@@ -305,10 +314,14 @@ public class RootedNetworkProperties {
                     phyloTree.nodeStream().filter(Node::isLeaf).count(),
                     phyloTree.nodeStream().filter(v -> v.getInDegree() > 1).mapToInt(v -> v.getInDegree() - 1).sum()));
 
-            if (isTreeBased(phyloTree))
-                buf.append(" tree-based");
-            else if (isTreeChild(phyloTree))
-                buf.append(" tree-child");
+			if (isTreeChild(phyloTree)) {
+				buf.append(" tree-child");
+			} else {
+				var distanceFromTreeBased = distanceFromTreeBased(phyloTree);
+				if (distanceFromTreeBased == 0)
+					buf.append(" tree-based");
+				else buf.append(" tree-based-dist=").append(distanceFromTreeBased);
+			}
             if (isTemporal(phyloTree))
                 buf.append(" temporal");
             buf.append(" network");
@@ -322,7 +335,6 @@ public class RootedNetworkProperties {
 
     /**
      * contracts all edges below min length
-     *
      * @return true, if anything contracted
      */
     public static boolean contractShortEdges(PhyloTree tree, double minLength) {

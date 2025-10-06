@@ -1,5 +1,6 @@
 /*
- * NumericalStability.java Copyright (C) 2024 Daniel H. Huson
+ * NumericalStability.java  (updated)
+ * Copyright (C) 2024 Daniel H. Huson
  *
  *  (Some files contain contributions from other authors, who are then mentioned separately.)
  *
@@ -15,7 +16,6 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 package jloda.graph.fmm.algorithm;
@@ -26,125 +26,149 @@ import jloda.graph.fmm.geometry.DPointMutable;
 import java.util.Random;
 
 /**
- * implementation of the fast multilayer method (note: without multipole algorithm)
+ * Numerical safeguards for the fast multilayer method (no multipole variant).
+ *
+ * This version avoids astronomically large/small rescue vectors and instead
+ * uses scale-aware, bounded random nudges when distances are effectively zero.
+ * You can set a geometric scale (e.g., average ideal edge length) so that
+ * epsilons adapt to the drawing size.
+ *
  * Original C++ author: Stefan Hachul, original license: GPL
- * Reimplemented in Java by Daniel Huson, 3.2021
+ * Reimplemented in Java by Daniel Huson, 3.2021; updated with the help of ChatGPT 2025-09
  */
 public class NumericalStability {
-	public static final double epsilon = 0.1;
-	public static final double POS_SMALL_DOUBLE = 1e-300;
-	public static final double POS_BIG_DOUBLE = 1e+300;
-	public static final double POS_BIG_LIMIT = POS_BIG_DOUBLE * 1e-190;
-	public static final double POS_SMALL_LIMIT = POS_SMALL_DOUBLE * 1e190;
 
+	/* =======================
+	 * Configuration (scale)
+	 * ======================= */
 
-	private static final Random random = new Random();
+	/**
+	 * Geometric scale of the drawing (e.g., average ideal edge length k).
+	 * Used to derive tolerances. Default 1.0 if not set.
+	 */
+	private static volatile double scale = 1.0;
 
+	/**
+	 * Set the geometric scale so epsilons are meaningful for your instance.
+	 * A good choice is the average ideal edge length used elsewhere (k).
+	 */
+	public static void setGeometricScale(double s) {
+		if (s > 0 && Double.isFinite(s)) {
+			scale = s;
+		}
+	}
+
+	/* =======================
+	 * Epsilon/tolerance model
+	 * ======================= */
+
+	// Base factors (dimensionless). Final magnitudes depend on 'scale'.
+	private static final double DIST_EPS_FACTOR = 1e-9;  // distances below ~scale*1e-9 treated as coincident
+	private static final double PUSH_EPS_FACTOR = 1e-6;  // nudge magnitude ~scale*1e-6
+	private static final double MAX_FORCE_FACTOR = 1e+3;  // upper bound for emergency vectors relative to scale
+
+	/**
+	 * Absolute distance threshold derived from scale.
+	 */
+	private static double distEps() {
+		return Math.max(1e-15, DIST_EPS_FACTOR * scale);
+	}
+
+	/**
+	 * Magnitude for small random nudges.
+	 */
+	private static double pushMag() {
+		return Math.max(1e-12, PUSH_EPS_FACTOR * scale);
+	}
+
+	/**
+	 * Clamp for any constructed emergency vector.
+	 */
+	private static double maxForceMag() {
+		return Math.max(1.0, MAX_FORCE_FACTOR * scale);
+	}
+
+	/* =======================
+	 * RNG / determinism
+	 * ======================= */
+
+	private static final Random random = new Random(0L); // deterministic by default
+
+	/**
+	 * Reseed to get reproducible or varied runs as desired.
+	 */
+	public static void reseed(long seed) {
+		random.setSeed(seed);
+	}
+
+	/* =======================
+	 * Public API (unchanged signatures)
+	 * ======================= */
+
+	/**
+	 * Returns true if the distance is "too small" for stable repulsion math and writes a bounded random
+	 * fallback vector to {@code force} (if non-null). No longer attempts to handle "too large" distances;
+	 * far-field repulsion is naturally tiny and numerically safe.
+	 */
 	public static boolean repulsionNearMachinePrecision(double distance, DPointMutable force) {
-
-		if (distance > POS_BIG_LIMIT) {
-			//create random number in range (0,1)
-			var randx = random.nextDouble();
-			var randy = random.nextDouble();
-			var rand_sign_x = random.nextInt(2);
-			var rand_sign_y = random.nextInt(2);
-			force.setX(POS_SMALL_LIMIT * (1 + randx) * Math.pow(-1.0, rand_sign_x));
-			force.setY(POS_SMALL_LIMIT * (1 + randy) * Math.pow(-1.0, rand_sign_y));
+		if (!(distance > 0) || distance < distEps()) {
+			if (force != null) {
+				setRandomUnitScaled(force, pushMag());
+			}
 			return true;
-
-		} else if (distance < POS_SMALL_LIMIT) {
-			//create random number in range (0,1)
-			var randx = random.nextDouble();
-			var randy = random.nextDouble();
-			var rand_sign_x = random.nextInt(2);
-			var rand_sign_y = random.nextInt(2);
-			force.setX(POS_BIG_LIMIT * randx * Math.pow(-1.0, rand_sign_x));
-			force.setY(POS_BIG_LIMIT * randy * Math.pow(-1.0, rand_sign_y));
-			return true;
-
-		} else
-			return false;
+		}
+		return false;
 	}
 
+	/**
+	 * Returns true if the distance is effectively zero for general force math and writes a bounded random
+	 * fallback vector to {@code force} (if non-null).
+	 */
 	public static boolean nearMachinePrecision(double distance, DPointMutable force) {
-		if (distance < POS_SMALL_LIMIT) {
-			//create random number in range (0,1)
-			double randx = random.nextDouble();
-			double randy = random.nextDouble();
-			int rand_sign_x = random.nextInt(2);
-			int rand_sign_y = random.nextInt(2);
-			force.setX(POS_SMALL_LIMIT * (1 + randx) * Math.pow(-1.0, rand_sign_x));
-			force.setY(POS_SMALL_LIMIT * (1 + randy) * Math.pow(-1.0, rand_sign_y));
+		if (!(distance > 0) || distance < distEps()) {
+			if (force != null) {
+				setRandomUnitScaled(force, pushMag());
+			}
 			return true;
-		} else if (distance > POS_BIG_LIMIT) {
-			//create random number in range (0,1)
-			double randx = random.nextDouble();
-			double randy = random.nextDouble();
-			int rand_sign_x = random.nextInt(2);
-			int rand_sign_y = random.nextInt(2);
-			force.setX(POS_BIG_LIMIT * randx * Math.pow(-1.0, rand_sign_x));
-			force.setY(POS_BIG_LIMIT * randy * Math.pow(-1.0, rand_sign_y));
-			return true;
-
-		} else
-			return false;
+		}
+		return false;
 	}
 
+	/**
+	 * Returns a nearby point distinct from {@code old_pos}, jittered by a small, scale-aware radius.
+	 * Kept for API compatibility with existing callers.
+	 */
 	public static DPoint chooseDistinctRandomPointInRadiusEpsilon(DPoint old_pos) {
-		double xmin = old_pos.getX() - 1 * epsilon;
-		double xmax = old_pos.getX() + 1 * epsilon;
-		double ymin = old_pos.getY() - 1 * epsilon;
-		double ymax = old_pos.getY() + 1 * epsilon;
-
-		return chooseDistinctRandomPointInDisk(old_pos, xmin, xmax, ymin, ymax);
+		final double r = pushMag(); // small, scale-aware jitter
+		final double a = 2.0 * Math.PI * random.nextDouble();
+		return new DPoint(old_pos.getX() + r * Math.cos(a), old_pos.getY() + r * Math.sin(a));
 	}
 
-	private static DPoint chooseDistinctRandomPointInDisk(DPoint oldPoint, double xmin, double xmax, double ymin, double ymax) {
-		var mindist_to_xmin = oldPoint.getX() - xmin;
-		var mindist_to_xmax = xmax - oldPoint.getX();
-		var mindist_to_ymin = oldPoint.getY() - ymin;
-		var mindist_to_ymax = ymax - oldPoint.getY();
+	/* =======================
+	 * Helpers
+	 * ======================= */
 
-		var mindist = Math.min(Math.min(mindist_to_xmin, mindist_to_xmax), Math.min(mindist_to_ymin, mindist_to_ymax));
+	private static void setRandomUnitScaled(DPointMutable out, double magnitude) {
+		// Draw a random direction uniformly on the circle, then scale.
+		double theta = 2.0 * Math.PI * random.nextDouble();
+		double x = Math.cos(theta);
+		double y = Math.sin(theta);
+		out.setX(x * magnitude);
+		out.setY(y * magnitude);
 
-		if (mindist > 0) {
-			DPointMutable newPoint = new DPointMutable();
-			do {
-				//assign random double values in range (-1,1)
-				var rand_x = 2 * random.nextDouble() - 1;
-				var rand_y = 2 * random.nextDouble() - 1;
+		// Final clamp (very conservative) in case caller composes multiple emergency vectors.
+		clampMagnitude(out, maxForceMag());
+	}
 
-				newPoint.setPosition(oldPoint.getX() + mindist * rand_x * epsilon, oldPoint.getY() + mindist * rand_y * epsilon);
-			} while (oldPoint.equals(newPoint) || oldPoint.distance(newPoint) >= mindist * epsilon);
-			return newPoint;
-		} else if (mindist == 0) {
-			double mindist_x = 0;
-			double mindist_y = 0;
-
-			if (mindist_to_xmin > 0)
-				mindist_x = (-1) * mindist_to_xmin;
-			else if (mindist_to_xmax > 0)
-				mindist_x = mindist_to_xmax;
-			if (mindist_to_ymin > 0)
-				mindist_y = (-1) * mindist_to_ymin;
-			else if (mindist_to_ymax > 0)
-				mindist_y = mindist_to_ymax;
-
-			DPointMutable newPoint = new DPointMutable();
-
-			if ((mindist_x != 0) || (mindist_y != 0))
-				do {
-					//assign random double values in range (0,1)
-					var rand_x = random.nextDouble();
-					var rand_y = random.nextDouble();
-					newPoint.setPosition(oldPoint.getX() + mindist_x * rand_x * epsilon, oldPoint.getY() + mindist_y * rand_y * epsilon);
-				} while (oldPoint.equals(newPoint));
-			else
-				System.err.println("Error chooseDistinctRandomPointInDisk(): box is equal to oldPoint");
-			return newPoint;
-		} else {
-			System.err.println("Error chooseDistinctRandomPointInDisk(): oldPoint not in box");
-			return oldPoint;
+	private static void clampMagnitude(DPointMutable v, double maxMag) {
+		double x = v.getX();
+		double y = v.getY();
+		double m2 = x * x + y * y;
+		double max2 = maxMag * maxMag;
+		if (m2 > max2) {
+			double s = maxMag / Math.sqrt(m2);
+			v.setX(x * s);
+			v.setY(y * s);
 		}
 	}
 }

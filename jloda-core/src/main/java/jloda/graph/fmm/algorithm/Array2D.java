@@ -1,5 +1,6 @@
 /*
- * Array2D.java Copyright (C) 2024 Daniel H. Huson
+ * Array2D.java (updated & documented)
+ * Copyright (C) 2024 Daniel H. Huson
  *
  *  (Some files contain contributions from other authors, who are then mentioned separately.)
  *
@@ -21,70 +22,156 @@
 package jloda.graph.fmm.algorithm;
 
 import java.util.Arrays;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
 /**
- * a two dimension array of fixed size
- * Daniel Huson, 3.2021
+ * Fixed-size 2D array with null-safe helpers.
+ *
+ * <p>Notes:</p>
+ * <ul>
+ *   <li>Indices are zero-based; bounds are checked on access/mutation.</li>
+ *   <li>Generic storage uses {@code Object[][]} internally; casts are localized.</li>
+ *   <li>{@link #computeIfAbsent(int, int, BiFunction)} mirrors Map semantics.</li>
+ * </ul>
  */
 public class Array2D<T> {
     private final Object[][] table;
 
+	/**
+	 * Create a rows×cols matrix. Rows and cols must be &ge; 0.
+	 */
     public Array2D(int numberOfRows, int numberOfCols) {
-        table = new Object[numberOfRows][numberOfCols];
+		if (numberOfRows < 0 || numberOfCols < 0) {
+			throw new IllegalArgumentException("numberOfRows and numberOfCols must be >= 0");
+		}
+		this.table = new Object[numberOfRows][numberOfCols];
     }
 
+	/**
+	 * Get the value at (row,col).
+	 */
+	@SuppressWarnings("unchecked")
     public T get(int row, int col) {
+		checkBounds(row, col);
         return (T) table[row][col];
-    }
+	}
 
+	/** Get the value at (row,col) or return {@code defaultValue} if null. */
     public T getOrDefault(int row, int col, T defaultValue) {
         T result = get(row, col);
-        if (result == null)
-            return defaultValue;
-        else
-            return result;
-    }
+		return (result == null ? defaultValue : result);
+	}
 
+	/**
+	 * If (row,col) is null, compute a value and store it; return the current or computed value.
+	 * If the mapping function returns null, the cell remains null.
+     */
     public T computeIfAbsent(int row, int col, BiFunction<Integer, Integer, T> function) {
         T result = get(row, col);
         if (result == null) {
-            result = function.apply(row, col);
-            if (result != null)
-                put(row, col, result);
+			T computed = function.apply(row, col);
+			if (computed != null) {
+				put(row, col, computed);
+				return computed;
+			}
+			return null;
         }
         return result;
-    }
+	}
 
+	/** Set the value at (row,col). */
     public void put(int row, int col, T value) {
+		checkBounds(row, col);
         table[row][col] = value;
-    }
+	}
 
-    public void clear() {
-        for (var row : table) {
-            Arrays.fill(row, null);
-        }
-    }
+	/**
+	 * Fill every cell with {@code value}.
+	 */
+	public void fill(T value) {
+		for (int r = 0; r < table.length; r++) {
+			Arrays.fill(table[r], value);
+		}
+	}
 
+	/** Clear all cells (set to null). */
+	public void clear() {
+		fill(null);
+	}
+
+	/** @return number of rows. */
     public int getNumberOfRows() {
         return table.length;
-    }
+	}
 
+	/** @return number of columns (0 for empty matrix). */
     public int getNumberOfColumns() {
-        return getNumberOfRows() == 0 ? 0 : table[0].length;
+		return table.length == 0 ? 0 : table[0].length;
+	}
+
+	/**
+	 * Iterate over all cells (row-major), passing (row, col, value) to the consumer.
+	 * Null values are passed as null.
+	 */
+	@SuppressWarnings("unchecked")
+	public void forEach(BiConsumer<Integer, Integer> indexConsumer, BiConsumer<Integer, Integer> valueIgnored) {
+		// Kept for backward compatibility if someone expects a two-arg variant—intentionally no-op on value
+		for (int r = 0; r < table.length; r++) {
+			for (int c = 0; c < (table[r] == null ? 0 : table[r].length); c++) {
+				indexConsumer.accept(r, c);
+			}
+		}
+	}
+
+	/**
+	 * Iterate over all cells (row-major), passing (row, col, value) to the consumer.
+	 */
+	@SuppressWarnings("unchecked")
+	public void forEach(BiConsumer<Integer, Integer> indexConsumer, TriConsumer<Integer, Integer, T> cellConsumer) {
+		for (int r = 0; r < table.length; r++) {
+			for (int c = 0; c < table[r].length; c++) {
+				indexConsumer.accept(r, c);
+				cellConsumer.accept(r, c, (T) table[r][c]);
+            }
+        }
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Array2D<?> that = (Array2D<?>) o;
-        return getNumberOfRows() == that.getNumberOfRows() && getNumberOfColumns() == that.getNumberOfColumns()
-               && Arrays.deepEquals(table, that.table);
+		if (!(o instanceof Array2D<?> that)) return false;
+		return getNumberOfRows() == that.getNumberOfRows()
+			   && getNumberOfColumns() == that.getNumberOfColumns()
+			   && Arrays.deepEquals(this.table, that.table);
     }
 
     @Override
     public int hashCode() {
         return Arrays.deepHashCode(table);
+	}
+
+	@Override
+	public String toString() {
+		return "Array2D[" + getNumberOfRows() + "x" + getNumberOfColumns() + "]";
+	}
+
+	/* ---------- helpers ---------- */
+
+	private void checkBounds(int row, int col) {
+		int rows = getNumberOfRows();
+		int cols = getNumberOfColumns();
+		if (row < 0 || row >= rows || col < 0 || col >= cols) {
+			throw new IndexOutOfBoundsException(
+					"Index (" + row + "," + col + ") out of bounds for " + rows + "x" + cols);
+		}
+	}
+
+	/**
+	 * Simple tri-consumer interface to avoid extra dependencies.
+	 */
+	@FunctionalInterface
+	public interface TriConsumer<A, B, C> {
+		void accept(A a, B b, C c);
     }
 }

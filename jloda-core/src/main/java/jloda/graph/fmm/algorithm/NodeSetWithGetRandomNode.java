@@ -1,5 +1,6 @@
 /*
- * NodeSetWithGetRandomNode.java Copyright (C) 2024 Daniel H. Huson
+ * NodeSetWithGetRandomNode.java (updated & documented)
+ * Copyright (C) 2024 Daniel H. Huson
  *
  *  (Some files contain contributions from other authors, who are then mentioned separately.)
  *
@@ -28,17 +29,31 @@ import jloda.graph.NodeIntArray;
 import java.util.Random;
 
 /**
- * implementation of the fast multilayer method (note: without multipole algorithm)
- * Original C++ author: Stefan Hachul, original license: GPL
- * Reimplemented in Java by Daniel Huson, 3.2021
+ * A mutable node set supporting:
+ * <ul>
+ *   <li>O(1) deletion by node</li>
+ *   <li>O(1) uniform sampling without replacement</li>
+ *   <li>Biased sampling by star mass (min/max over a fixed number of random tries)</li>
+ * </ul>
+ *
+ * <p>Internally stores nodes in an array; the active range is {@code [0..lastSelectableIndexOfNode]}.
+ * Deletion swaps a node with the tail element and shrinks the active range.</p>
+ *
+ * <p>Determinism: call {@link #setSeed(int)} before any sampling.</p>
+ *
+ * <p>Original C++ author: Stefan Hachul (GPL). Reimplemented in Java by Daniel Huson, 3.2021.
+ * This version adds guards and documentation.</p>
  */
 public class NodeSetWithGetRandomNode {
-	final private Node[] array;
+	private final Node[] array;
 	private final NodeIntArray positionInArray;
 	private final NodeIntArray massOfStar;
 	private int lastSelectableIndexOfNode;
-	final private Random random = new Random();
+	private final Random random = new Random();
 
+	/**
+	 * Build a node set with unit masses.
+	 */
 	public NodeSetWithGetRandomNode(Graph graph) {
 		array = new Node[graph.getNumberOfNodes()];
 		positionInArray = graph.newNodeIntArray();
@@ -48,12 +63,15 @@ public class NodeSetWithGetRandomNode {
 		for (var v : graph.nodes()) {
 			array[i] = v;
 			positionInArray.put(v, i);
-			i++;
 			massOfStar.put(v, 1);
+			i++;
 		}
 		lastSelectableIndexOfNode = array.length - 1;
 	}
 
+	/**
+	 * Build a node set with masses taken from {@code nodeAttributes.get(v).getMass()}.
+	 */
 	public NodeSetWithGetRandomNode(Graph graph, NodeArray<NodeAttributes> nodeAttributes) {
 		array = new Node[graph.getNumberOfNodes()];
 		positionInArray = graph.newNodeIntArray();
@@ -63,91 +81,166 @@ public class NodeSetWithGetRandomNode {
 		for (var v : graph.nodes()) {
 			array[i] = v;
 			positionInArray.put(v, i);
-			i++;
 			massOfStar.put(v, nodeAttributes.get(v).getMass());
+			i++;
 		}
 		lastSelectableIndexOfNode = array.length - 1;
-
 	}
 
+	/** @return {@code true} if no selectable nodes remain. */
 	public boolean isEmpty() {
 		return lastSelectableIndexOfNode < 0;
 	}
 
+	/** @return {@code true} if {@code v} has been deleted (or was never in the active range). */
 	public boolean isDeleted(Node v) {
 		return positionInArray.get(v) > lastSelectableIndexOfNode;
 	}
 
+	/**
+	 * Delete {@code v} from the active set if present (O(1)).
+	 * No-op if already deleted.
+	 */
 	public void delete(Node v) {
 		if (!isDeleted(v)) {
-			var pos = positionInArray.get(v);
-			var w = array[lastSelectableIndexOfNode];
-			array[pos] = w;
-			positionInArray.put(w, pos);
+			int pos = positionInArray.get(v);
+			Node tail = array[lastSelectableIndexOfNode];
+			array[pos] = tail;
+			positionInArray.put(tail, pos);
 			array[lastSelectableIndexOfNode] = v;
 			positionInArray.put(v, lastSelectableIndexOfNode);
 			lastSelectableIndexOfNode--;
 		}
 	}
 
+	/**
+	 * Uniform random node from the active set (without replacement).
+	 * @throws IllegalStateException if the set is empty.
+	 */
 	public Node getRandomNode() {
-		var v = array[random.nextInt(lastSelectableIndexOfNode + 1)];
+		if (isEmpty()) {
+			throw new IllegalStateException("NodeSetWithGetRandomNode is empty");
+		}
+		Node v = array[random.nextInt(lastSelectableIndexOfNode + 1)];
 		delete(v);
 		return v;
 	}
 
+	/**
+	 * Random-biased selection preferring the lowest star mass among up to {@code numberRandomTries} random candidates.
+	 * Each try samples uniformly without replacement from the active range by swapping with the tail segment used for tries.
+	 * Falls back to uniform if no candidate was found (e.g., zero tries).
+	 *
+	 * @throws IllegalStateException if the set is empty.
+	 */
 	public Node getRandomNodeWithLowestStarMass(int numberRandomTries) {
+		if (isEmpty()) {
+			throw new IllegalStateException("NodeSetWithGetRandomNode is empty");
+		}
+		if (numberRandomTries <= 0) {
+			return getRandomNode();
+		}
+
 		int minMass = Integer.MAX_VALUE;
-		Node randomNode = null;
-		int last_trie_index = lastSelectableIndexOfNode;
-		int i = 1;
-		while (i <= numberRandomTries && last_trie_index >= 0) {
-			var lastTrieNode = array[last_trie_index];
-			var newRandomIndex = random.nextInt(last_trie_index + 1);
-			var newRandomNode = array[newRandomIndex];
-			array[last_trie_index] = newRandomNode;
-			array[newRandomIndex] = lastTrieNode;
-			positionInArray.put(newRandomNode, last_trie_index);
-			positionInArray.put(lastTrieNode, newRandomIndex);
+		Node chosen = null;
 
-			if (massOfStar.get(array[last_trie_index]) < minMass) {
-				randomNode = array[last_trie_index];
-				minMass = massOfStar.get(randomNode);
+		int lastTryIdx = lastSelectableIndexOfNode;
+		int tries = 0;
+
+		while (tries < numberRandomTries && lastTryIdx >= 0) {
+			// sample uniformly from [0..lastTryIdx], then move that sampled element to lastTryIdx (try-reservoir)
+			int rndIdx = random.nextInt(lastTryIdx + 1);
+			Node sampled = array[rndIdx];
+			Node tail = array[lastTryIdx];
+			array[rndIdx] = tail;
+			array[lastTryIdx] = sampled;
+			positionInArray.put(tail, rndIdx);
+			positionInArray.put(sampled, lastTryIdx);
+
+			int mass = massOfStar.get(sampled);
+			if (mass < minMass) {
+				minMass = mass;
+				chosen = sampled;
 			}
-			i++;
-			last_trie_index -= 1;
+			tries++;
+			lastTryIdx--;
 		}
-		delete(randomNode);
-		return randomNode;
+
+		if (chosen == null) {
+			// Should not happen unless zero tries, but be defensive
+			return getRandomNode();
+		}
+		delete(chosen);
+		return chosen;
 	}
 
+	/**
+	 * Random-biased selection preferring the highest star mass among up to {@code numberRandomTries} random candidates.
+	 * Each try samples uniformly without replacement from the active range by swapping with the tail segment used for tries.
+	 * Falls back to uniform if no candidate was found (e.g., zero tries).
+	 *
+	 * @throws IllegalStateException if the set is empty.
+	 */
 	public Node getRandomNodeWithHighestStarMass(int numberRandomTries) {
-		int maxMass = 0;
-		Node randomNode = null;
-		int last_trie_index = lastSelectableIndexOfNode;
-		int i = 1;
-		while (i <= numberRandomTries && last_trie_index >= 0) {
-			var lastTrieNode = array[last_trie_index];
-			var newRandomIndex = random.nextInt(last_trie_index + 1);
-			var newRandomNode = array[newRandomIndex];
-			array[last_trie_index] = newRandomNode;
-			array[newRandomIndex] = lastTrieNode;
-			positionInArray.put(newRandomNode, last_trie_index);
-			positionInArray.put(lastTrieNode, newRandomIndex);
-
-			if (massOfStar.get(array[last_trie_index]) > maxMass) {
-				randomNode = array[last_trie_index];
-				maxMass = massOfStar.get(randomNode);
-			}
-			i++;
-			last_trie_index -= 1;
+		if (isEmpty()) {
+			throw new IllegalStateException("NodeSetWithGetRandomNode is empty");
+		}
+		if (numberRandomTries <= 0) {
+			return getRandomNode();
 		}
 
-		delete(randomNode);
-		return randomNode;
+		int maxMass = Integer.MIN_VALUE;
+		Node chosen = null;
+
+		int lastTryIdx = lastSelectableIndexOfNode;
+		int tries = 0;
+
+		while (tries < numberRandomTries && lastTryIdx >= 0) {
+			// sample uniformly from [0..lastTryIdx], then move that sampled element to lastTryIdx (try-reservoir)
+			int rndIdx = random.nextInt(lastTryIdx + 1);
+			Node sampled = array[rndIdx];
+			Node tail = array[lastTryIdx];
+			array[rndIdx] = tail;
+			array[lastTryIdx] = sampled;
+			positionInArray.put(tail, rndIdx);
+			positionInArray.put(sampled, lastTryIdx);
+
+			int mass = massOfStar.get(sampled);
+			if (mass > maxMass) {
+				maxMass = mass;
+				chosen = sampled;
+			}
+			tries++;
+			lastTryIdx--;
+		}
+
+		if (chosen == null) {
+			// Should not happen unless zero tries, but be defensive
+			return getRandomNode();
+		}
+		delete(chosen);
+		return chosen;
 	}
 
+	/**
+	 * Seed the RNG for deterministic selection.
+	 * Call before any sampling.
+	 */
 	public void setSeed(int seed) {
 		random.setSeed(seed);
+	}
+
+	/**
+	 * Total number of nodes the set was initialized with.
+	 */
+	public int size() {
+		return array.length;
+	}
+
+	/**
+	 * Number of nodes still selectable (not deleted).
+	 */
+	public int remainingCount() {
+		return lastSelectableIndexOfNode + 1;
 	}
 }

@@ -73,9 +73,10 @@ public class LayoutRootedPhylogeny {
 
 			if (originalScore > 0) {
 				DAGTraversals.preOrderTraversal(network.getRoot(), network.getLSAChildrenMap(), v -> OptimizeLayout.optimizeOrdering(v, network.getLSAChildrenMap(), nodePointMap, random, optimizeHow));
-				if (false) {
+				if (true) {
+					var ystep = computeLeafYStep(network, v -> nodePointMap.get(v).getY());
 					var newScore = computeCost(network, network.getLSAChildrenMap(), nodePointMap, optimizeHow);
-					System.err.printf("Layout optimization: %d -> %d%n", originalScore, newScore);
+					System.err.printf("Layout optimization: %.1f -> %.1f%n", ((float) originalScore / ystep), ((float) newScore / ystep));
 				}
 			}
 		}
@@ -112,6 +113,21 @@ public class LayoutRootedPhylogeny {
 				nodeAngleMap.put(v, 0.0);
 			}
 		}
+	}
+
+	private static double computeLeafYStep(PhyloTree network, Function<Node, Double> yFunction) {
+		var min = Double.MAX_VALUE;
+		var max = Double.MIN_VALUE;
+		var count = 0;
+		for (var v : network.nodes()) {
+			if (v.isLeaf()) {
+				var value = yFunction.apply(v);
+				min = Math.min(min, value);
+				max = Math.max(max, value);
+				count++;
+			}
+		}
+		return count >= 2 ? (max - min) / (count - 1) : 1;
 	}
 
 	/**

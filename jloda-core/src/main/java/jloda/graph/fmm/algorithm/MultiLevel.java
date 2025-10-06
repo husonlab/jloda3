@@ -1,5 +1,6 @@
 /*
- * MultiLevel.java Copyright (C) 2024 Daniel H. Huson
+ * MultiLevel.java (updated & documented)
+ * Copyright (C) 2024 Daniel H. Huson
  *
  *  (Some files contain contributions from other authors, who are then mentioned separately.)
  *
@@ -29,24 +30,56 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Random;
 
-
 /**
- * implementation of the fast multilayer method (note: without multipole algorithm)
- * Original C++ author: Stefan Hachul, original license: GPL
- * Reimplemented in Java by Daniel Huson, 3.2021
+ * Multilevel coarsening and initialization routines for the Fast Multilayer Method (FMMM),
+ * following the "galaxy → solar-system → collapse" scheme.
+ *
+ * <p>Key responsibilities:</p>
+ * <ul>
+ *   <li>Build a pyramid of coarser graphs (levels 0..L) while keeping per-level attributes.</li>
+ *   <li>Select "suns" (coarse representatives), attach "planets" and "moons", then collapse.</li>
+ *   <li>Provide initial positions for finer levels from already placed coarser levels.</li>
+ * </ul>
+ *
+ * <p>Notable updates vs. original:</p>
+ * <ul>
+ *   <li>Randomness is now seeded from {@link FastMultiLayerMethodOptions#getRandSeed()} for determinism.</li>
+ *   <li>Removed try-with-resources on per-level attribute arrays (they must not be auto-closed while still used later).</li>
+ *   <li>Fixed the parallel-edge merge to use a single stable comparator (minId,maxId) and average lengths correctly.</li>
+ *   <li>Corrected lambda index handling in PM-node initialization (no off-by-one / skipping last element).</li>
+ *   <li>Clarified and tightened the sector selection logic; reduced double-increment of the loop index.</li>
+ *   <li>Minor naming cleanup: "Mode" → "Moon".</li>
+ * </ul>
  */
 public class MultiLevel {
+	/**
+	 * Shared RNG seeded per run from options to keep deterministic behavior.
+	 */
 	private static final Random random = new Random();
 
 	/**
-	 * creates the multi-level representation
+	 * Create the multilevel representations (level 0 = original graph).
 	 *
-	 * @return the number of levels
+	 * @param options                      FMMM options
+	 * @param graph                        level-0 graph
+	 * @param nodeAttributes               level-0 node attributes
+	 * @param edgeAttributes               level-0 edge attributes
+	 * @param multiLevelGraph              output array: per-level graphs
+	 * @param multiLevelNodeAttributes     output array: per-level node attributes
+	 * @param multiLevelEdgeAttributes     output array: per-level edge attributes
+	 * @return the top level index (L), i.e., number of levels - 1
 	 */
-	public static int createMultiLevelRepresentations(FastMultiLayerMethodOptions options, Graph graph, NodeArray<NodeAttributes> nodeAttributes,
+	public static int createMultiLevelRepresentations(FastMultiLayerMethodOptions options,
+													  Graph graph,
+													  NodeArray<NodeAttributes> nodeAttributes,
 													  EdgeArray<EdgeAttributes> edgeAttributes,
-													  Graph[] multiLevelGraph, NodeArray<NodeAttributes>[] multiLevelNodeAttributes,
+													  Graph[] multiLevelGraph,
+													  NodeArray<NodeAttributes>[] multiLevelNodeAttributes,
 													  EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes) {
+
+		// Seed RNG once per multilevel run for determinism
+		random.setSeed(options.getRandSeed());
+
 		multiLevelGraph[0] = graph;
 		multiLevelNodeAttributes[0] = nodeAttributes;
 		multiLevelEdgeAttributes[0] = edgeAttributes;
@@ -55,65 +88,78 @@ public class MultiLevel {
 		var activeLevel = 0;
 		var activeGraph = multiLevelGraph[0];
 
-		while (activeGraph.getNumberOfNodes() > options.getMinGraphSize() && edgeNumberSumOfAllLevelsIsLinear(multiLevelGraph, activeLevel, badEdgeNrCounter)) {
+		// Build higher levels until graph small enough or edge growth no longer near-linear
+		while (activeGraph.getNumberOfNodes() > options.getMinGraphSize()
+			   && edgeNumberSumOfAllLevelsIsLinear(multiLevelGraph, activeLevel, badEdgeNrCounter)) {
+
 			var newGraph = new Graph();
-			try (NodeArray<NodeAttributes> newNodeAttributes = newGraph.newNodeArray();
-				 EdgeArray<EdgeAttributes> newEdgeAttributes = newGraph.newEdgeArray()) {
-				multiLevelGraph[activeLevel + 1] = newGraph;
-				multiLevelNodeAttributes[activeLevel + 1] = newNodeAttributes;
-				multiLevelEdgeAttributes[activeLevel + 1] = newEdgeAttributes;
+			// DO NOT use try-with-resources here; these arrays live beyond this block.
+			NodeArray<NodeAttributes> newNodeAttributes = newGraph.newNodeArray();
+			EdgeArray<EdgeAttributes> newEdgeAttributes = newGraph.newEdgeArray();
 
-				partitionGalaxyIntoSolarSystems(options, multiLevelGraph, multiLevelNodeAttributes, multiLevelEdgeAttributes, activeLevel);
-				collapseSolarSystems(multiLevelGraph, multiLevelNodeAttributes, multiLevelEdgeAttributes, activeLevel);
+			multiLevelGraph[activeLevel + 1] = newGraph;
+			multiLevelNodeAttributes[activeLevel + 1] = newNodeAttributes;
+			multiLevelEdgeAttributes[activeLevel + 1] = newEdgeAttributes;
 
-				activeLevel++;
-				activeGraph = multiLevelGraph[activeLevel];
-			}
+			partitionGalaxyIntoSolarSystems(options, multiLevelGraph, multiLevelNodeAttributes, multiLevelEdgeAttributes, activeLevel);
+			collapseSolarSystems(multiLevelGraph, multiLevelNodeAttributes, multiLevelEdgeAttributes, activeLevel);
+
+			activeLevel++;
+			activeGraph = multiLevelGraph[activeLevel];
 		}
 		return activeLevel;
 	}
 
 	/**
-	 * determines whether edge number of sum of all levels can be considered linear
-	 *
-	 * @return true, if linear
+	 * Heuristic guard: keep building levels while summed edge counts shrink roughly linearly.
 	 */
 	private static boolean edgeNumberSumOfAllLevelsIsLinear(Graph[] multiLevelGraph, int activeLevel, Counter badEdgeNrCounter) {
-		if (activeLevel == 0)
+		if (activeLevel == 0) {
 			return true;
-		else if (multiLevelGraph[activeLevel].getNumberOfEdges() <= 0.8 * (multiLevelGraph[activeLevel - 1].getNumberOfEdges()))
+		} else if (multiLevelGraph[activeLevel].getNumberOfEdges()
+				   <= 0.8 * (multiLevelGraph[activeLevel - 1].getNumberOfEdges())) {
 			return true;
-		else if (badEdgeNrCounter.get() < 5) {
+		} else if (badEdgeNrCounter.get() < 5) {
 			badEdgeNrCounter.increment();
 			return true;
-		} else
+		} else {
 			return false;
+		}
 	}
 
-	private static void partitionGalaxyIntoSolarSystems(FastMultiLayerMethodOptions options, Graph[] multiLevelGraph, NodeArray<NodeAttributes>[] multiLevelNodeAttributes, EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes, int level) {
+	/**
+	 * Partition level-{@code level} galaxy into solar systems and label suns/planets/moons.
+	 */
+	private static void partitionGalaxyIntoSolarSystems(FastMultiLayerMethodOptions options,
+														Graph[] multiLevelGraph,
+														NodeArray<NodeAttributes>[] multiLevelNodeAttributes,
+														EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes,
+														int level) {
 		createSunsAndPlanets(options, multiLevelGraph, multiLevelNodeAttributes, multiLevelEdgeAttributes, level);
 		createMoonNodesAndPMNodes(multiLevelGraph, multiLevelNodeAttributes, multiLevelEdgeAttributes, level);
 	}
 
 	/**
-	 * create suns and planets
+	 * Select suns and planets, create higher-level representatives, and set core attributes.
 	 */
-	private static void createSunsAndPlanets(FastMultiLayerMethodOptions options, Graph[] multiLevelGraph, NodeArray<NodeAttributes>[] multiLevelNodeAttributes, EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes, int level) {
+	private static void createSunsAndPlanets(FastMultiLayerMethodOptions options,
+											 Graph[] multiLevelGraph,
+											 NodeArray<NodeAttributes>[] multiLevelNodeAttributes,
+											 EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes,
+											 int level) {
 		if (level == 0) {
-			multiLevelNodeAttributes[level].values().forEach(ba -> ba.setMass(1));
+			multiLevelNodeAttributes[level].values().forEach(na -> na.setMass(1));
 		}
 
-		final NodeSetWithGetRandomNode nodeSet;
-		if (options.getGalaxyChoice() == FastMultiLayerMethodOptions.GalaxyChoice.UniformProb) {
-			nodeSet = new NodeSetWithGetRandomNode(multiLevelGraph[level]);
-		} else {
-			nodeSet = new NodeSetWithGetRandomNode(multiLevelGraph[level], multiLevelNodeAttributes[level]);
-		}
+		final NodeSetWithGetRandomNode nodeSet = (options.getGalaxyChoice() == FastMultiLayerMethodOptions.GalaxyChoice.UniformProb)
+				? new NodeSetWithGetRandomNode(multiLevelGraph[level])
+				: new NodeSetWithGetRandomNode(multiLevelGraph[level], multiLevelNodeAttributes[level]);
 		nodeSet.setSeed(options.getRandSeed());
 
 		var sunNodes = new ArrayList<Node>();
 
-		while (!nodeSet.isEmpty()) { // randomly select a sun node
+		while (!nodeSet.isEmpty()) {
+			// 1) Pick a sun
 			Node sunNode = switch (options.getGalaxyChoice()) {
 				default -> nodeSet.getRandomNode();
 				case NonUniformProbLowerMass -> nodeSet.getRandomNodeWithLowestStarMass(options.getNumberRandomTries());
@@ -122,44 +168,37 @@ public class MultiLevel {
 			};
 			sunNodes.add(sunNode);
 
-			//create new node at higher level that represents the collapsed solar_system
+			// 2) Create the representative at level+1
 			var newNode = multiLevelGraph[level + 1].newNode();
-			{
-				var na = new NodeAttributes();
-				na.initMultiLevelValues();
-				multiLevelNodeAttributes[level + 1].put(newNode, na);
-			}
+			var newNa = new NodeAttributes();
+			newNa.initMultiLevelValues();
+			multiLevelNodeAttributes[level + 1].put(newNode, newNa);
 
-			//update information for sun_node
-			{
-				var sa = multiLevelNodeAttributes[level].get(sunNode);
-				sa.setHigherLevelNode(newNode);
-				sa.setType(NodeAttributes.Type.Sun);
-				sa.setDedicatedSunNode(sunNode);
-				sa.setDedicatedSunDistance(0);
-			}
+			// 3) Label the sun
+			var sa = multiLevelNodeAttributes[level].get(sunNode);
+			sa.setHigherLevelNode(newNode);
+			sa.setType(NodeAttributes.Type.Sun);
+			sa.setDedicatedSunNode(sunNode);
+			sa.setDedicatedSunDistance(0);
 
-			//update information for planet_nodes
+			// 4) Label planets (neighbors of the sun)
 			var planetNodes = new ArrayList<Node>();
 			for (var sunEdge : sunNode.adjacentEdges()) {
 				double distanceToSun = multiLevelEdgeAttributes[level].get(sunEdge).getLength();
 				final Node planetNode = sunEdge.getOpposite(sunNode);
-				{
-					var na = multiLevelNodeAttributes[level].get(planetNode);
-					na.setType(NodeAttributes.Type.Planet);
-					na.setDedicatedSunNode(sunNode);
-					na.setDedicatedSunDistance(distanceToSun);
-				}
+				var na = multiLevelNodeAttributes[level].get(planetNode);
+				na.setType(NodeAttributes.Type.Planet);
+				na.setDedicatedSunNode(sunNode);
+				na.setDedicatedSunDistance(distanceToSun);
 				planetNodes.add(planetNode);
 			}
 
-			//delete all planet_nodes nodeSet
+			// 5) Remove planets from candidate set
 			for (var v : planetNodes) {
-				if (!nodeSet.isDeleted(v))
-					nodeSet.delete(v);
+				if (!nodeSet.isDeleted(v)) nodeSet.delete(v);
 			}
 
-			// determine possible moons:
+			// 6) Pre-claim neighbors of planets as potential moons (remove unclassified neighbors)
 			for (var v : planetNodes) {
 				for (var e : v.adjacentEdges()) {
 					var possibleMoonNode = e.getOpposite(v);
@@ -171,227 +210,303 @@ public class MultiLevel {
 			}
 		}
 
+		// Copy visual properties from suns to their reps at level+1 and reset masses (recomputed later)
 		for (var sunNode : sunNodes) {
 			var sna = multiLevelNodeAttributes[level].get(sunNode);
-			var newNode = sna.getHigherLevelNode();
-			var newNodeAttribute = new NodeAttributes(sna.getWidth(), sna.getHeight(), sna.getPosition(), sunNode, null);
-			newNodeAttribute.setMass(0);
-			multiLevelNodeAttributes[level + 1].put(newNode, newNodeAttribute);
+			var rep = sna.getHigherLevelNode();
+			var repAttr = new NodeAttributes(sna.getWidth(), sna.getHeight(), sna.getPosition(), sunNode, null);
+			repAttr.setMass(0);
+			multiLevelNodeAttributes[level + 1].put(rep, repAttr);
 		}
 	}
 
 	/**
-	 * create moon nodes and possibly moon nodes
+	 * Identify moon nodes and attach them to planet-with-moons (PM) nodes.
 	 */
-	private static void createMoonNodesAndPMNodes(Graph[] multiLevelGraph, NodeArray<NodeAttributes>[] multiLevelNodeAttributes, EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes, int level) {
+	private static void createMoonNodesAndPMNodes(Graph[] multiLevelGraph,
+												  NodeArray<NodeAttributes>[] multiLevelNodeAttributes,
+												  EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes,
+												  int level) {
 		for (var v : multiLevelGraph[level].nodes()) {
-			if (multiLevelNodeAttributes[level].get(v).getType() == NodeAttributes.Type.Unspecified) { // possible moon node
-				double distanceToNearestNeighbor = 0;
-				Node nearestNeighborNode = null;
+			if (multiLevelNodeAttributes[level].get(v).getType() == NodeAttributes.Type.Unspecified) {
+				double bestDist = 0;
+				Node nearestPlanet = null;
 				Edge moonEdge = null;
+
 				for (var e : v.adjacentEdges()) {
-					var neighborNode = e.getOpposite(v);
-					var neighborType = multiLevelNodeAttributes[level].get(neighborNode).getType();
+					var neighbor = e.getOpposite(v);
+					var neighborType = multiLevelNodeAttributes[level].get(neighbor).getType();
 					if (neighborType == NodeAttributes.Type.Planet || neighborType == NodeAttributes.Type.PlanetWithMoons) {
 						var ea = multiLevelEdgeAttributes[level].get(e);
-						if (moonEdge == null || distanceToNearestNeighbor > ea.getLength()) {
+						if (moonEdge == null || bestDist > ea.getLength()) {
 							moonEdge = e;
-							distanceToNearestNeighbor = ea.getLength();
-							nearestNeighborNode = neighborNode;
+							bestDist = ea.getLength();
+							nearestPlanet = neighbor;
 						}
 					}
 				}
-				if (moonEdge != null)
+				if (moonEdge != null) {
 					multiLevelEdgeAttributes[level].get(moonEdge).makeMoonEdge();
-				if (nearestNeighborNode != null) {
-					var nna = multiLevelNodeAttributes[level].get(nearestNeighborNode);
-					nna.setType(NodeAttributes.Type.PlanetWithMoons);
-					nna.getMoons().add(v);
-					{
-						var va = multiLevelNodeAttributes[level].get(v);
-						va.setType(NodeAttributes.Type.Moon);
-						va.setDedicatedSunNode(nna.getDedicatedSunNode());
-						va.setDedicatedSunDistance(nna.getDedicatedSunDistance());
-						va.setDedicatedPMNode(nearestNeighborNode);
-					}
+				}
+				if (nearestPlanet != null) {
+					var pa = multiLevelNodeAttributes[level].get(nearestPlanet);
+					pa.setType(NodeAttributes.Type.PlanetWithMoons);
+					pa.getMoons().add(v);
+
+					var va = multiLevelNodeAttributes[level].get(v);
+					va.setType(NodeAttributes.Type.Moon);
+					va.setDedicatedSunNode(pa.getDedicatedSunNode());
+					va.setDedicatedSunDistance(pa.getDedicatedSunDistance());
+					va.setDedicatedPMNode(nearestPlanet);
 				}
 			}
 		}
 	}
 
 	/**
-	 * collapse solar systems
+	 * Collapse solar systems from level→level+1 and update edge lengths/attributes.
 	 */
-	private static void collapseSolarSystems(Graph[] multiLevelGraph, NodeArray<NodeAttributes>[] multiLevelNodeAttributes, EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes, int level) {
+	private static void collapseSolarSystems(Graph[] multiLevelGraph,
+											 NodeArray<NodeAttributes>[] multiLevelNodeAttributes,
+											 EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes,
+											 int level) {
 		calculateMassOfCollapsedNodes(multiLevelGraph, multiLevelNodeAttributes, level);
 		var newEdgeLengths = createEdgesEdgeDistancesAndLambdaLists(multiLevelGraph, multiLevelNodeAttributes, multiLevelEdgeAttributes, level);
 		deleteParallelEdgesAndUpdateEdgeLength(multiLevelGraph, multiLevelEdgeAttributes, newEdgeLengths, level);
 	}
 
 	/**
-	 * calculate mass of collapsed nodes
+	 * Sum masses into representatives at level+1.
 	 */
-	private static void calculateMassOfCollapsedNodes(Graph[] multiLevelGraph, NodeArray<NodeAttributes>[] multiLevelNodeAttributes, int level) {
+	private static void calculateMassOfCollapsedNodes(Graph[] multiLevelGraph,
+													  NodeArray<NodeAttributes>[] multiLevelNodeAttributes,
+													  int level) {
 		for (var v : multiLevelGraph[level].nodes()) {
 			var dedicatedSun = multiLevelNodeAttributes[level].get(v).getDedicatedSunNode();
-			var highestLevelNode = multiLevelNodeAttributes[level].get(dedicatedSun).getHigherLevelNode();
-			multiLevelNodeAttributes[level + 1].get(highestLevelNode).setMass(multiLevelNodeAttributes[level + 1].get(highestLevelNode).getMass() + 1);
-
+			var rep = multiLevelNodeAttributes[level].get(dedicatedSun).getHigherLevelNode();
+			var repAttr = multiLevelNodeAttributes[level + 1].get(rep);
+			repAttr.setMass(repAttr.getMass() + 1);
 		}
 	}
 
 	/**
-	 * create edge distances and lambda lists, also sets the edge attributes for the next level
+	 * Create inter-solar-system edges on level+1; compute composed edge lengths newLength = sDist + eLen + tDist;
+	 * propagate lambda-splits for finer-level interpolation.
 	 */
-	private static EdgeDoubleArray createEdgesEdgeDistancesAndLambdaLists(Graph[] multiLevelGraph, NodeArray<NodeAttributes>[] multiLevelNodeAttributes, EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes, int level) {
-		var interSolarSystemEdges = new ArrayList<Edge>();
+	private static EdgeDoubleArray createEdgesEdgeDistancesAndLambdaLists(Graph[] multiLevelGraph,
+																		  NodeArray<NodeAttributes>[] multiLevelNodeAttributes,
+																		  EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes,
+																		  int level) {
+		var interSolar = new ArrayList<Edge>();
 
-		multiLevelEdgeAttributes[level + 1] = multiLevelGraph[level + 1].newEdgeArray();
+		// Ensure attributes array for level+1 exists (created earlier in createMultiLevelRepresentations)
+		if (multiLevelEdgeAttributes[level + 1] == null) {
+			multiLevelEdgeAttributes[level + 1] = multiLevelGraph[level + 1].newEdgeArray();
+		}
 		var newEdgeLengths = multiLevelGraph[level + 1].newEdgeDoubleArray();
 
-
+		// Build edges between different suns at level+1
 		for (var e : multiLevelGraph[level].edges()) {
-			var sourceSun = multiLevelNodeAttributes[level].get(e.getSource()).getDedicatedSunNode();
-			var targetSun = multiLevelNodeAttributes[level].get(e.getTarget()).getDedicatedSunNode();
-			if (sourceSun != targetSun) {
-				var highLevelSourceSun = multiLevelNodeAttributes[level].get(sourceSun).getHigherLevelNode();
-				var highLevelTargetSun = multiLevelNodeAttributes[level].get(targetSun).getHigherLevelNode();
+			var sSun = multiLevelNodeAttributes[level].get(e.getSource()).getDedicatedSunNode();
+			var tSun = multiLevelNodeAttributes[level].get(e.getTarget()).getDedicatedSunNode();
+			if (sSun != tSun) {
+				var hs = multiLevelNodeAttributes[level].get(sSun).getHigherLevelNode();
+				var ht = multiLevelNodeAttributes[level].get(tSun).getHigherLevelNode();
 
-				var newEdge = multiLevelGraph[level + 1].newEdge(highLevelSourceSun, highLevelTargetSun);
-				{
-					var ea = new EdgeAttributes();
-					ea.initMultiLevelValues();
-					multiLevelEdgeAttributes[level + 1].put(newEdge, ea);
-				}
-				multiLevelEdgeAttributes[level].get(e).setHigherLevelEdge(newEdge);
-				interSolarSystemEdges.add(e);
+				var newE = multiLevelGraph[level + 1].newEdge(hs, ht);
+				var ea = new EdgeAttributes();
+				ea.initMultiLevelValues();
+				multiLevelEdgeAttributes[level + 1].put(newE, ea);
+
+				multiLevelEdgeAttributes[level].get(e).setHigherLevelEdge(newE);
+				interSolar.add(e);
 			}
 		}
 
-		for (var e : interSolarSystemEdges) {
-			var sourceSun = multiLevelNodeAttributes[level].get(e.getSource()).getDedicatedSunNode();
-			var targetSun = multiLevelNodeAttributes[level].get(e.getTarget()).getDedicatedSunNode();
+		// Compute new composed lengths and record lambdas/neighbor suns on the fine level
+		for (var e : interSolar) {
+			var sSun = multiLevelNodeAttributes[level].get(e.getSource()).getDedicatedSunNode();
+			var tSun = multiLevelNodeAttributes[level].get(e.getTarget()).getDedicatedSunNode();
 
-			var eLength = multiLevelEdgeAttributes[level].get(e).getLength();
-			var sEdgeLength = multiLevelNodeAttributes[level].get(e.getSource()).getDedicatedSunDistance();
-			var tEdgeLength = multiLevelNodeAttributes[level].get(e.getTarget()).getDedicatedSunDistance();
-			var newLength = sEdgeLength + eLength + tEdgeLength;
+			double eLen = multiLevelEdgeAttributes[level].get(e).getLength();
+			double sDist = multiLevelNodeAttributes[level].get(e.getSource()).getDedicatedSunDistance();
+			double tDist = multiLevelNodeAttributes[level].get(e.getTarget()).getDedicatedSunDistance();
+			double newLen = sDist + eLen + tDist;
+
 			var eNew = multiLevelEdgeAttributes[level].get(e).getHigherLevelEdge();
-			newEdgeLengths.put(eNew, newLength);
+			newEdgeLengths.put(eNew, newLen);
 
-			multiLevelNodeAttributes[level].get(e.getSource()).getLambdas().add(sEdgeLength / newLength);
-			multiLevelNodeAttributes[level].get(e.getTarget()).getLambdas().add(tEdgeLength / newLength);
+			// Store lambdas for later interpolation
+			var sAttr = multiLevelNodeAttributes[level].get(e.getSource());
+			var tAttr = multiLevelNodeAttributes[level].get(e.getTarget());
+			if (newLen > 0) {
+				sAttr.getLambdas().add(sDist / newLen);
+				tAttr.getLambdas().add(tDist / newLen);
+			} else {
+				// Degenerate; fall back to equal split
+				sAttr.getLambdas().add(0.5);
+				tAttr.getLambdas().add(0.5);
+			}
 
-			multiLevelNodeAttributes[level].get(e.getSource()).getNeighborSunNodes().add(targetSun);
-			multiLevelNodeAttributes[level].get(e.getTarget()).getNeighborSunNodes().add(sourceSun);
-
+			sAttr.getNeighborSunNodes().add(tSun);
+			tAttr.getNeighborSunNodes().add(sSun);
 		}
 		return newEdgeLengths;
 	}
 
 	/**
-	 * delete parallel edges and update edge lengths
+	 * Merge parallel edges (same unordered endpoints) on level+1; average their composed lengths.
 	 */
-	private static void deleteParallelEdgesAndUpdateEdgeLength(Graph[] multiLevelGraph, EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes, EdgeDoubleArray newEdgeLengths, int level) {
+	private static void deleteParallelEdgesAndUpdateEdgeLength(Graph[] multiLevelGraph,
+															   EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes,
+															   EdgeDoubleArray newEdgeLengths,
+															   int level) {
 		var nextGraph = multiLevelGraph[level + 1];
 
-		var sortedEdges = nextGraph.getEdgesAsList();
-		sortedEdges.sort(Comparator.comparingInt(a -> Math.max(a.getSource().getId(), a.getTarget().getId())));
-		sortedEdges.sort(Comparator.comparingInt(a -> Math.min(a.getSource().getId(), a.getTarget().getId())));
+		var sorted = nextGraph.getEdgesAsList();
+		// Sort by (minId, maxId) in a single stable comparator
+		sorted.sort(Comparator
+				.comparingInt((Edge e) -> Math.min(e.getSource().getId(), e.getTarget().getId()))
+				.thenComparingInt(e -> Math.max(e.getSource().getId(), e.getTarget().getId())));
 
-		Edge prev = null;
-		int counter = 1;
-		for (var e : sortedEdges) {
-			if (prev == null)
-				prev = e;
-			else {
-				if (e.getSource() == prev.getSource() && e.getTarget() == prev.getTarget() || e.getSource() == prev.getTarget() && e.getTarget() == prev.getSource()) {
-					newEdgeLengths.put(prev, newEdgeLengths.get(prev) + newEdgeLengths.get(e));
+		Edge groupHead = null;
+		int count = 0;
+		for (var e : sorted) {
+			if (groupHead == null) {
+				groupHead = e;
+				count = 1;
+			} else {
+				boolean samePair =
+						(e.getSource() == groupHead.getSource() && e.getTarget() == groupHead.getTarget()) ||
+						(e.getSource() == groupHead.getTarget() && e.getTarget() == groupHead.getSource());
+				if (samePair) {
+					// accumulate into groupHead
+					newEdgeLengths.put(groupHead, newEdgeLengths.get(groupHead) + newEdgeLengths.get(e));
 					nextGraph.deleteEdge(e);
-					counter++;
+					count++;
 				} else {
-					if (counter > 1) {
-						newEdgeLengths.put(prev, newEdgeLengths.get(prev) / counter);
-						counter = 1;
+					// finish previous group
+					if (count > 1) {
+						newEdgeLengths.put(groupHead, newEdgeLengths.get(groupHead) / count);
 					}
-					prev = e;
+					groupHead = e;
+					count = 1;
 				}
 			}
 		}
-		if (counter > 1)
-			newEdgeLengths.put(prev, newEdgeLengths.get(prev) / counter);
+		// finish last group
+		if (groupHead != null && count > 1) {
+			newEdgeLengths.put(groupHead, newEdgeLengths.get(groupHead) / count);
+		}
 
+		// Write final lengths into the level+1 edge attributes
 		for (var e : nextGraph.edges()) {
 			multiLevelEdgeAttributes[level + 1].get(e).setLength(newEdgeLengths.get(e));
 		}
 	}
 
-	public static void findInitialPlacementForLevel(int level, FastMultiLayerMethodOptions options, Graph[] multiLevelGraph, NodeArray<NodeAttributes>[] multiLevelNodeAttributes, EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes) {
+	/**
+	 * Lift placement from level+1 to level, setting initial positions of sun nodes,
+	 * then planets/moons (including PM-nodes), using lambdas/angles/neighbor suns.
+	 */
+	public static void findInitialPlacementForLevel(int level,
+													FastMultiLayerMethodOptions options,
+													Graph[] multiLevelGraph,
+													NodeArray<NodeAttributes>[] multiLevelNodeAttributes,
+													EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes) {
 		setInitialPositionsOfSunNodes(level, multiLevelGraph, multiLevelNodeAttributes);
+
 		var pmNodes = new ArrayList<Node>();
-		setInitialPositionsOfPlanetAndModeNodes(level, options, multiLevelGraph, multiLevelNodeAttributes, multiLevelEdgeAttributes, pmNodes);
+		setInitialPositionsOfPlanetAndMoonNodes(level, options, multiLevelGraph, multiLevelNodeAttributes, multiLevelEdgeAttributes, pmNodes);
 		setInitialPositionsOfPMNodes(level, options, multiLevelNodeAttributes, multiLevelEdgeAttributes, pmNodes);
 	}
 
-	private static void setInitialPositionsOfSunNodes(int level, Graph[] multiLevelGraph, NodeArray<NodeAttributes>[] multiLevelNodeAttributes) {
-		//multiLevelNodeAttributes[level+1]=multiLevelGraph[level+1].newNodeArray();
+	/**
+	 * Copy rep node positions (level+1) down to their corresponding sun nodes (level).
+	 */
+	private static void setInitialPositionsOfSunNodes(int level,
+													  Graph[] multiLevelGraph,
+													  NodeArray<NodeAttributes>[] multiLevelNodeAttributes) {
 		for (var vHigh : multiLevelGraph[level + 1].nodes()) {
-			var na = multiLevelNodeAttributes[level + 1].get(vHigh);
-			var vAct = na.getLowerLevelNode();
-			multiLevelNodeAttributes[level].get(vAct).setPosition(na.getPosition());
-			multiLevelNodeAttributes[level].get(vAct).placed();
+			var naHigh = multiLevelNodeAttributes[level + 1].get(vHigh);
+			var vLow = naHigh.getLowerLevelNode();
+			multiLevelNodeAttributes[level].get(vLow).setPosition(naHigh.getPosition());
+			multiLevelNodeAttributes[level].get(vLow).placed();
 		}
 	}
 
-	private static void setInitialPositionsOfPlanetAndModeNodes(int level, FastMultiLayerMethodOptions options, Graph[] multiLevelGraph, NodeArray<NodeAttributes>[] multiLevelNodeAttributes, EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes, ArrayList<Node> pmNodes) {
-		final var list = new ArrayList<DPoint>();
+	/**
+	 * Position planets and moons (except PM-nodes which are handled later).
+	 * Uses sector constraints (angles) and neighbor information if available.
+	 */
+	private static void setInitialPositionsOfPlanetAndMoonNodes(int level,
+																FastMultiLayerMethodOptions options,
+																Graph[] multiLevelGraph,
+																NodeArray<NodeAttributes>[] multiLevelNodeAttributes,
+																EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes,
+																ArrayList<Node> pmNodes) {
+		final var candidates = new ArrayList<DPoint>();
 
 		createAllPlacementSectors(multiLevelGraph, multiLevelNodeAttributes, multiLevelEdgeAttributes, level);
 
 		for (var v : multiLevelGraph[level].nodes()) {
 			var va = multiLevelNodeAttributes[level].get(v);
-			var nodeType = va.getType();
-			if (nodeType == NodeAttributes.Type.PlanetWithMoons) {
+			var type = va.getType();
+
+			if (type == NodeAttributes.Type.PlanetWithMoons) {
 				pmNodes.add(v);
-			} else {
-				list.clear();
-				var dedicatedSunPosition = multiLevelNodeAttributes[level].get(va.getDedicatedSunNode()).getPosition();
-
-				if (options.getInitialPlacementMult() == FastMultiLayerMethodOptions.InitialPlacementMultiLayer.Advanced) {
-					for (var e : v.adjacentEdges()) {
-						var adj = e.getOpposite(v);
-						var aa = multiLevelNodeAttributes[level].get(adj);
-
-						if (va.getDedicatedSunNode() == aa.getDedicatedSunNode() && aa.getType() != NodeAttributes.Type.Sun && aa.isPlaced()) {
-							var newPosition = calculatePosition(dedicatedSunPosition, aa.getPosition(),
-									va.getDedicatedSunDistance(), multiLevelEdgeAttributes[level].get(e).getLength());
-							list.add(newPosition);
-						}
-					}
-				}
-				if (va.getLambdas().isEmpty()) {
-					if (list.isEmpty()) {
-						var newPosition = createRandomPosition(dedicatedSunPosition, va.getDedicatedSunDistance(), va.getAngle1(), va.getAngle2());
-						list.add(newPosition);
-					}
-				} else {
-					var lambdaPos = 0;
-
-					for (var adjSun : va.getNeighborSunNodes()) {
-						var lambda = va.getLambdas().get(lambdaPos);
-						var adjSunPosition = multiLevelNodeAttributes[level].get(adjSun).getPosition();
-						var newPosition = getWaggledInbetweenPosition(dedicatedSunPosition, adjSunPosition, lambda);
-						list.add(newPosition);
-						lambdaPos = (lambdaPos + 1 < va.getLambdas().size() ? lambdaPos + 1 : 0);
-					}
-				}
-				va.setPosition(DPoint.computeBarycenter(list));
-				va.placed();
+				continue;
 			}
+
+			candidates.clear();
+			var sunPos = multiLevelNodeAttributes[level].get(va.getDedicatedSunNode()).getPosition();
+
+			// Use already placed neighbors within the same solar system to triangulate a starting position
+			if (options.getInitialPlacementMult() == FastMultiLayerMethodOptions.InitialPlacementMultiLayer.Advanced) {
+				for (var e : v.adjacentEdges()) {
+					var adj = e.getOpposite(v);
+					var aa = multiLevelNodeAttributes[level].get(adj);
+
+					if (va.getDedicatedSunNode() == aa.getDedicatedSunNode()
+						&& aa.getType() != NodeAttributes.Type.Sun
+						&& aa.isPlaced()) {
+						var newPos = calculatePosition(sunPos, aa.getPosition(),
+								va.getDedicatedSunDistance(), multiLevelEdgeAttributes[level].get(e).getLength());
+						candidates.add(newPos);
+					}
+				}
+			}
+
+			// If no lambda info: choose a random point within allowed sector at the right radius
+			if (va.getLambdas().isEmpty()) {
+				if (candidates.isEmpty()) {
+					var newPos = createRandomPosition(sunPos, va.getDedicatedSunDistance(), va.getAngle1(), va.getAngle2());
+					candidates.add(newPos);
+				}
+			} else {
+				// Use lambdas to place between this sun and neighbor suns
+				int lambdaIdx = 0;
+				for (var adjSun : va.getNeighborSunNodes()) {
+					var lambda = va.getLambdas().get(lambdaIdx);
+					var adjSunPos = multiLevelNodeAttributes[level].get(adjSun).getPosition();
+					var newPos = getWaggledInbetweenPosition(sunPos, adjSunPos, lambda);
+					candidates.add(newPos);
+					lambdaIdx = (lambdaIdx + 1 < va.getLambdas().size() ? lambdaIdx + 1 : 0);
+				}
+			}
+
+			va.setPosition(DPoint.computeBarycenter(candidates));
+			va.placed();
 		}
 	}
 
-	private static void createAllPlacementSectors(Graph[] multiLevelGraph, NodeArray<NodeAttributes>[] multiLevelNodeAttributes, EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes, int level) {
+	/**
+	 * Compute sector angles for all suns at level using neighbor geometry from level+1.
+	 */
+	private static void createAllPlacementSectors(Graph[] multiLevelGraph,
+												  NodeArray<NodeAttributes>[] multiLevelNodeAttributes,
+												  EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes,
+												  int level) {
 		var adjPositions = new ArrayList<DPoint>();
 
 		for (var vHigh : multiLevelGraph[level + 1].nodes()) {
@@ -402,147 +517,158 @@ public class MultiLevel {
 			for (var eHigh : vHigh.adjacentEdges()) {
 				if (multiLevelEdgeAttributes[level + 1].get(eHigh).isExtraEdge()) {
 					var wHigh = eHigh.getOpposite(vHigh);
-					var wa = multiLevelNodeAttributes[level + 1].get(wHigh);
-					var wHighPosition = new DPoint(wa.getX(), wa.getY());
-					adjPositions.add(wHighPosition);
+					var wPos = multiLevelNodeAttributes[level + 1].get(wHigh).getPosition();
+					adjPositions.add(new DPoint(wPos.getX(), wPos.getY()));
 				}
 			}
-			double angle_1;
-			double angle_2;
+
+			double angle1, angle2;
 			if (adjPositions.isEmpty()) {
-				angle_1 = 0;
-				angle_2 = 6.2831853;
-			} else if (adjPositions.size() == 1) //special case
-			{
-				//create angle_1
-				var start_pos = adjPositions.get(0);
-				var xParallelPosition = new DPoint(vHighPosition.getX() + 1, vHighPosition.getY());
-				angle_1 = DPoint.angle(vHighPosition, xParallelPosition, start_pos);
-				//create angle_2
-				angle_2 = angle_1 + Math.PI;
-			} else { //usual case
-				int MAX = 10; //the biggest of at most MAX random selected sectors is choosen
-				int steps = 1;
-				var i = 0;
+				angle1 = 0;
+				angle2 = 2 * Math.PI;
+			} else if (adjPositions.size() == 1) {
+				// Opposite half-plane to the only neighbor
+				var start = adjPositions.get(0);
+				var xAxis = new DPoint(vHighPosition.getX() + 1, vHighPosition.getY());
+				angle1 = DPoint.angle(vHighPosition, xAxis, start);
+				angle2 = angle1 + Math.PI;
+			} else {
+				// Choose the largest angular gap between neighbors (up to MAX random samples)
+				final int MAX = 10;
+				angle1 = 0;
+				angle2 = 0;
 
-				angle_1 = 0;
-				angle_2 = 0;
-				double act_angle_1;
-				double act_angle_2;
+				int samples = Math.min(MAX, adjPositions.size());
+				for (int s = 0; s < samples; s++) {
+					var start = adjPositions.get(s);
+					var xAxis = new DPoint(vHighPosition.getX() + 1, vHighPosition.getY());
+					double a1 = DPoint.angle(vHighPosition, xAxis, start);
 
-				do {
-					//create act_angle_1
-					var startPos = adjPositions.get(i++);
-					var xParallelPosition = new DPoint(vHighPosition.getX() + 1, vHighPosition.getY());
-					act_angle_1 = DPoint.angle(vHighPosition, xParallelPosition, startPos);
-					//create act_angle_2
-					boolean first_angle = true;
-					double min_next_angle = 0;
-
+					boolean first = true;
+					double minDelta = 0;
 					for (int j = 0; j < adjPositions.size(); j++) {
-						var nextAngle = DPoint.angle(vHighPosition, startPos, adjPositions.get(j));
-						if (j != i && (first_angle || nextAngle < min_next_angle)) {
-							min_next_angle = nextAngle;
-							first_angle = false;
+						if (j == s) continue;
+						double delta = DPoint.angle(vHighPosition, start, adjPositions.get(j));
+						if (first || delta < minDelta) {
+							minDelta = delta;
+							first = false;
 						}
 					}
-					act_angle_2 = act_angle_1 + min_next_angle;
-					if (i == 0 || ((act_angle_2 - act_angle_1) > (angle_2 - angle_1))) {
-						angle_1 = act_angle_1;
-						angle_2 = act_angle_2;
+					double a2 = a1 + minDelta;
+					if (s == 0 || (a2 - a1) > (angle2 - angle1)) {
+						angle1 = a1;
+						angle2 = a2;
 					}
-					i++;
-					steps++;
 				}
-				while ((steps <= MAX) && i < adjPositions.size());
-
-				if (angle_1 == angle_2)
-					angle_2 = angle_1 + Math.PI;
+				if (angle1 == angle2) {
+					angle2 = angle1 + Math.PI;
+				}
 			}
 
-			var sunNode = vha.getLowerLevelNode();
-			multiLevelNodeAttributes[level].get(sunNode).setAngle1(angle_1);
-			multiLevelNodeAttributes[level].get(sunNode).setAngle2(angle_2);
-		} // for all nodes
+			// write sector to the corresponding sun at level
+			var sunAtLevel = vha.getLowerLevelNode();
+			multiLevelNodeAttributes[level].get(sunAtLevel).setAngle1(angle1);
+			multiLevelNodeAttributes[level].get(sunAtLevel).setAngle2(angle2);
+		}
 
-		//import the angle values from the values of the dedicated sun nodes
+		// import the sector of each node from its dedicated sun
 		for (var v : multiLevelGraph[level].nodes()) {
 			var va = multiLevelNodeAttributes[level].get(v);
-			var dedicatedSun = va.getDedicatedSunNode();
-			va.setAngle1(multiLevelNodeAttributes[level].get(dedicatedSun).getAngle1());
-			va.setAngle2(multiLevelNodeAttributes[level].get(dedicatedSun).getAngle2());
+			var sun = va.getDedicatedSunNode();
+			va.setAngle1(multiLevelNodeAttributes[level].get(sun).getAngle1());
+			va.setAngle2(multiLevelNodeAttributes[level].get(sun).getAngle2());
 		}
 	}
 
+	/** Place a node at distance {@code dist_s} from s and {@code dist_t} from t along the line st, with slight waggle. */
 	private static DPoint calculatePosition(DPoint s, DPoint t, double dist_s, double dist_t) {
 		var dist_st = s.distance(t);
-		var lambda = (dist_s + (dist_st - dist_s - dist_t) / 2) / dist_st;
-
-		if (Double.isNaN(lambda))
-			System.err.println("NaN");
+		double lambda = (dist_s + (dist_st - dist_s - dist_t) / 2.0) / (dist_st == 0 ? 1.0 : dist_st);
+		if (Double.isNaN(lambda)) {
+			// extremely degenerate case; fall back to mid
+			lambda = 0.5;
+		}
 		return getWaggledInbetweenPosition(s, t, lambda);
 	}
 
+	/** Interpolate between s and t using lambda, then add a small random orthogonal waggle. */
 	private static DPoint getWaggledInbetweenPosition(DPoint s, DPoint t, double lambda) {
-		final var WAGGLEFACTOR = 0.05;
-		var inbetweenPoint = new DPoint(s.getX() + lambda * (t.getX() - s.getX()), s.getY() + lambda * (t.getY() - s.getY()));
-		var dist_st = Math.sqrt((s.getX() - t.getX()) * (s.getX() - t.getX()) + (s.getY() - t.getY()) * (s.getY() - t.getY()));
-		var radius = WAGGLEFACTOR * dist_st;
-		var rand_radius = radius * random.nextDouble();
-		return createRandomPosition(inbetweenPoint, rand_radius, 0, 2 * Math.PI);
+		final double WAGGLE = 0.05;
+		var inbetween = new DPoint(
+				s.getX() + lambda * (t.getX() - s.getX()),
+				s.getY() + lambda * (t.getY() - s.getY()));
+		var dist = s.distance(t);
+		var radius = WAGGLE * dist;
+		var randRadius = radius * random.nextDouble();
+		return createRandomPosition(inbetween, randRadius, 0, 2 * Math.PI);
 	}
 
+	/** Uniformly sample a point on a circular arc sector around {@code center}. */
 	private static DPoint createRandomPosition(DPoint center, double radius, double angle1, double angle2) {
-		var rnd_angle = angle1 + (angle2 - angle1) * random.nextDouble();
-		var dx = Math.cos(rnd_angle) * radius;
-		var dy = Math.sin(rnd_angle) * radius;
+		var rnd = angle1 + (angle2 - angle1) * random.nextDouble();
+		var dx = Math.cos(rnd) * radius;
+		var dy = Math.sin(rnd) * radius;
 		return new DPoint(center.getX() + dx, center.getY() + dy);
 	}
 
-	private static void setInitialPositionsOfPMNodes(int level, FastMultiLayerMethodOptions options, NodeArray<NodeAttributes>[] multiLevelNodeAttributes, EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes, ArrayList<Node> pmNodes) {
-		var list = new ArrayList<DPoint>();
+	/**
+	 * Place PM-nodes using advanced heuristics and their attached moons.
+	 */
+	private static void setInitialPositionsOfPMNodes(int level,
+													 FastMultiLayerMethodOptions options,
+													 NodeArray<NodeAttributes>[] multiLevelNodeAttributes,
+													 EdgeArray<EdgeAttributes>[] multiLevelEdgeAttributes,
+													 ArrayList<Node> pmNodes) {
+		var candidates = new ArrayList<DPoint>();
 
 		for (var v : pmNodes) {
-			list.clear();
+			candidates.clear();
 			var va = multiLevelNodeAttributes[level].get(v);
 
-			var sunNode = va.getDedicatedSunNode();
+			var sun = va.getDedicatedSunNode();
 			var sunDist = va.getDedicatedSunDistance();
-			var sunPos = multiLevelNodeAttributes[level].get(sunNode).getPosition();
+			var sunPos = multiLevelNodeAttributes[level].get(sun).getPosition();
 
+			// Triangulate using placed non-moon neighbors within the same solar system
 			if (options.getInitialPlacementMult() == FastMultiLayerMethodOptions.InitialPlacementMultiLayer.Advanced) {
 				for (var e : v.adjacentEdges()) {
 					var adj = e.getOpposite(v);
 					var aa = multiLevelNodeAttributes[level].get(adj);
 					var ea = multiLevelEdgeAttributes[level].get(e);
 
-					if (!ea.isMoonEdge() && va.getDedicatedSunNode() == aa.getDedicatedSunNode() && aa.getType() != NodeAttributes.Type.Sun && aa.isPlaced()) {
-						var newPosition = calculatePosition(sunPos, aa.getPosition(), sunDist, ea.getLength());
-						list.add(newPosition);
+					if (!ea.isMoonEdge()
+						&& va.getDedicatedSunNode() == aa.getDedicatedSunNode()
+						&& aa.getType() != NodeAttributes.Type.Sun
+						&& aa.isPlaced()) {
+						var newPos = calculatePosition(sunPos, aa.getPosition(), sunDist, ea.getLength());
+						candidates.add(newPos);
 					}
 				}
 			}
+
+			// Use moons to position PM between its sun and moon(s)
 			for (var moon : va.getMoons()) {
 				var ma = multiLevelNodeAttributes[level].get(moon);
 				var moonPos = ma.getPosition();
 				var moonDist = ma.getDedicatedSunDistance();
-				var lambda = sunDist / moonDist;
-				var newPosition = getWaggledInbetweenPosition(sunPos, moonPos, lambda);
-				list.add(newPosition);
+				if (moonDist > 0) {
+					double lambda = sunDist / moonDist;
+					candidates.add(getWaggledInbetweenPosition(sunPos, moonPos, lambda));
+				}
 			}
 
+			// Use neighbor-sun lambdas if present
 			if (!va.getLambdas().isEmpty()) {
 				int i = 0;
 				for (var adjSun : va.getNeighborSunNodes()) {
 					var lambda = va.getLambdas().get(i);
 					var adjSunPos = multiLevelNodeAttributes[level].get(adjSun).getPosition();
-					var newPosition = getWaggledInbetweenPosition(sunPos, adjSunPos, lambda);
-					list.add(newPosition);
-					if (i + 1 < va.getLambdas().size() - 1)
-						i++;
+					candidates.add(getWaggledInbetweenPosition(sunPos, adjSunPos, lambda));
+					i = (i + 1 < va.getLambdas().size() ? i + 1 : 0);
 				}
 			}
-			va.setPosition(DPoint.computeBarycenter(list));
+
+			va.setPosition(DPoint.computeBarycenter(candidates));
 			va.placed();
 		}
 	}

@@ -1,5 +1,6 @@
 /*
- * FruchtermanReingold.java Copyright (C) 2024 Daniel H. Huson
+ * FruchtermanReingold.java (updated)
+ * Copyright (C) 2024 Daniel H. Huson
  *
  *  (Some files contain contributions from other authors, who are then mentioned separately.)
  *
@@ -15,7 +16,6 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 package jloda.graph.fmm.algorithm;
@@ -33,86 +33,173 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * implementation of the fast multilayer method (note: without multipole algorithm)
+ * Fruchterman-Reingold repulsive forces used within the Fast Multilayer Method (no multipole).
+ * This version:
+ *  - computes exact repulsion with a triangular loop (no double counting),
+ *  - computes approximate repulsion on a uniform grid with 3x3 neighbor cells and no double counting,
+ *  - handles coincident/near-coincident nodes via bounded, scale-aware nudges (see NumericalStability),
+ *  - clamps grid indices and tolerates nodes slightly outside the box.
+ *
  * Original C++ author: Stefan Hachul, original license: GPL
- * Reimplemented in Java by Daniel Huson, 3.2021
+ * Reimplemented in Java by Daniel Huson, 3.2021; updated with the help of ChatGPT 2025-09
  */
 public class FruchtermanReingold {
+
     /**
-     * calculate exact repulsive forces using Fruchterman-Reingold
+     * Calculate exact repulsive forces using a triangular loop over node pairs.
+     * force(v) += f(u->v), force(u) -= f(u->v)
      */
-    public static void calculateExactRepulsiveForces(Graph graph, NodeArray<NodeAttributes> nodeAttributes, NodeArray<DPoint> force) {
+    public static void calculateExactRepulsiveForces(Graph graph,
+                                                     NodeArray<NodeAttributes> nodeAttributes,
+                                                     NodeArray<DPoint> force) {
+        // init
         for (var v : graph.nodes()) {
-            force.put(v, DPoint.ORIGIN);
+            force.put(v, new DPoint(0, 0));
         }
 
-        for (var u : graph.nodes()) {
-            var pos_u = nodeAttributes.get(u).getPosition();
-            for (var v : graph.nodes(u)) {
-                var pos_v = nodeAttributes.get(v).getPosition();
-                if (pos_u.equals(pos_v)) {//if2  (Exception handling if two nodes have the same position)
-                    pos_u = NumericalStability.chooseDistinctRandomPointInRadiusEpsilon(pos_u);
-                }
-                var vector_v_minus_u = pos_v.subtract(pos_u);
-                var norm_v_minus_u = vector_v_minus_u.norm();
-                var f_rep_u_on_v = new DPointMutable();
+        // triangular pair loop to avoid double counting
+        final List<Node> nodes = graph.getNodesAsList();
+        final int n = nodes.size();
 
-                if (!NumericalStability.repulsionNearMachinePrecision(norm_v_minus_u, f_rep_u_on_v)) {
-                    var scalar = repulsionScalar(norm_v_minus_u) / norm_v_minus_u;
-                    f_rep_u_on_v.setPosition(vector_v_minus_u.scaleBy(scalar));
+        for (int i = 0; i < n; i++) {
+            final Node u = nodes.get(i);
+            final DPoint pu0 = nodeAttributes.get(u).getPosition();
+            for (int j = i + 1; j < n; j++) {
+                final Node v = nodes.get(j);
+                final DPoint pv0 = nodeAttributes.get(v).getPosition();
+
+                DPoint delta = pv0.subtract(pu0);
+                double dist = delta.norm();
+
+                // Handle degenerate/near-degenerate distances with bounded rescue vector
+                DPointMutable vec = new DPointMutable();
+                if (NumericalStability.repulsionNearMachinePrecision(dist, vec)) {
+                    // vec is already a small bounded repulsive vector in random direction
+                } else {
+                    // Regular FR repulsion: (k^2 / d) in direction delta, with k^2 applied later by caller.
+                    // Here we produce (1/d^2) * delta; caller multiplies by k^2.
+                    double s = repulsionScalar(dist) / dist; // 1/d^2
+                    vec.setPosition(delta.scaleBy(s));
                 }
-                force.put(v, force.get(v).add(f_rep_u_on_v));
-                force.put(u, force.get(u).subtract(f_rep_u_on_v));
+
+                // Apply action-reaction
+                force.put(v, force.get(v).add(vec));
+                force.put(u, force.get(u).subtract(vec));
             }
         }
     }
 
-    public static void calculateApproxRepulsiveForces(FastMultiLayerMethodOptions options, Graph graph, LayoutBox layoutBox, NodeArray<NodeAttributes> nodeAttributes, NodeArray<DPoint> force) {
+    /**
+     * Calculate approximate repulsive forces using a uniform grid.
+     * We compute exact interactions within the same cell and its 8 neighbors,
+     * but iterate cells in a way that avoids double counting:
+     * - same-cell pairs: triangular loop
+     * - neighbor cells: only process "upper/right half" to ensure each unordered pair once
+     */
+    public static void calculateApproxRepulsiveForces(FastMultiLayerMethodOptions options,
+                                                      Graph graph,
+                                                      LayoutBox layoutBox,
+                                                      NodeArray<NodeAttributes> nodeAttributes,
+                                                      NodeArray<DPoint> force) {
+        // init
         for (var v : graph.nodes()) {
-            force.put(v, DPoint.ORIGIN);
+            force.put(v, new DPoint(0, 0));
         }
 
-        var size = (int) (Math.sqrt(graph.getNumberOfNodes()) / options.getFrGridQuotient());
+        final int n = graph.getNumberOfNodes();
+        if (n <= 1) return;
 
-        if (size <= 1) {
+        // Choose grid size; fallback to exact if too small
+        int size = (int) (Math.sqrt(n) / Math.max(1e-9, options.getFrGridQuotient()));
+        size = Math.max(2, Math.min(2048, size));
+
+        if (size < 2) {
             calculateExactRepulsiveForces(graph, nodeAttributes, force);
             return;
         }
 
-        final var grid = new Array2D<List<Node>>(size, size);
-        final var gridBoxLength = layoutBox.getLength() / (double) (size);
+        final double left = layoutBox.getLeft();
+        final double down = layoutBox.getDown();
+        final double boxLen = Math.max(1e-12, layoutBox.getLength()); // avoid div-by-zero
+        final double cell = boxLen / size;
 
+        // Bin nodes into cells (with clamping)
+        final Array2D<List<Node>> grid = new Array2D<>(size, size);
         for (var v : graph.nodes()) {
-            var va = nodeAttributes.get(v);
-            var x = va.getX() - layoutBox.getLeft();
-            var y = va.getY() - layoutBox.getDown();
-            var x_index = (int) (x / gridBoxLength);
-            var y_index = (int) (y / gridBoxLength);
-            grid.computeIfAbsent(x_index, y_index, (r, c) -> new ArrayList<>()).add(v);
+            var p = nodeAttributes.get(v).getPosition();
+            int ix = (int) Math.floor((p.getX() - left) / cell);
+            int iy = (int) Math.floor((p.getY() - down) / cell);
+            if (ix < 0) ix = 0;
+            else if (ix >= size) ix = size - 1;
+            if (iy < 0) iy = 0;
+            else if (iy >= size) iy = size - 1;
+            grid.computeIfAbsent(ix, iy, (r, c) -> new ArrayList<>()).add(v);
         }
 
-        //force calculation
+        // For each cell, compute:
+        //  - same-cell interactions via triangular loop
+        //  - neighbor-cell interactions for 8 neighbors, but only "upper/right half" to avoid double counting
+        DPointMutable vec = new DPointMutable();
 
-        for (int row_u = 0; row_u < size; row_u++) {
-            for (int col_u = 0; col_u < size; col_u++) {
-                for (var u : grid.getOrDefault(row_u, col_u, Collections.emptyList())) {
-                    var pos_u = nodeAttributes.get(u).getPosition();
-                    for (var row_v = row_u; row_v <= row_u + 1 && row_v < size; row_v++) {
-                        for (var col_v = col_u; col_v <= col_u + 1 && col_v < size; col_v++) {
-                            for (var v : grid.getOrDefault(row_v, col_v, Collections.emptyList())) {
-                                var pos_v = nodeAttributes.get(v).getPosition();
-                                if (pos_u.equals(pos_v)) {
-                                    pos_u = NumericalStability.chooseDistinctRandomPointInRadiusEpsilon(pos_u);
+        for (int ix = 0; ix < size; ix++) {
+            for (int iy = 0; iy < size; iy++) {
+                final List<Node> here = grid.getOrDefault(ix, iy, Collections.emptyList());
+                final int m = here.size();
+                if (m == 0) continue;
+
+                // Same-cell pairs: triangular
+                for (int a = 0; a < m; a++) {
+                    final Node u = here.get(a);
+                    final DPoint pu0 = nodeAttributes.get(u).getPosition();
+                    for (int b = a + 1; b < m; b++) {
+                        final Node v = here.get(b);
+                        final DPoint pv0 = nodeAttributes.get(v).getPosition();
+
+                        DPoint delta = pv0.subtract(pu0);
+                        double dist = delta.norm();
+
+                        if (NumericalStability.repulsionNearMachinePrecision(dist, vec)) {
+                            // vec set by rescue
+                        } else {
+                            double s = repulsionScalar(dist) / dist; // 1/d^2
+                            vec.setPosition(delta.scaleBy(s));
+                        }
+
+                        force.put(v, force.get(v).add(vec));
+                        force.put(u, force.get(u).subtract(vec));
+                    }
+                }
+
+                // Neighbor cells: process only upper/right half to avoid double counting
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dy = -1; dy <= 1; dy++) {
+                        // skip same cell (handled) and lower/left half to avoid double counting
+                        if (dx < 0 || (dx == 0 && dy <= 0)) continue;
+
+                        int jx = ix + dx, jy = iy + dy;
+                        if (jx < 0 || jx >= size || jy < 0 || jy >= size) continue;
+
+                        final List<Node> neigh = grid.getOrDefault(jx, jy, Collections.emptyList());
+                        if (neigh.isEmpty()) continue;
+
+                        for (var u : here) {
+                            final DPoint pu0 = nodeAttributes.get(u).getPosition();
+                            for (var v : neigh) {
+                                if (u == v) continue; // defensive; should never happen
+
+                                final DPoint pv0 = nodeAttributes.get(v).getPosition();
+                                DPoint delta = pv0.subtract(pu0);
+                                double dist = delta.norm();
+
+                                if (NumericalStability.repulsionNearMachinePrecision(dist, vec)) {
+                                    // vec set by rescue
+                                } else {
+                                    double s = repulsionScalar(dist) / dist; // 1/d^2
+                                    vec.setPosition(delta.scaleBy(s));
                                 }
-                                var vector_v_minus_u = pos_v.subtract(pos_u);
-                                var norm_v_minus_u = vector_v_minus_u.norm();
-                                var f_rep_u_on_v = new DPointMutable();
-                                if (!NumericalStability.repulsionNearMachinePrecision(norm_v_minus_u, f_rep_u_on_v)) {
-                                    var scalar = repulsionScalar(norm_v_minus_u) / norm_v_minus_u;
-                                    f_rep_u_on_v.setPosition(vector_v_minus_u.scaleBy(scalar));
-                                }
-                                force.put(v, force.get(v).add(f_rep_u_on_v));
-                                force.put(u, force.get(u).subtract(f_rep_u_on_v));
+
+                                force.put(v, force.get(v).add(vec));
+                                force.put(u, force.get(u).subtract(vec));
                             }
                         }
                     }
@@ -121,13 +208,13 @@ public class FruchtermanReingold {
         }
     }
 
+    /**
+     * FR repulsion magnitude core: returns 1/d, so that after multiplying by 1/d (unit direction)
+     * we get a 1/d^2 scaling. The FMMM caller later scales by k^2 (average ideal edge length squared).
+     */
     private static double repulsionScalar(double d) {
-        if (d > 0) {
-            return 1 / d;
-
-        } else {
-            System.err.println("Error: repulsionScalar(): d=0");
-            return 0;
-        }
+        if (d > 0) return 1.0 / d;
+        // Should not happen thanks to NumericalStability checks; provide safe fallback:
+        return 0.0;
     }
 }
