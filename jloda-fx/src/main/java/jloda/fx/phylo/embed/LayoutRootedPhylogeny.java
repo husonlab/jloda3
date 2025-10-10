@@ -76,7 +76,7 @@ public class LayoutRootedPhylogeny {
 				if (true) {
 					var ystep = computeLeafYStep(network, v -> nodePointMap.get(v).getY());
 					var newScore = computeCost(network, network.getLSAChildrenMap(), nodePointMap, optimizeHow);
-					System.err.printf("Layout optimization: %.1f -> %.1f%n", ((float) originalScore / ystep), ((float) newScore / ystep));
+					System.err.printf("Layout displacement-optimization: %.1f -> %.1f%n", ((float) originalScore / ystep), ((float) newScore / ystep));
 				}
 			}
 		}

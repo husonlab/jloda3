@@ -66,20 +66,26 @@ public class PhyloTree extends PhyloSplitsGraph {
 	public void clear() {
 		super.clear();
 		setRoot(null);
-		reticulateEdges = null;
-		transferAcceptorEdges = null;
-		lsaChildrenMap = null;
+		clearReticulateEdges();
+		clearTransferAcceptorEdges();
+		clearLsaChildrenMap();
 	}
 
 	public void clearReticulateEdges() {
+		if (reticulateEdges != null)
+			reticulateEdges.close();
 		reticulateEdges = null;
 	}
 
 	public void clearTransferAcceptorEdges() {
+		if (transferAcceptorEdges != null)
+			transferAcceptorEdges.close();
 		transferAcceptorEdges = null;
 	}
 
 	public void clearLsaChildrenMap() {
+		if (lsaChildrenMap != null)
+			lsaChildrenMap.close();
 		lsaChildrenMap = null;
 	}
 
@@ -100,38 +106,56 @@ public class PhyloTree extends PhyloSplitsGraph {
 	 * copies a phylogenetic tree
 	 */
 	public void copy(PhyloTree src, NodeArray<Node> oldNode2NewNode, EdgeArray<Edge> oldEdge2NewEdge) {
-		if (oldEdge2NewEdge == null)
-			oldEdge2NewEdge = new EdgeArray<>(src);
-		oldNode2NewNode = super.copy(src, oldNode2NewNode, oldEdge2NewEdge);
-		if (src.getRoot() != null) {
-			var root = src.getRoot();
-			setRoot(oldNode2NewNode.get(root));
+		var tmpNodeMap = false;
+		if (oldNode2NewNode == null) {
+			oldNode2NewNode = src.newNodeArray();
+			tmpNodeMap = true;
 		}
-		if (src.hasLSAChildrenMap()) {
-			for (var v : src.nodes()) {
-				var children = src.getLSAChildrenMap().get(v);
-				if (children != null) {
-					var newChildren = new ArrayList<Node>();
-					for (var w : children) {
-						newChildren.add(oldNode2NewNode.get(w));
+
+		var tmpEdgeMap = false;
+		if (oldEdge2NewEdge == null) {
+			oldEdge2NewEdge = src.newEdgeArray();
+			tmpEdgeMap = true;
+		}
+
+		try {
+			super.copy(src, oldNode2NewNode, oldEdge2NewEdge);
+			if (src.getRoot() != null) {
+				var root = src.getRoot();
+				setRoot(oldNode2NewNode.get(root));
+			}
+			clearLsaChildrenMap();
+			if (src.hasLSAChildrenMap()) {
+				for (var v : src.nodes()) {
+					var children = src.getLSAChildrenMap().get(v);
+					if (children != null) {
+						var newChildren = new ArrayList<Node>();
+						for (var w : children) {
+							newChildren.add(oldNode2NewNode.get(w));
+						}
+						getLSAChildrenMap().put(oldNode2NewNode.get(v), newChildren);
 					}
-					getLSAChildrenMap().put(oldNode2NewNode.get(v), newChildren);
 				}
 			}
-		}
-		reticulateEdges = null;
-		if (src.hasReticulateEdges()) {
-			for (var e : src.getReticulateEdges()) {
-				setReticulate(oldEdge2NewEdge.get(e), true);
+			clearReticulateEdges();
+			if (src.hasReticulateEdges()) {
+				for (var e : src.getReticulateEdges()) {
+					setReticulate(oldEdge2NewEdge.get(e), true);
+				}
 			}
-		}
-		transferAcceptorEdges = null;
-		if (src.hasTransferAcceptorEdges()) {
-			for (var e : src.getTransferAcceptorEdges()) {
-				setTransferAcceptor(oldEdge2NewEdge.get(e), true);
+			clearTransferAcceptorEdges();
+			if (src.hasTransferAcceptorEdges()) {
+				for (var e : src.getTransferAcceptorEdges()) {
+					setTransferAcceptor(oldEdge2NewEdge.get(e), true);
+				}
 			}
+			setName(src.getName());
+		} finally {
+			if (tmpNodeMap)
+				oldNode2NewNode.clear();
+			if (tmpEdgeMap)
+				oldEdge2NewEdge.clear();
 		}
-		setName(src.getName());
 	}
 
 	/**
