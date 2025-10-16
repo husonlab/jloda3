@@ -1,4 +1,8 @@
-# jloda-connect
+# jloda-phylogeny
 
-This provides a connection to an SQLITE database. This has been isolated
-because it causes problems when trying to transpile for iOS.
+This package provides algorithms for phylogenetics using function interfaces for easy deployment in other tools.
+
+Presently this provides
+
+- a displacement-optimization algorithm for backbone-tree based layout of rooted phylogenetic networks
+- a displacement-optimization algorithm for a tanglegram between rooted phylogenetic trees and/or networks
