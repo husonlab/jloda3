@@ -33,6 +33,7 @@ import java.util.Map;
 
 /**
  * computes the y-coordinates for the rectangular left-to-right layout
+ * todo: make independent of jloda and move to jloda-phylogeny
  * Daniel Huson, 2025
  */
 public class HeightAndAngles {

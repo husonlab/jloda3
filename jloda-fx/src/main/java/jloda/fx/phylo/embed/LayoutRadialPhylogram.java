@@ -34,6 +34,7 @@ import java.util.function.Function;
 
 /**
  * lays out a radial phylogram
+ * todo: make independent of jloda and move to jloda-phylogeny
  * Daniel Huson, 8.2025
  */
 public class LayoutRadialPhylogram {
@@ -57,7 +58,6 @@ public class LayoutRadialPhylogram {
 			assignPointsRec(network.getLSAChildrenMap(), network.getRoot(), null, nodeDepthMap, nodeAngleMap, nodePointMap);
 		}
 	}
-
 
 	/**
 	 * compute the layout distance from the root to each node

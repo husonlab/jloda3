@@ -29,6 +29,11 @@ import jloda.util.ProgramProperties;
 import java.util.LinkedList;
 import java.util.Map;
 
+/**
+ * compute the coordinates for a phylogram
+ * todo: make independent of jloda and move to jloda-phylogeny
+ * Daniel Huson, 8.2025
+ */
 public class LayoutRectangularPhylogram {
 	/**
 	 * computes the coordinates of a phylogram

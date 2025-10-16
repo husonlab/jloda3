@@ -7,6 +7,7 @@ module jloda_fx {
 	requires java.desktop;
 
 	requires jloda_core;
+	requires jloda_phylogeny;
 	requires org.apache.fontbox;
 	requires org.apache.pdfbox;
 

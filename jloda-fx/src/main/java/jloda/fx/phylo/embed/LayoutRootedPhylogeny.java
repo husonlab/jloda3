@@ -25,16 +25,15 @@ import jloda.graph.DAGTraversals;
 import jloda.graph.Node;
 import jloda.phylo.LSAUtils;
 import jloda.phylo.PhyloTree;
+import jloda.phylogeny.dolayout.DoNetworkLayout;
 
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
-import static jloda.fx.phylo.embed.OptimizeLayout.computeCost;
-
 /**
  * computes the layout of a rooted phylogenetic tree or network
+ * todo: make independent of jloda and move to jloda-phylogeny
  * Daniel Huson, 12.2021, 3.2025
  */
 public class LayoutRootedPhylogeny {
@@ -61,24 +60,18 @@ public class LayoutRootedPhylogeny {
 			averaging = Averaging.LeafAverage; // leaf averaging not valid for radial layout
 		}
 
-
 		if (optimizeReticulateEdges && network.hasReticulateEdges()) {
-			nodeAngleMap.clear();
-			nodePointMap.clear();
-
-			LayoutRectangularCladogram.apply(network, averaging, nodePointMap);
-
-			var optimizeHow = (layout == Layout.Rectangular ? OptimizeLayout.How.Rectangular : OptimizeLayout.How.Circular);
-			var originalScore = computeCost(network, network.getLSAChildrenMap(), nodePointMap, optimizeHow);
-
-			if (originalScore > 0) {
-				DAGTraversals.preOrderTraversal(network.getRoot(), network.getLSAChildrenMap(), v -> OptimizeLayout.optimizeOrdering(v, network.getLSAChildrenMap(), nodePointMap, random, optimizeHow));
-				if (true) {
-					var ystep = computeLeafYStep(network, v -> nodePointMap.get(v).getY());
-					var newScore = computeCost(network, network.getLSAChildrenMap(), nodePointMap, optimizeHow);
-					System.err.printf("Layout displacement-optimization: %.1f -> %.1f%n", ((float) originalScore / ystep), ((float) newScore / ystep));
+			var reticulateMap = new HashMap<Node, List<Node>>();
+			for (var e : network.edges()) {
+				if (network.isReticulateEdge(e) && !network.isTransferAcceptorEdge(e)) {
+					reticulateMap.computeIfAbsent(e.getSource(), k -> new ArrayList<>()).add(e.getTarget());
+					reticulateMap.computeIfAbsent(e.getTarget(), k -> new ArrayList<>()).add(e.getSource());
 				}
 			}
+			var circular = (layout != Layout.Rectangular);
+			var result = DoNetworkLayout.apply(network.getRoot(), network.getLSAChildrenMap()::get, reticulateMap::get, circular, random, () -> false);
+			network.getLSAChildrenMap().clear();
+			network.getLSAChildrenMap().putAll(result);
 		}
 
 		nodeAngleMap.clear();
@@ -113,21 +106,6 @@ public class LayoutRootedPhylogeny {
 				nodeAngleMap.put(v, 0.0);
 			}
 		}
-	}
-
-	private static double computeLeafYStep(PhyloTree network, Function<Node, Double> yFunction) {
-		var min = Double.MAX_VALUE;
-		var max = Double.MIN_VALUE;
-		var count = 0;
-		for (var v : network.nodes()) {
-			if (v.isLeaf()) {
-				var value = yFunction.apply(v);
-				min = Math.min(min, value);
-				max = Math.max(max, value);
-				count++;
-			}
-		}
-		return count >= 2 ? (max - min) / (count - 1) : 1;
 	}
 
 	/**

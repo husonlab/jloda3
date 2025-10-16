@@ -10,4 +10,9 @@ The library has been split into multiple parts:
 - jloda-fx contains JavaFX-specific classes
 - jloda-connect contains code to open a SQLite database file. This is currently isolated because it causes problems when transpiling to iOS
 
+- jloda-phylogeny is a new part (October 2025) in which new algorithms for phylogenetics will be made available
+  using minimalistic functional interfaces to allow easy integration into other programs. It currently contains
+  two new algorithms based on displacement optimization (DO algorithms):
+  one for rooted network layout (DoNetworkLayout) and one for tanglegrams for trees/networks (DoTanglegram)
+
 You will need to install the libraries provided here before building one of the above-mentioned projects.

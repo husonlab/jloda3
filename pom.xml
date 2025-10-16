@@ -39,6 +39,7 @@
         <module>jloda-connect</module>
         <module>jloda-fx</module>
         <module>jloda-swing</module>
+        <module>jloda-phylogeny</module>
     </modules>
 
 </project>

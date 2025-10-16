@@ -33,6 +33,7 @@ import java.util.Map;
 
 /**
  * computes a triangular layout for a tree
+ * todo: make independent of jloda and move to jloda-phylogeny
  * Daniel Huson, 12.2021
  */
 public class TriangularTreeLayout {

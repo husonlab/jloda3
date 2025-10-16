@@ -29,6 +29,7 @@ import java.util.Map;
 
 /**
  * compute the coordinates for a (early branching) cladogram
+ * todo: make independent of jloda and move to jloda-phylogeny
  * Daniel Huson, 8.2025
  */
 public class LayoutRectangularCladogram {
@@ -85,6 +86,4 @@ public class LayoutRectangularCladogram {
 			computeLongestPathsRec(network, w, longestPath);
 		}
 	}
-
-
 }
