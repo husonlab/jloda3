@@ -52,6 +52,8 @@ public class FastMultiLayerMethodLayout {
 								  ToDoubleFunction<Edge> edgeWeights0,
 								  Function<Node, Point> initialPosFunction,
 								  BiConsumer<Node, Point> result) {
+		if (options == null)
+			options = new FastMultiLayerMethodOptions();
 		NumericalStability.reseed(options.getRandSeed());
 		if (!graph.isSimple())
 			throw new IllegalArgumentException("graph is not simple");
@@ -62,9 +64,6 @@ public class FastMultiLayerMethodLayout {
 		var edgeWeights = (edgeWeights0 != null ? edgeWeights0 : defaultWeights);
 
 		if (graph.getNumberOfNodes() > 2) {
-			if (options == null)
-				options = new FastMultiLayerMethodOptions();
-
 			NodeArray<NodeAttributes> nodeAttributes = graph.newNodeArray();
 			EdgeArray<EdgeAttributes> edgeAttributes = graph.newEdgeArray();
 
