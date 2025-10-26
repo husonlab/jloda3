@@ -2241,6 +2241,10 @@ public enum MaterialIcons {
 		setIcon(labeled, icon, null, true);
 	}
 
+	public static void setIcon(Labeled labeled, MaterialIcons icon, boolean graphicOnly) {
+		setIcon(labeled, icon, null, graphicOnly);
+	}
+
 	public static void setIcon(Labeled labeled, MaterialIcons icon, String style, boolean graphicOnly) {
 		labeled.getStylesheets().add(getStyleSheet());
 		labeled.setGraphic(graphic(icon, style));
