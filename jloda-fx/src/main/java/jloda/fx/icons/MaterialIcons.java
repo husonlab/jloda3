@@ -2228,6 +2228,11 @@ public enum MaterialIcons {
 		setIcon(labeled, valueOf(materialIconName), null, true);
 	}
 
+	public static void setIcon(Labeled labeled, String materialIconName, boolean graphicOnly) {
+		setIcon(labeled, valueOf(materialIconName), null, graphicOnly);
+	}
+
+
 	public static void setIcon(Labeled labeled, String materialIconName, String style, boolean graphicOnly) {
 		setIcon(labeled, valueOf(materialIconName), style, graphicOnly);
 	}
