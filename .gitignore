@@ -23,6 +23,9 @@
 hs_err_pid*
 replay_pid*
 
+### Mac OS ###
+.DS_Store
+
 # IDE
 .idea/
 *.iml

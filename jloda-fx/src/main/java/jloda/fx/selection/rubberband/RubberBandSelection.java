@@ -19,160 +19,183 @@
  */
 
 package jloda.fx.selection.rubberband;
-
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.geometry.Bounds;
 import javafx.geometry.Point2D;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Cursor;
-import javafx.scene.Group;
-import javafx.scene.control.ScrollPane;
+import javafx.scene.Node;
+import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
-import javafx.scene.layout.Pane;
+import javafx.scene.input.ScrollEvent;
+import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
-import jloda.fx.util.SelectionEffect;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/**
- * Shows a rubber band and calls a handler
- * Daniel Huson, 1.2018
- */
 public class RubberBandSelection {
+
     private static ExecutorService service;
 
     @FunctionalInterface
     public interface Handler {
         /**
-         * handle a rubber band selection
-         *
-         * @param rectangle       in scene coordinates
-         * @param extendSelection true if shift key down
-         * @param service         use this service for computations outside of the FX thread
+         * Called when a rubber-band selection completes.
+         * @param rectangle selection rectangle in SCENE coordinates
+         * @param extendSelection true if shift pressed
+         * @param service executor you can use for non-FX work
          */
         void handle(Rectangle2D rectangle, boolean extendSelection, ExecutorService service);
     }
 
-    private final Rectangle rectangle;
-    private Point2D start;
-    private Point2D end;
+    private final Node area;          // the node you draw over (Canvas, Pane, etc.)
+    private final Rectangle band;     // the visible rubber band
     private final Handler handler;
 
-    private boolean stillDownWithoutMoving;
-    private boolean inWait;
-    private final BooleanProperty inRubberBand = new SimpleBooleanProperty();
-    private final BooleanProperty inDrag = new SimpleBooleanProperty();
+    private final BooleanProperty inDrag = new SimpleBooleanProperty(false);
+    private final BooleanProperty inRubberBand = new SimpleBooleanProperty(false);
 
-    /**
-     * constructor
-     *
-     * @param pane       node on which mouse can be clicked and dragged to show rubber band
-     * @param scrollPane if non-null, will implement panning
-     * @param group      group into which rubber band should be temporarily added so that it appears in the scene
-     * @param handler    this is called when rubber band is released
-     */
-    public RubberBandSelection(final Pane pane, final ScrollPane scrollPane, final Group group, final Handler handler) {
-        if (service == null)
-            service = Executors.newSingleThreadExecutor();
+    private double anchorX, anchorY;
 
+    public RubberBandSelection(Node area, Handler handler) {
+        this.area = area;
         this.handler = handler;
-        rectangle = new Rectangle();
 
-        rectangle.setFill(Color.TRANSPARENT);
-        rectangle.setStroke(SelectionEffect.getInstance().getColor());
+        if (service == null) {
+            service = Executors.newCachedThreadPool(r -> {
+                Thread t = new Thread(r, "rubberband-worker");
+                t.setDaemon(true);
+                return t;
+            });
+        }
 
-        inRubberBand.addListener((c, o, n) -> {
-            pane.setCursor(n ? Cursor.CROSSHAIR : Cursor.DEFAULT);
-            if (n)
-                group.getChildren().add(rectangle);
-            else
-                group.getChildren().remove(rectangle);
+        // The band is added as a child of the same parent as `area` so it sits above it.
+        // If `area` is a Parent, you could alternatively add to an overlay group.
+        band = new Rectangle(0, 0, 0, 0);
+        band.setManaged(false);
+        band.setMouseTransparent(true);
+        band.setStroke(Color.web("#1a73e8"));          // outline
+        band.setFill(Color.web("#1a73e8", 0.15));      // translucent fill
+        band.setVisible(false);
+
+        // Ensure band is present above the area
+        Platform.runLater(() -> {
+            var p = area.getParent();
+            if (p != null) {
+                if (!p.getChildrenUnmodifiable().contains(band) && p instanceof javafx.scene.layout.Pane pane) {
+                    pane.getChildren().add(band);
+                    // keep band above
+                    band.toFront();
+                }
+            }
         });
 
-        pane.addEventHandler(MouseEvent.MOUSE_PRESSED, (e) -> {
-            stillDownWithoutMoving = true;
+        // Prevent scroll-wheel jitter while drawing (esp. on trackpads)
+        area.addEventFilter(ScrollEvent.ANY, e -> {
+            if (inDrag.get()) e.consume();
+        });
+
+        // Start
+        area.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
+            if (e.getButton() != MouseButton.PRIMARY) return;
+            inDrag.set(true);
             inRubberBand.set(false);
 
-            start = group.screenToLocal(e.getScreenX(), e.getScreenY());
-            if (start != null) {
-                end = null;
-                rectangle.setX(start.getX());
-                rectangle.setY(start.getY());
-                rectangle.setWidth(0);
-                rectangle.setHeight(0);
+            // anchor in LOCAL coords of `area`, clamped into bounds
+            Bounds b = getLocalBounds(area);
+            anchorX = clamp(e.getX(), b.getMinX(), b.getMaxX());
+            anchorY = clamp(e.getY(), b.getMinY(), b.getMaxY());
 
-                if (e.isShiftDown()) {
-                    inRubberBand.set(true);
-                } else if (!inWait) {
-                    service.execute(() -> {
-                        try {
-                            inWait = true;
-                            synchronized (this) {
-                                Thread.sleep(500);
-                            }
-                        } catch (InterruptedException ignored) {
-                        }
-                        if (stillDownWithoutMoving) {
-                            Platform.runLater(() -> inRubberBand.set(true));
-                        }
-                        inWait = false;
-                    });
-                }
-                if (pane.getCursor() == Cursor.CROSSHAIR)
-                    e.consume();
-            }
+            // place band in PARENT coordinates (so it sits visually over the area)
+            Point2D startInParent = area.localToParent(anchorX, anchorY);
+            band.setX(startInParent.getX());
+            band.setY(startInParent.getY());
+            band.setWidth(0);
+            band.setHeight(0);
+            band.setVisible(true);
+            band.toFront();
+            area.setCursor(Cursor.CROSSHAIR);
+            e.consume();
         });
 
-        pane.addEventHandler(MouseEvent.MOUSE_DRAGGED, (e) -> {
-            stillDownWithoutMoving = false;
-            if (inRubberBand.get()) {
-                if (start != null) {
-                    end = group.screenToLocal(e.getScreenX(), e.getScreenY());
-                    rectangle.setX(Math.min(start.getX(), end.getX()));
-                    rectangle.setY(Math.min(start.getY(), end.getY()));
-                    rectangle.setWidth(Math.abs(end.getX() - start.getX()));
-                    rectangle.setHeight(Math.abs(end.getY() - start.getY()));
-                    if (pane.getCursor() == Cursor.CROSSHAIR)
-                        e.consume();
-                }
-            } else if (scrollPane != null && start != null) {
-                inDrag.set(true);
-                double deltaX = e.getScreenX() - start.getX();
-                double deltaY = e.getScreenY() - start.getY();
-                // todo: determine the correct amount to scroll by
-                if (deltaX > 5)
-                    scrollPane.setHvalue(scrollPane.getHvalue() - 0.01 * scrollPane.getHmax());
-                else if (deltaX < -5)
-                    scrollPane.setHvalue(scrollPane.getHvalue() + 0.01 * scrollPane.getHmax());
-                if (deltaY > 5)
-                    scrollPane.setVvalue(scrollPane.getVvalue() - 0.01 * scrollPane.getVmax());
-                else if (deltaY < -5)
-                    scrollPane.setVvalue(scrollPane.getVvalue() + 0.01 * scrollPane.getVmax());
-                if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5)
-                    start = new Point2D(e.getScreenX(), e.getScreenY());
-            }
+        // Drag
+        area.addEventHandler(MouseEvent.MOUSE_DRAGGED, e -> {
+            if (!inDrag.get()) return;
+
+            Bounds b = getLocalBounds(area);
+
+            // clamp current point so we never go past the left/top (or right/bottom) edges
+            double xLocal = clamp(e.getX(), b.getMinX(), b.getMaxX());
+            double yLocal = clamp(e.getY(), b.getMinY(), b.getMaxY());
+
+            // convert both anchor and current to parent space (band lives in parent)
+            Point2D a = area.localToParent(anchorX, anchorY);
+            Point2D c = area.localToParent(xLocal, yLocal);
+
+            double minX = Math.min(a.getX(), c.getX());
+            double minY = Math.min(a.getY(), c.getY());
+            double maxX = Math.max(a.getX(), c.getX());
+            double maxY = Math.max(a.getY(), c.getY());
+
+            band.setX(minX);
+            band.setY(minY);
+            band.setWidth(maxX - minX);
+            band.setHeight(maxY - minY);
+
+            // activate only when visible size > 0
+            inRubberBand.set(band.getWidth() > 0 && band.getHeight() > 0);
+            e.consume();
         });
 
-        pane.addEventHandler(MouseEvent.MOUSE_RELEASED, (e) -> {
-            stillDownWithoutMoving = false;
-            if (inRubberBand.get()) {
-                if (start != null) {
-                    start = null;
-                    if (pane.getCursor() == Cursor.CROSSHAIR)
-                        e.consume();
-                    if (this.handler != null && rectangle.getWidth() > 0 && rectangle.getHeight() > 0) {
-                        Point2D min = group.localToScene(rectangle.getX(), rectangle.getY());
-                        Point2D max = group.localToScene(rectangle.getX() + rectangle.getWidth(), rectangle.getY() + rectangle.getHeight());
-                        this.handler.handle(new Rectangle2D(min.getX(), min.getY(), max.getX() - min.getX(), max.getY() - min.getY()), e.isShiftDown(), service);
-                    }
+        // End
+        area.addEventHandler(MouseEvent.MOUSE_RELEASED, e -> {
+            if (!inDrag.get()) return;
+
+            if (inRubberBand.get() && band.getWidth() > 0 && band.getHeight() > 0) {
+                // Report in SCENE coordinates (as your existing handler expects)
+                Point2D minScene = band.localToScene(0, 0);
+                Point2D maxScene = band.localToScene(band.getWidth(), band.getHeight());
+                Rectangle2D sceneRect = new Rectangle2D(
+                        Math.min(minScene.getX(), maxScene.getX()),
+                        Math.min(minScene.getY(), maxScene.getY()),
+                        Math.abs(maxScene.getX() - minScene.getX()),
+                        Math.abs(maxScene.getY() - minScene.getY())
+                );
+                if (handler != null) {
+                    handler.handle(sceneRect, e.isShiftDown(), service);
                 }
-                inRubberBand.set(false);
             }
+
+            band.setVisible(false);
+            band.setWidth(0);
+            band.setHeight(0);
+            inRubberBand.set(false);
             inDrag.set(false);
+            area.setCursor(Cursor.DEFAULT);
+            e.consume();
         });
+    }
+
+    // If the area is a Region (Pane, Canvas wrapper in a Pane, etc.), prefer its current width/height.
+    // Otherwise fall back to its layout bounds.
+    private static Bounds getLocalBounds(Node n) {
+        if (n instanceof Region r) {
+            double w = Math.max(0, r.getWidth());
+            double h = Math.max(0, r.getHeight());
+            // Regions report 0 until laid out; fallback if needed:
+            if (w > 0 && h > 0) {
+                return new javafx.geometry.BoundingBox(0, 0, w, h);
+            }
+        }
+        return n.getLayoutBounds();
+    }
+
+    private static double clamp(double v, double min, double max) {
+        return (v < min) ? min : Math.min(v, max);
     }
 
     public BooleanProperty inRubberBandProperty() {
