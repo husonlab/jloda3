@@ -21,6 +21,7 @@
 package jloda.fx.shapes;
 
 import javafx.scene.Node;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.Shape;
 import javafx.scene.shape.Shape3D;
 import javafx.scene.shape.Sphere;
@@ -39,7 +40,7 @@ public enum NodeShape {
      * @return node shape
      */
     public static NodeShape valueOf(Shape shape) {
-        if (shape instanceof CircleShape)
+        if (/*shape instanceof CircleShape || */shape instanceof javafx.scene.shape.Circle)
             return Circle;
         else if (shape instanceof SquareShape)
             return Square;
@@ -51,7 +52,7 @@ public enum NodeShape {
             return TriangleUp;
         else if (shape instanceof TriangleDownShape)
             return TriangleDown;
-        else if (shape instanceof RectangleShape)
+        else if (shape instanceof RectangleShape || shape instanceof javafx.scene.shape.Rectangle)
             return Rectangle;
         else if (shape instanceof OvalShape)
             return Oval;
@@ -71,7 +72,7 @@ public enum NodeShape {
      *
      * @return shape
      */
-    public static Shape create(String name, int size) {
+    public static Shape create(String name, double size) {
         return create(name, size, size);
     }
 
@@ -80,7 +81,7 @@ public enum NodeShape {
      *
      * @return shape
      */
-    public static Shape create(NodeShape nodeShape, int size) {
+    public static Shape create(NodeShape nodeShape, double size) {
         return create(nodeShape, size, size);
     }
 
@@ -115,12 +116,38 @@ public enum NodeShape {
     }
 
     // todo: implement different shapes here
-    public static Shape3D create3D(Node shape, int width) {
+    public static Shape3D create3D(Node shape, double width) {
         ((Sphere) shape).setRadius(0.5 * width);
         return (Sphere) shape;
     }
 
     public static int[] getSize(Shape shape) {
         return new int[]{(int) Math.round(shape.getBoundsInLocal().getWidth()), (int) Math.round(shape.getBoundsInLocal().getHeight())};
+    }
+
+    public static double getWidth(Shape shape) {
+        return shape.getBoundsInLocal().getWidth();
+    }
+
+    public static double getHeight(Shape shape) {
+        return shape.getBoundsInLocal().getHeight();
+    }
+
+    /**
+     * set the size of a shape (either a NodeShape or a circle or rectangle)
+     *
+     * @param shape  the shape
+     * @param width  desired width (and 2*radius for a circle)
+     * @param height desired height (ignored for a circle)
+     */
+    public static void setSize(Shape shape, double width, double height) {
+        if (shape instanceof javafx.scene.shape.Circle circle) {
+            circle.setRadius(width / 2);
+        } else if (shape instanceof Rectangle rectangle) {
+            rectangle.setWidth(width);
+            rectangle.setHeight(height);
+        } else if (shape instanceof ISized iSized) {
+            iSized.setSize(width, height);
+        }
     }
 }
