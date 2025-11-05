@@ -44,6 +44,7 @@ import jloda.fx.util.RunAfterAWhile;
 import jloda.fx.window.NotificationManager;
 import jloda.util.*;
 
+import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -610,7 +611,7 @@ public class RichTextLabel extends Group {
 						imageView = new ImageView(file2image.get(src));
 					else {
 						System.err.println("Loading: " + src);
-						final var image = new Image(src, true);
+						final var image = load(src);
 						file2image.put(src, image);
 						imageView = new ImageView(image);
 						image.exceptionProperty().addListener((c, o, n) -> {
@@ -644,6 +645,18 @@ public class RichTextLabel extends Group {
 				return new Text(map.get("alt"));
 		}
 		return null;
+	}
+
+	private static Image load(String urlStr) throws Exception {
+		var url = new URL(urlStr);
+		var connection = url.openConnection();
+		connection.setRequestProperty("User-Agent",
+				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+				"AppleWebKit/537.36 (KHTML, like Gecko) " +
+				"Chrome/123.0 Safari/537.36");
+		try (var stream = connection.getInputStream()) {
+			return new Image(stream);
+		}
 	}
 
 	private static Shape createMark(String specification, double defaultScale, double defaultSize, Paint defaultFill) {
