@@ -52,7 +52,7 @@ public class LayoutRootedPhylogeny {
 	 * @param nodePointMap the node layout points
 	 */
 	public static void apply(PhyloTree network, Layout layout, Scaling scaling, Averaging averaging, boolean optimizeReticulateEdges, Random random, Map<Node, Double> nodeAngleMap, Map<Node, Point2D> nodePointMap) {
-		if (network.getRoot() != null && (!network.hasLSAChildrenMap() || network.getLSAChildrenMap().isEmpty() || network.getLSAChildrenMap().get(network.getRoot()).isEmpty())) {
+		if (network.getRoot() != null && (!network.hasLSAChildrenMap() || network.getLSAChildrenMap().isEmpty() || network.getLSAChildrenMap().get(network.getRoot()) == null || network.getLSAChildrenMap().get(network.getRoot()).isEmpty())) {
 			LSAUtils.setLSAChildrenAndTransfersMap(network);
 		}
 
