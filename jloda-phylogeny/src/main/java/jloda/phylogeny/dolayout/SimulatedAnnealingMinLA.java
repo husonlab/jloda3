@@ -32,10 +32,15 @@ import java.util.function.Function;
  * @param <T>
  */
 public class SimulatedAnnealingMinLA<T> {
-	private double startTemp = 1000.0;
-	private double endTemp = 0.01;
-	private int iterationsPerTemp = 1000;
-	private double coolingRate = 0.95;
+	public static double DEFAULT_START_TEMPERATURE = 1000.0;
+	public static double DEFAULT_END_TEMPERATURE = 0.01;
+	public static int DEFAULT_ITERATIONS_PER_TEMPERATURE = 1000;
+	public static double DEFAULT_COOLING_RATE = 0.95;
+
+	private double startTemperature = DEFAULT_START_TEMPERATURE;
+	private double endTemperature = DEFAULT_END_TEMPERATURE;
+	private int iterationsPerTemp = DEFAULT_ITERATIONS_PER_TEMPERATURE;
+	private double coolingRate = DEFAULT_COOLING_RATE;
 
 	/**
 	 * apply simulated annealing to find best ordering of objects
@@ -58,9 +63,9 @@ public class SimulatedAnnealingMinLA<T> {
 		if (false)
 			System.err.println("Original cost: " + bestCost);
 
-		var temp = startTemp;
+		var temp = startTemperature;
 
-		while (temp > endTemp) {
+		while (temp > endTemperature) {
 			for (var iter = 0; iter < iterationsPerTemp; iter++) {
 				var i = rand.nextInt(n);
 				var j = rand.nextInt(n);
@@ -105,20 +110,20 @@ public class SimulatedAnnealingMinLA<T> {
 	}
 
 
-	public double getStartTemp() {
-		return startTemp;
+	public double getStartTemperature() {
+		return startTemperature;
 	}
 
-	public void setStartTemp(double startTemp) {
-		this.startTemp = startTemp;
+	public void setStartTemperature(double startTemperature) {
+		this.startTemperature = startTemperature;
 	}
 
-	public double getEndTemp() {
-		return endTemp;
+	public double getEndTemperature() {
+		return endTemperature;
 	}
 
-	public void setEndTemp(double endTemp) {
-		this.endTemp = endTemp;
+	public void setEndTemperature(double endTemperature) {
+		this.endTemperature = endTemperature;
 	}
 
 	public int getIterationsPerTemp() {

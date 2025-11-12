@@ -169,6 +169,10 @@ public class Icebergs {
 					shape.fireEvent(e);
 					e.consume();
 				});
+				iceberg.setOnContextMenuRequested(e -> {
+					shape.fireEvent(e);
+					e.consume();
+				});
 			}
 			EventHandler<MouseEvent> handler = shape::fireEvent;
 			iceberg.setOnMouseEntered(handler);
