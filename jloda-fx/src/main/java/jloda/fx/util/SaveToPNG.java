@@ -61,7 +61,7 @@ public class SaveToPNG {
 	public static void apply(Image image, File file) throws IOException {
 		if (file.exists())
 			Files.delete(file.toPath());
-		var bytes = new PngEncoderFX(image, true).pngEncode();
+		var bytes = new PngEncoderFX(image, true, PngEncoderFX.FILTER_NONE, 9).pngEncode();
 		try (var outs = new FileOutputStream(file)) {
 			outs.write(bytes);
 		}

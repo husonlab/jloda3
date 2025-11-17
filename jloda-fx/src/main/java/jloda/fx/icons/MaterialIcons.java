@@ -2250,6 +2250,8 @@ public enum MaterialIcons {
 		labeled.setGraphic(graphic(icon, style));
 		if (graphicOnly)
 			labeled.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+		else
+			labeled.setContentDisplay(ContentDisplay.LEFT);
 	}
 
 	private static void initialize() {

@@ -56,7 +56,7 @@ import java.util.zip.DeflaterOutputStream;
  * Fixed bug with calculation of nRows
  */
 
-public class PngEncoderFX extends Object {
+public class PngEncoderFX {
 
 	/**
 	 * Constant specifying that alpha channel should be encoded.
