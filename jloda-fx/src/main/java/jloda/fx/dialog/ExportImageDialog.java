@@ -27,6 +27,7 @@ import jloda.fx.util.ProgramProperties;
 import jloda.fx.util.SaveToPDF;
 import jloda.fx.util.SaveToPNG;
 import jloda.fx.util.SaveToSVG;
+import jloda.fx.window.MainWindowManager;
 import jloda.fx.window.NotificationManager;
 import jloda.util.FileUtils;
 import jloda.util.StringUtils;
@@ -82,11 +83,20 @@ public class ExportImageDialog {
 	}
 
 	public static void saveNodeAsImage(Node node, String formatName, File file) throws IOException {
+		var dark = MainWindowManager.isUseDarkTheme();
+		try {
+			if (dark)
+				MainWindowManager.setUseDarkTheme(false);
 		switch (formatName.toLowerCase()) {
 			case "pdf" -> SaveToPDF.apply(node, file);
 			case "svg" -> SaveToSVG.apply(node, file);
 			case "png" -> SaveToPNG.apply(node, file);
 			default -> throw new IOException("Write failed: format not supported: " + formatName);
+		}
+		} finally {
+			if (dark) {
+				MainWindowManager.setUseDarkTheme(true);
+			}
 		}
 	}
 }
