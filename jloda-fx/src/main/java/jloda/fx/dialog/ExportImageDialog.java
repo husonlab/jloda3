@@ -94,9 +94,8 @@ public class ExportImageDialog {
 			default -> throw new IOException("Write failed: format not supported: " + formatName);
 		}
 		} finally {
-			if (dark) {
+			if (dark)
 				MainWindowManager.setUseDarkTheme(true);
-			}
 		}
 	}
 }
