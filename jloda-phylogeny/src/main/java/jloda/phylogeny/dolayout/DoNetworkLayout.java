@@ -80,9 +80,11 @@ public class DoNetworkLayout {
 				var displacement = 0.0;
 				var reticulateNeighbors = reticulateEdges.apply(v);
 				if (reticulateNeighbors != null) {
+					var hV = nodeHeightMap.get(v);
 					for (var w : reticulateNeighbors) {
-						var min = Math.min(nodeHeightMap.get(v), nodeHeightMap.get(w));
-						var max = Math.max(nodeHeightMap.get(v), nodeHeightMap.get(w));
+						var hW = nodeHeightMap.get(w);
+						var min = Math.min(hV, hW);
+						var max = Math.max(hV, hW);
 						var diff = Math.min(max - min, (totalMax - max) + (min - totalMin) + 1);
 						displacement += 0.5 * diff;
 					}
@@ -94,10 +96,13 @@ public class DoNetworkLayout {
 				var displacement = 0.0;
 				var reticulateNeighbors = reticulateEdges.apply(v);
 				if (reticulateNeighbors != null) {
+					var hV = nodeHeightMap.get(v);
 					for (var w : reticulateNeighbors) {
-						var diff = Math.abs(nodeHeightMap.get(v) - nodeHeightMap.get(w));
+						var hW = nodeHeightMap.get(w);
+						var diff = Math.abs(hV - hW);
 						displacement += 0.5 * diff;
 					}
+					// todo: additional term that avoids lopsided layout
 				}
 				return displacement;
 			};

@@ -53,7 +53,7 @@ import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 /**
- * find (and replace) tool bar
+ * find (and replace) toolbar
  * Daniel Huson, 1.2018
  */
 public class FindToolBar extends VBox {

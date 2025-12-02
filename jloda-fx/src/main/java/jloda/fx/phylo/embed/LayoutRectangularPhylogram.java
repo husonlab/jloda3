@@ -46,7 +46,7 @@ public class LayoutRectangularPhylogram {
 		try (var yCoord = network.newNodeDoubleArray()) {
 			HeightAndAngles.apply(network, yCoord, averaging, true);
 
-			var percentOffset = ProgramProperties.get("ReticulationOffsetPercent", 50.0);
+			var percentOffset = ProgramProperties.get("ReticulationOffsetPercent", 10.0);
 
 			var averageWeight = network.edgeStream().mapToDouble(network::getWeight).average().orElse(1);
 			var smallOffsetForReticulateEdge = (percentOffset / 100.0) * averageWeight;
