@@ -48,6 +48,8 @@ module jloda_fx {
 	exports jloda.fx.workflow;
 	exports jloda.fx.selection.rubberband;
 	exports jloda.fx.thirdparty;
+	exports jloda.fx.windownotifications;
+
 
 	exports jloda.fx.phylo.embed;
 }

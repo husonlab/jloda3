@@ -36,6 +36,8 @@ public interface SelectionModel<T> {
 
 	boolean setSelected(T t, boolean select);
 
+	boolean setSelected(Collection<? extends T> list);
+
 	boolean selectAll(Collection<? extends T> list);
 
 	void clearSelection();

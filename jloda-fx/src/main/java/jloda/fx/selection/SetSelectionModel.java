@@ -55,6 +55,15 @@ public class SetSelectionModel<T> implements SelectionModel<T> {
 	}
 
 	@Override
+	public boolean setSelected(Collection<? extends T> list) {
+		var changed = size() > 0;
+		clearSelection();
+		if (set.addAll(list))
+			changed = true;
+		return changed;
+	}
+
+	@Override
 	public boolean selectAll(Collection<? extends T> list) {
 		var result = false;
 		for (var item : list) {

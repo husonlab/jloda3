@@ -92,6 +92,14 @@ public class NumberUtils {
 		return m;
 	}
 
+	public static int sum(int... array) {
+		var sum = 0;
+		for (var x : array) {
+			sum += x;
+		}
+		return sum;
+	}
+
 	/**
 	 * gets the max value of an array
 	 */

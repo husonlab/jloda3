@@ -214,6 +214,8 @@ public class StringUtils {
 	 * @return string representation
 	 */
 	public static String toString(int[] array, int offset, int length, String separator) {
+		if (array == null)
+			return "";
 		final var buf = new StringBuilder();
 
 		var first = true;
@@ -2230,6 +2232,8 @@ public class StringUtils {
 	}
 
 	public static String toString(String format, float[] array, int offset, int length, String separator) {
+		if (array == null)
+			return null;
 		final var buf = new StringBuilder();
 
 		var first = true;
@@ -2246,6 +2250,9 @@ public class StringUtils {
 	}
 
 	public static String toString(String format, int[] array, int offset, int length, String separator) {
+		if (array == null)
+			return "";
+
 		final var buf = new StringBuilder();
 
 		var first = true;

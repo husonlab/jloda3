@@ -35,7 +35,7 @@ public class DAGTraversals {
 	 * @param children provides the children
 	 * @param consumer consumer for the current node
 	 */
-	public static void postOrderTraversal(Node v, Function<Node, List<Node>> children, Consumer<Node> consumer) {
+	public static <N> void postOrderTraversal(N v, Function<N, List<N>> children, Consumer<N> consumer) {
 		for (var w : children.apply(v)) {
 			postOrderTraversal(w, children, consumer);
 		}
@@ -66,7 +66,7 @@ public class DAGTraversals {
 	 * @param children provides the children
 	 * @param consumer consumer for the current node
 	 */
-	public static void preOrderTraversal(Node v, Function<Node, List<Node>> children, Consumer<Node> consumer) {
+	public static <N> void preOrderTraversal(N v, Function<N, List<N>> children, Consumer<N> consumer) {
 		consumer.accept(v);
 		for (var w : children.apply(v)) {
 			preOrderTraversal(w, children, consumer);
