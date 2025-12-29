@@ -358,6 +358,20 @@ public class IteratorUtils {
 		return iterator.hasNext() ? iterator.next() : null;
 	}
 
+	/**
+	 * gets last item or null
+	 *
+	 * @return last item or null
+	 */
+	public static <T> T getLast(Iterable<T> iterable) {
+		var iterator = iterable.iterator();
+		T value = null;
+		while (iterator.hasNext()) {
+			value = iterator.next();
+		}
+		return value;
+	}
+
 	public static <T> Iterable<T> withAdditionalItems(Iterable<T> iterable, T... additional) {
 		return () -> new Iterator<>() {
 			private final Iterator<T> it = iterable.iterator();

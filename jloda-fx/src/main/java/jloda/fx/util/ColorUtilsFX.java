@@ -63,6 +63,29 @@ public class ColorUtilsFX {
 		return new Color(color.getRed() / 255.0, color.getGreen() / 255.0, color.getBlue() / 255.0, color.getAlpha() / 255.0);
 	}
 
+	/**
+	 * Convert a JavaFX Color to "#RRGGBBAA"
+	 */
+	public static String toWeb(Color c) {
+		int r = (int) Math.round(c.getRed() * 255);
+		int g = (int) Math.round(c.getGreen() * 255);
+		int b = (int) Math.round(c.getBlue() * 255);
+		int a = (int) Math.round(c.getOpacity() * 255);
+
+		return String.format("#%02X%02X%02X%02X", r, g, b, a);
+	}
+
+	/**
+	 * Parse "#RRGGBB" or "#RRGGBBAA" into a Color
+	 */
+	public static Color fromWeb(String s) {
+		if (s == null || s.isEmpty())
+			return Color.BLACK;
+
+		// JavaFX supports both #RRGGBB and #RRGGBBAA
+		return Color.web(s);
+	}
+
 	public static String getName(Color color) {
 		if (Color.ALICEBLUE.equals(color)) return "ALICEBLUE".toLowerCase();
 		else if (Color.ANTIQUEWHITE.equals(color)) return "ANTIQUEWHITE".toLowerCase();

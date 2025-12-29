@@ -44,6 +44,8 @@ public class NewickIO {
 	public static boolean NUMBERS_ON_INTERNAL_NODES_ARE_CONFIDENCE_VALUES = true;
 	public boolean allowMultiLabeledNodes = true;
 
+	public static int MAX_LENGTH_SINGLE_QUOTED_LABEL = 1000;
+
 	private final boolean cleanLabelsOnWrite;
 
 	private boolean numbersOnInternalNodesAreConfidenceValues = NUMBERS_ON_INTERNAL_NODES_ARE_CONFIDENCE_VALUES;
@@ -398,6 +400,10 @@ public class NewickIO {
 		inputHasMultiLabels = false;
 
 		str = str.trim();
+
+		if (!StringUtils.checkSingleQuotes(str, MAX_LENGTH_SINGLE_QUOTED_LABEL))
+			throw new IOException("String contains problematic single quotes");
+
 		{
 			while (str.startsWith("[")) {
 				var next = str.indexOf("[", 1);

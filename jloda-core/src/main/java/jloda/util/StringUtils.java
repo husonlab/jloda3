@@ -2271,4 +2271,25 @@ public class StringUtils {
 	public static boolean containsIgnoreCase(Collection<String> list, String query) {
 		return list.stream().anyMatch(item -> item.equalsIgnoreCase(query));
 	}
+
+	public static boolean checkSingleQuotes(String str, int maxSeparation) {
+		var lastQuoteIndex = -1;
+		var insideQuote = false;
+
+		for (var i = 0; i < str.length(); i++) {
+			if (str.charAt(i) == '\'') {
+				if (!insideQuote) {
+					lastQuoteIndex = i;
+					insideQuote = true;
+				} else {
+					int separation = i - lastQuoteIndex - 1;
+					if (separation > maxSeparation) {
+						return false;
+					}
+					insideQuote = false;
+				}
+			}
+		}
+		return !insideQuote;
+	}
 }
