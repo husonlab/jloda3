@@ -42,10 +42,14 @@ import java.util.ArrayList;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 
+import static jloda.fx.print.Print.restoreMenuBar;
+
 /**
  * print a  node
+ * @deprecated This class has been superseded by {@link jloda.fx.print.Print}.
  * Daniel Huson, 1.2018
  */
+@Deprecated
 public class Print {
 	public static PageLayout pageLayoutSelected;
 
@@ -53,74 +57,78 @@ public class Print {
 	 * print the given node
 	 */
 	public static void print(Stage owner, Node node0) {
-		final PrinterJob job = PrinterJob.createPrinterJob();
-		if (job != null) {
-			if (job.showPrintDialog(owner)) {
-				System.err.println(job.getJobSettings());
+		try {
+			final PrinterJob job = PrinterJob.createPrinterJob();
+			if (job != null) {
+				if (job.showPrintDialog(owner)) {
+					System.err.println(job.getJobSettings());
 
-				final PageLayout pageLayout = (pageLayoutSelected != null ? pageLayoutSelected : job.getJobSettings().getPageLayout());
+					final PageLayout pageLayout = (pageLayoutSelected != null ? pageLayoutSelected : job.getJobSettings().getPageLayout());
 
-				final Node node;
-				if (node0 instanceof TextArea) {
-					final TextArea textArea = (TextArea) node0;
-					final Text text = new Text("\n" + textArea.getText());
-					text.setWrappingWidth(pageLayout.getPrintableWidth());
-					text.setFont(textArea.getFont());
-					node = text;
-					// todo: need print to multiple pages
-				} else
-					node = node0;
+					final Node node;
+					if (node0 instanceof TextArea) {
+						final TextArea textArea = (TextArea) node0;
+						final Text text = new Text("\n" + textArea.getText());
+						text.setWrappingWidth(pageLayout.getPrintableWidth());
+						text.setFont(textArea.getFont());
+						node = text;
+						// todo: need print to multiple pages
+					} else
+						node = node0;
 
-				final Scale scale;
-				if (node == node0 && node.getBoundsInParent().getWidth() > pageLayout.getPrintableWidth() || node.getBoundsInParent().getHeight() > pageLayout.getPrintableHeight()) {
-					if (true) {
-						System.err.printf("Scene size (%.0f x %.0f) exceeds printable area (%.0f x %.0f), scaled to fit%n", node.getBoundsInParent().getWidth(),
-								node.getBoundsInParent().getHeight(), pageLayout.getPrintableWidth(), pageLayout.getPrintableHeight());
-						double factor = Math.min(pageLayout.getPrintableWidth() / node.getBoundsInParent().getWidth(), pageLayout.getPrintableHeight() / node.getBoundsInParent().getHeight());
-						scale = new Scale(factor, factor);
-						node.getTransforms().add(scale);
-					} else {
-						javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.CONFIRMATION);
-						alert.initOwner(owner);
-						alert.setResizable(true);
+					final Scale scale;
+					if (node == node0 && node.getBoundsInParent().getWidth() > pageLayout.getPrintableWidth() || node.getBoundsInParent().getHeight() > pageLayout.getPrintableHeight()) {
+						if (true) {
+							System.err.printf("Scene size (%.0f x %.0f) exceeds printable area (%.0f x %.0f), scaled to fit%n", node.getBoundsInParent().getWidth(),
+									node.getBoundsInParent().getHeight(), pageLayout.getPrintableWidth(), pageLayout.getPrintableHeight());
+							double factor = Math.min(pageLayout.getPrintableWidth() / node.getBoundsInParent().getWidth(), pageLayout.getPrintableHeight() / node.getBoundsInParent().getHeight());
+							scale = new Scale(factor, factor);
+							node.getTransforms().add(scale);
+						} else {
+							javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.CONFIRMATION);
+							alert.initOwner(owner);
+							alert.setResizable(true);
 
-						alert.setTitle("ScalingType Before Printing - " + ProgramProperties.getProgramName());
-						alert.setHeaderText(String.format("Scene size (%.0f x %.0f) exceeds printable area (%.0f x %.0f)", node.getBoundsInParent().getWidth(),
-								node.getBoundsInParent().getHeight(), pageLayout.getPrintableWidth(), pageLayout.getPrintableHeight()));
-						alert.setContentText("ScalingType to fit printable area?");
-						ButtonType buttonTypeYes = new ButtonType("Yes", ButtonBar.ButtonData.YES);
-						ButtonType buttonTypeNo = new ButtonType("No", ButtonBar.ButtonData.NO);
-						ButtonType buttonTypeCancel = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
-						alert.getButtonTypes().setAll(buttonTypeYes, buttonTypeNo, buttonTypeCancel);
+							alert.setTitle("ScalingType Before Printing - " + ProgramProperties.getProgramName());
+							alert.setHeaderText(String.format("Scene size (%.0f x %.0f) exceeds printable area (%.0f x %.0f)", node.getBoundsInParent().getWidth(),
+									node.getBoundsInParent().getHeight(), pageLayout.getPrintableWidth(), pageLayout.getPrintableHeight()));
+							alert.setContentText("ScalingType to fit printable area?");
+							ButtonType buttonTypeYes = new ButtonType("Yes", ButtonBar.ButtonData.YES);
+							ButtonType buttonTypeNo = new ButtonType("No", ButtonBar.ButtonData.NO);
+							ButtonType buttonTypeCancel = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+							alert.getButtonTypes().setAll(buttonTypeYes, buttonTypeNo, buttonTypeCancel);
 
-						final Optional<ButtonType> result = alert.showAndWait();
-						if (result.isPresent()) {
-							if (result.get() == buttonTypeYes) {
-								final double factor = Math.min(pageLayout.getPrintableWidth() / node.getBoundsInParent().getWidth(), pageLayout.getPrintableHeight() / node.getBoundsInParent().getHeight());
-								scale = new Scale(factor, factor);
-								node.getTransforms().add(scale);
-							} else if (result.get() == buttonTypeCancel)
-								return;
-							else
+							final Optional<ButtonType> result = alert.showAndWait();
+							if (result.isPresent()) {
+								if (result.get() == buttonTypeYes) {
+									final double factor = Math.min(pageLayout.getPrintableWidth() / node.getBoundsInParent().getWidth(), pageLayout.getPrintableHeight() / node.getBoundsInParent().getHeight());
+									scale = new Scale(factor, factor);
+									node.getTransforms().add(scale);
+								} else if (result.get() == buttonTypeCancel)
+									return;
+								else
+									scale = null;
+							} else
 								scale = null;
-						} else
-							scale = null;
-					}
-				} else
-					scale = null;
+						}
+					} else
+						scale = null;
 
-				job.jobStatusProperty().addListener((c, o, n) -> {
-					//System.err.println("Status: " + o + " -> " + n);
-					if (scale != null && n != PrinterJob.JobStatus.NOT_STARTED && n != PrinterJob.JobStatus.PRINTING) {
-						Platform.runLater(() -> node.getTransforms().remove(scale));
-					}
-				});
-				job.setPrinter(job.getPrinter());
-				if (job.printPage(pageLayout, node))
-					job.endJob();
-			}
-		} else
-			NotificationManager.showError("Failed to create Printer Job");
+					job.jobStatusProperty().addListener((c, o, n) -> {
+						//System.err.println("Status: " + o + " -> " + n);
+						if (scale != null && n != PrinterJob.JobStatus.NOT_STARTED && n != PrinterJob.JobStatus.PRINTING) {
+							Platform.runLater(() -> node.getTransforms().remove(scale));
+						}
+					});
+					job.setPrinter(job.getPrinter());
+					if (job.printPage(pageLayout, node))
+						job.endJob();
+				}
+			} else
+				NotificationManager.showError("Failed to create Print Job");
+		} finally {
+			restoreMenuBar(owner);
+		}
 	}
 
 	/**
@@ -145,16 +153,20 @@ public class Print {
 					job.endJob();
 			}
 		} else
-			NotificationManager.showError("Failed to create Printer Job");
+			NotificationManager.showError("Failed to create Print Job");
 	}
 
 	/**
 	 * show the page layout dialog
 	 */
 	public static void showPageLayout(Stage owner) {
-		final PrinterJob job = PrinterJob.createPrinterJob();
-		if (job.showPageSetupDialog(owner)) {
-			pageLayoutSelected = (job.getJobSettings().getPageLayout());
+		try {
+			final PrinterJob job = PrinterJob.createPrinterJob();
+			if (job.showPageSetupDialog(owner)) {
+				pageLayoutSelected = (job.getJobSettings().getPageLayout());
+			}
+		} finally {
+			restoreMenuBar(owner);
 		}
 	}
 
@@ -282,4 +294,5 @@ public class Print {
 		}
 		return chr;
 	}
+
 }

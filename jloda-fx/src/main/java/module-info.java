@@ -52,4 +52,5 @@ module jloda_fx {
 
 
 	exports jloda.fx.phylo.embed;
+	exports jloda.fx.print;
 }
