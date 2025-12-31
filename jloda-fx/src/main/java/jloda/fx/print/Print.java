@@ -22,17 +22,14 @@ package jloda.fx.print;
 import javafx.application.Platform;
 import javafx.print.PageLayout;
 import javafx.print.PrinterJob;
-import javafx.scene.Group;
 import javafx.scene.Node;
-import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.TextInputControl;
+import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
-import javafx.scene.transform.Scale;
 import javafx.stage.*;
 import jloda.fx.window.MainWindowManager;
 
@@ -120,17 +117,19 @@ public class Print {
 		MainWindowManager.setUseDarkTheme(false);
 		WritableImage snapshot;
 		try {
-			snapshot = CroppedSnapshot.snapshotContentBBox(node, Color.WHITE, 300, 200);
+			var bbox = ContentBoundsUtil.computeContentBoundsLocal(node);
+			snapshot = TightSnapshot.snapshotBBoxTight(node, bbox, Color.WHITE, 300, 8);
 			if (snapshot == null) return;
 			snapshot = ImageCropper.cropWhiteMargins(snapshot, 20, 0.1, 0.1);
+			if (snapshot == null) return;
 		} finally {
 			MainWindowManager.setUseDarkTheme(dark);
 		}
-		printSnapshot(owner, snapshot, 4);
+		printSnapshot(owner, snapshot);
 
 	}
 
-	public static void printSnapshot(Stage owner, WritableImage snapshot, int requestedOversample) {
+	public static void printSnapshot(Stage owner, WritableImage snapshot) {
 		try {
 			if (snapshot == null) return;
 
@@ -142,50 +141,12 @@ public class Print {
 			double pw = pl.getPrintableWidth();
 			double ph = pl.getPrintableHeight();
 
-			// Conservative max dimension for internal raster/texture.
-			final int MAX_DIM = 4096;
-
-			// Account for Retina / output scaling
-			double osx = outputScaleX(owner);
-			double osy = outputScaleY(owner);
-
-			// Cap oversample so (pw*O*osx) and (ph*O*osy) stay <= MAX_DIM
-			int maxO1 = (int) Math.floor(MAX_DIM / (pw * osx));
-			int maxO2 = (int) Math.floor(MAX_DIM / (ph * osy));
-			int oversample = Math.max(1, Math.min(requestedOversample, Math.max(1, Math.min(maxO1, maxO2))));
-
-			// Fit snapshot to printable area (preserve aspect ratio)
-			double fit = Math.min(pw / snapshot.getWidth(), ph / snapshot.getHeight());
-			double drawW = snapshot.getWidth() * fit;
-			double drawH = snapshot.getHeight() * fit;
-			double x = (pw - drawW) / 2.0;
-			double y = (ph - drawH) / 2.0;
-
-			Canvas canvas = new Canvas(pw * oversample, ph * oversample);
-			GraphicsContext gc = canvas.getGraphicsContext2D();
-
-			gc.setFill(Color.WHITE);
-			gc.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
-			gc.setImageSmoothing(true);
-
-			gc.drawImage(snapshot,
-					x * oversample, y * oversample,
-					drawW * oversample, drawH * oversample);
-
-			Group printable = new Group(canvas);
-			printable.getTransforms().add(new Scale(1.0 / oversample, 1.0 / oversample, 0, 0));
-
-			if (false) {
-				System.err.println("oversample requested=" + requestedOversample
-								   + " used=" + oversample
-								   + " canvas=" + (int) canvas.getWidth() + "x" + (int) canvas.getHeight()
-								   + " outputScale=" + osx + "x" + osy
-								   + " effective=" + (int) Math.round(canvas.getWidth() * osx) + "x" + (int) Math.round(canvas.getHeight() * osy));
-			}
-
-			boolean ok = job.printPage(pl, printable);
+			var imageView = new ImageView(snapshot);
+			imageView.setPreserveRatio(true);
+			imageView.setFitWidth(pw);
+			imageView.setFitHeight(ph);
+			boolean ok = job.printPage(pl, imageView);
 			if (ok) job.endJob();
-
 		} finally {
 			Print.restoreMenuBar(owner);
 		}

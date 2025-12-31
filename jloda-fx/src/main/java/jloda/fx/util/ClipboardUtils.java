@@ -25,11 +25,18 @@ import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.concurrent.ScheduledService;
 import javafx.concurrent.Task;
+import javafx.scene.Node;
 import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.DataFormat;
+import javafx.scene.paint.Color;
+import javafx.stage.Stage;
 import javafx.util.Duration;
+import jloda.fx.dialog.ExportImageDialog;
+import jloda.fx.print.ContentBoundsUtil;
+import jloda.fx.window.MainWindowManager;
 import jloda.util.FileUtils;
 import jloda.util.TriConsumer;
 
@@ -39,6 +46,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * some clipboard utilities
@@ -112,6 +120,51 @@ public class ClipboardUtils {
 	public static void putImage(Image image) {
 		if (copyFunction != null)
 			copyFunction.accept(null, image, null);
+	}
+
+	public static void putImage(Node node) {
+		var dark = MainWindowManager.isUseDarkTheme();
+		if (dark)
+			MainWindowManager.setUseDarkTheme(false);
+		try {
+			var bbox = ContentBoundsUtil.computeContentBoundsLocal(node);
+			var snapshot = jloda.fx.print.TightSnapshot.snapshotBBoxTight(node, bbox, Color.WHITE, 300, 200);
+			snapshot = jloda.fx.print.ImageCropper.cropWhiteMargins(snapshot, 20, 0.02, 0.1);
+			ClipboardUtils.putImage(snapshot);
+		} finally {
+			MainWindowManager.setUseDarkTheme(dark);
+		}
+	}
+
+	/**
+	 * creates a snapshot of the node and saves it to the file as a PNG
+	 *
+	 * @param node                   the node to be snapshot
+	 * @param pngFile                the destination file to be put on the clipboard
+	 * @param additionalFileConsumer if non-null, a method that is called to share the file (used in mobile apps).
+	 */
+	public static void putImageAsFile(Stage stage, Node node, File pngFile, Consumer<File> additionalFileConsumer) {
+		var dark = MainWindowManager.isUseDarkTheme();
+		try {
+			if (dark)
+				MainWindowManager.ensureDarkTheme(stage, false);
+			var bbox = ContentBoundsUtil.computeContentBoundsLocal(node);
+			var snapshot = jloda.fx.print.TightSnapshot.snapshotBBoxTight(node, bbox, Color.WHITE, 300, 200);
+			snapshot = jloda.fx.print.ImageCropper.cropWhiteMargins(snapshot, 20, 0.02, 0.1);
+			ExportImageDialog.saveNodeAsImage(new ImageView(snapshot), "png", pngFile);
+			if (FileUtils.fileExistsAndIsNonEmpty(pngFile)) {
+				if (additionalFileConsumer != null) {
+					additionalFileConsumer.accept(pngFile);
+				}
+				var content = new ClipboardContent();
+				content.putFiles(List.of(pngFile));
+				Clipboard.getSystemClipboard().setContent(content);
+			}
+		} catch (IOException ignored) {
+		} finally {
+			if (dark)
+				MainWindowManager.ensureDarkTheme(stage, true);
+		}
 	}
 
 	public static void putFile(File file) {

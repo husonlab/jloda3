@@ -23,18 +23,18 @@ public final class ImageCropper {
 	public static WritableImage cropWhiteMargins(Image image, int padding, double whiteTol, double alphaTol) {
 		if (image == null) return null;
 
-		int w = (int) Math.round(image.getWidth());
-		int h = (int) Math.round(image.getHeight());
+		var w = (int) Math.round(image.getWidth());
+		var h = (int) Math.round(image.getHeight());
 		if (w <= 0 || h <= 0) return null;
 
-		PixelReader pr = image.getPixelReader();
+		var pr = image.getPixelReader();
 		if (pr == null) return null;
 
 		// Scan bounds
-		int top = 0;
-		int bottom = h - 1;
-		int left = 0;
-		int right = w - 1;
+		var top = 0;
+		var bottom = h - 1;
+		var left = 0;
+		var right = w - 1;
 
 		// Trim top
 		while (top <= bottom && rowIsWhite(pr, w, top, whiteTol, alphaTol)) top++;
@@ -51,21 +51,21 @@ public final class ImageCropper {
 		}
 
 		// Apply padding
-		int x0 = Math.max(0, left - padding);
-		int y0 = Math.max(0, top - padding);
-		int x1 = Math.min(w - 1, right + padding);
-		int y1 = Math.min(h - 1, bottom + padding);
+		var x0 = Math.max(0, left - padding);
+		var y0 = Math.max(0, top - padding);
+		var x1 = Math.min(w - 1, right + padding);
+		var y1 = Math.min(h - 1, bottom + padding);
 
-		int cw = x1 - x0 + 1;
-		int ch = y1 - y0 + 1;
+		var cw = x1 - x0 + 1;
+		var ch = y1 - y0 + 1;
 
 		return new WritableImage(pr, x0, y0, cw, ch);
 	}
 
 	private static boolean rowIsWhite(PixelReader pr, int width, int y, double whiteTol, double alphaTol) {
-		double minChannel = 1.0 - whiteTol;
-		for (int x = 0; x < width; x++) {
-			Color c = pr.getColor(x, y);
+		var minChannel = 1.0 - whiteTol;
+		for (var x = 0; x < width; x++) {
+			var c = pr.getColor(x, y);
 			if (!isWhiteOrTransparent(c, minChannel, alphaTol)) {
 				return false;
 			}
@@ -74,9 +74,9 @@ public final class ImageCropper {
 	}
 
 	private static boolean colIsWhite(PixelReader pr, int height, int x, double whiteTol, double alphaTol) {
-		double minChannel = 1.0 - whiteTol;
-		for (int y = 0; y < height; y++) {
-			Color c = pr.getColor(x, y);
+		var minChannel = 1.0 - whiteTol;
+		for (var y = 0; y < height; y++) {
+			var c = pr.getColor(x, y);
 			if (!isWhiteOrTransparent(c, minChannel, alphaTol)) {
 				return false;
 			}
