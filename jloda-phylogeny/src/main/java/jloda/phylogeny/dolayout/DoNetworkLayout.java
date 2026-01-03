@@ -95,14 +95,25 @@ public class DoNetworkLayout {
 			reticulateDisplacementFunction = v -> {
 				var displacement = 0.0;
 				var reticulateNeighbors = reticulateEdges.apply(v);
+				var fromAbove = 0;
+				var fromBelow = 0;
 				if (reticulateNeighbors != null) {
 					var hV = nodeHeightMap.get(v);
 					for (var w : reticulateNeighbors) {
 						var hW = nodeHeightMap.get(w);
 						var diff = Math.abs(hV - hW);
 						displacement += 0.5 * diff;
+						if (reticulateEdges.apply(w).contains(v)) {
+							if (hW > hV)
+								fromBelow++;
+							else if (hW < hV)
+								fromAbove++;
+						}
 					}
 					// todo: additional term that avoids lopsided layout
+					if (fromBelow + fromAbove >= 2 && (fromBelow == 0 || fromAbove == 0)) {
+						displacement += 10; // encourage node to be placed between sources of incoming edges
+					}
 				}
 				return displacement;
 			};
