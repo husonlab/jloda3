@@ -552,6 +552,8 @@ public class BasicFX {
 			} else {
 				targetItem = new MenuItem(sourceItem.getText());
 			}
+			targetItem.setAccelerator(sourceItem.getAccelerator());
+			targetItem.setGraphic(sourceItem.getGraphic());
 			targetItem.setOnAction(e -> {
 				var action = sourceItem.getOnAction();
 				if (action != null)
