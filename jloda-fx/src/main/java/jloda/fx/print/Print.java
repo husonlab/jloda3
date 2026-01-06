@@ -20,6 +20,7 @@
 package jloda.fx.print;
 
 import javafx.application.Platform;
+import javafx.geometry.Insets;
 import javafx.print.PageLayout;
 import javafx.print.PrinterJob;
 import javafx.scene.Node;
@@ -53,58 +54,90 @@ public class Print {
 		}
 	}
 
-
 	/**
-	 * Print plain text with automatic pagination.
+	 * Print plain text with automatic pagination (wrap-aware, no missing lines).
 	 */
 	public static void printText(Stage owner, String text) {
-		if (text == null || text.isEmpty())
-			return;
+		if (text == null || text.isEmpty()) return;
 
 		var job = (lastJob != null ? lastJob : PrinterJob.createPrinterJob());
-		if (job == null)
-			return;
+		if (job == null) return;
 
-		if (!job.showPrintDialog(owner))
-			return;
+		if (!job.showPrintDialog(owner)) return;
 
 		var dark = MainWindowManager.isUseDarkTheme();
 		MainWindowManager.setUseDarkTheme(false);
+
 		try {
-			var printer = job.getPrinter();
-			var layout = printer.getDefaultPageLayout();
+			// IMPORTANT: Use the job's layout (reflects orientation/margins from dialog)
+			var layout = job.getJobSettings().getPageLayout();
 
-			var printableWidth = layout.getPrintableWidth();
-			var printableHeight = layout.getPrintableHeight();
+			double printableWidth = layout.getPrintableWidth();
+			double printableHeight = layout.getPrintableHeight();
 
-			var page = new VBox();
-			page.setPrefWidth(printableWidth);
+			// Safety padding so nothing is clipped at the edges
+			final double padLeft = 18;
+			final double padRight = 18;
+			final double padTop = 12;
+			final double padBottom = 12;
+
+			double textWidth = Math.max(10, printableWidth - padLeft - padRight);
 
 			Font font = Font.font("Monospaced", 11);
 
-			Text measuringText = new Text("X");
-			measuringText.setFont(font);
-			var lineHeight = measuringText.getLayoutBounds().getHeight();
+			// Keep empty trailing lines too
+			String[] lines = text.split("\n", -1);
 
-			var maxLinesPerPage = (int) (printableHeight / lineHeight) - 1;
-			String[] lines = text.split("\n");
+			VBox page = new VBox();
+			page.setPadding(new Insets(padTop, padRight, padBottom, padLeft));
+			page.setPrefWidth(printableWidth);
+			page.setMaxWidth(printableWidth);
 
-			var lineIndex = 0;
-			while (lineIndex < lines.length) {
+			// Helper: create one visual line node
+			java.util.function.Function<String, Text> makeLine = s -> {
+				Text t = new Text(s);
+				t.setFont(font);
+				t.setWrappingWidth(textWidth);   // wrap rather than clip
+				return t;
+			};
+
+			int i = 0;
+			while (i < lines.length) {
+
 				page.getChildren().clear();
+				double lastGoodHeight = page.prefHeight(printableWidth);
 
-				for (var i = 0; i < maxLinesPerPage && lineIndex < lines.length; i++) {
-					Text line = new Text(lines[lineIndex++]);
-					line.setFont(font);
-					page.getChildren().add(line);
+				// Fill the current page until adding the next line would overflow
+				while (i < lines.length) {
+					Text t = makeLine.apply(lines[i]);
+
+					page.getChildren().add(t);
+
+					// Use prefHeight to measure actual layout height (wrap-aware)
+					double h = page.prefHeight(printableWidth);
+
+					if (h <= printableHeight) {
+						lastGoodHeight = h;
+						i++;
+					} else {
+						// Overflow: remove the last line and print what we have
+						page.getChildren().remove(page.getChildren().size() - 1);
+
+						// Edge case: a single wrapped line is too tall for the page
+						if (page.getChildren().isEmpty()) {
+							page.getChildren().add(t); // force it onto this page
+							i++; // consume it to avoid infinite loop
+						}
+						break;
+					}
 				}
 
-				var success = job.printPage(page);
-				if (!success)
-					break;
+				boolean ok = job.printPage(layout, page);
+				if (!ok) break;
 			}
 
 			job.endJob();
+
 		} finally {
 			MainWindowManager.setUseDarkTheme(dark);
 			restoreMenuBar(owner);

@@ -533,7 +533,7 @@ public class BasicFX {
 	 * @param items items to copy
 	 * @return copies of items
 	 */
-	public static List<MenuItem> copyMenu(List<MenuItem> items) {
+	public static List<MenuItem> copyMenu(List<MenuItem> items, boolean copyAccelerators) {
 		var result = new ArrayList<MenuItem>();
 		for (var sourceItem : items) {
 			MenuItem targetItem;
@@ -547,12 +547,14 @@ public class BasicFX {
 				((RadioMenuItem) targetItem).selectedProperty().bindBidirectional(sourceRadioMenuItem.selectedProperty());
 			} else if (sourceItem instanceof Menu sourceMenu) {
 				var subMenu = new Menu(sourceMenu.getText());
-				subMenu.getItems().addAll(copyMenu(sourceMenu.getItems()));
+				subMenu.getItems().addAll(copyMenu(sourceMenu.getItems(), copyAccelerators));
 				targetItem = subMenu;
 			} else {
 				targetItem = new MenuItem(sourceItem.getText());
 			}
-			targetItem.setAccelerator(sourceItem.getAccelerator());
+			if (copyAccelerators) {
+				targetItem.setAccelerator(sourceItem.getAccelerator());
+			}
 			targetItem.setGraphic(sourceItem.getGraphic());
 			targetItem.setOnAction(e -> {
 				var action = sourceItem.getOnAction();
