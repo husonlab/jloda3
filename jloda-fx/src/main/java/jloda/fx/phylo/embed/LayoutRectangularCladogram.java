@@ -32,6 +32,7 @@ import java.util.Map;
  * todo: make independent of jloda and move to jloda-phylogeny
  * Daniel Huson, 8.2025
  */
+@Deprecated
 public class LayoutRectangularCladogram {
 	public static void apply(PhyloTree network, Averaging averaging, Map<Node, Point2D> nodePointMap) {
 		var longestPath = new HashMap<Node, Double>();

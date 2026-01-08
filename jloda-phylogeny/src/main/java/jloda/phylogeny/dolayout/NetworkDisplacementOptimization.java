@@ -1,5 +1,5 @@
 /*
- * DoNetworkLayout.java Copyright (C) 2025 Daniel H. Huson
+ * NetworkDisplacementOptimization.java Copyright (C) 2025 Daniel H. Huson
  *
  *  (Some files contain contributions from other authors, who are then mentioned separately.)
  *
@@ -20,6 +20,8 @@
 
 package jloda.phylogeny.dolayout;
 
+import jloda.phylogeny.utils.GraphUtils;
+
 import java.util.*;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
@@ -29,7 +31,7 @@ import java.util.function.Function;
  * If you use this code, then please cite: D.H. Huson, Sketch, Capture and Layout Phylogenies, submitted, 2025
  * Daniel Huson, 10.2025
  */
-public class DoNetworkLayout {
+public class NetworkDisplacementOptimization {
 	public static boolean verbose = false;
 
 	/**
@@ -65,17 +67,17 @@ public class DoNetworkLayout {
 		var childrenMap = new HashMap<Node, List<Node>>();
 
 		{
-			Common.postOrderTraversal(root, backboneChildren, u -> {
+			GraphUtils.postOrderTraversal(root, backboneChildren, u -> {
 				childrenMap.put(u, backboneChildren.apply(u));
 			});
 		}
 
-		var nodeHeightMap = Common.computeNodeHeightMap(root, childrenMap);
+		var nodeHeightMap = GraphUtils.computeNodeHeightMap(root, childrenMap);
 		Function<Node, Double> reticulateDisplacementFunction;
 
 		if (circular) {
-			var totalMin = Common.getMinHeight(root, childrenMap, nodeHeightMap);
-			var totalMax = Common.getMaxHeight(root, childrenMap, nodeHeightMap);
+			var totalMin = GraphUtils.getMinHeight(root, childrenMap, nodeHeightMap);
+			var totalMax = GraphUtils.getMaxHeight(root, childrenMap, nodeHeightMap);
 			reticulateDisplacementFunction = v -> {
 				var displacement = 0.0;
 				var reticulateNeighbors = reticulateEdges.apply(v);
@@ -121,7 +123,7 @@ public class DoNetworkLayout {
 		var oldScore = (verbose ? computeCostBelow(childrenMap, root, reticulateDisplacementFunction) : -1);
 
 		// pre- or post-order better?
-		Common.preOrderTraversal(root, childrenMap::get, v -> optimizeOrdering(childrenMap, v, nodeHeightMap, reticulateDisplacementFunction, random, canceled));
+		GraphUtils.preOrderTraversal(root, childrenMap::get, v -> optimizeOrdering(childrenMap, v, nodeHeightMap, reticulateDisplacementFunction, random, canceled));
 
 
 		if (oldScore != -1) {
@@ -198,7 +200,7 @@ public class DoNetworkLayout {
 
 	private static <Node> Map<Node, Double> copyHeightBelowMap(Node v, Map<Node, List<Node>> childrenMap, Map<Node, Double> heightMap) {
 		var heightMapBelow = new HashMap<Node, Double>();
-		Common.postOrderTraversal(v, childrenMap::get, u -> heightMapBelow.put(u, heightMap.get(u)));
+		GraphUtils.postOrderTraversal(v, childrenMap::get, u -> heightMapBelow.put(u, heightMap.get(u)));
 		return heightMapBelow;
 	}
 
@@ -212,9 +214,9 @@ public class DoNetworkLayout {
 	private static <Node> void changeOrderOfChildren(Map<Node, List<Node>> childrenMap, Node v, List<Node> newOrder, Map<Node, Double> nodeHeightMap) {
 		var oldOrder = childrenMap.get(v);
 		if (oldOrder.size() > 1 && !oldOrder.equals(newOrder)) {
-			var next = new Value<>(Common.getMinHeight(oldOrder.get(0), childrenMap, nodeHeightMap));
+			var next = new Value<>(GraphUtils.getMinHeight(oldOrder.get(0), childrenMap, nodeHeightMap));
 			for (var w : newOrder) {
-				Common.computeNodeHeightMapRec(w, childrenMap, next, nodeHeightMap);
+				GraphUtils.computeNodeHeightMapRec(w, childrenMap, next, nodeHeightMap);
 			}
 			childrenMap.put(v, newOrder);
 		}
@@ -222,7 +224,7 @@ public class DoNetworkLayout {
 
 	private static <Node> double computeCostBelow(Map<Node, List<Node>> childrenMap, Node v, Function<Node, Double> costFunction) {
 		var cost = new double[]{0.0};
-		Common.postOrderTraversal(v, childrenMap::get, u -> cost[0] += costFunction.apply(u));
+		GraphUtils.postOrderTraversal(v, childrenMap::get, u -> cost[0] += costFunction.apply(u));
 		return cost[0];
 	}
 }

@@ -36,6 +36,7 @@ import java.util.Map;
  * todo: make independent of jloda and move to jloda-phylogeny
  * Daniel Huson, 12.2021
  */
+@Deprecated
 public class TriangularTreeLayout {
 	/**
 	 * applies algorithm

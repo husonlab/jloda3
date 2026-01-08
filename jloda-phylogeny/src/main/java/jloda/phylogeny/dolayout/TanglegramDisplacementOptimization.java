@@ -1,5 +1,5 @@
 /*
- * DoTanglegram.java Copyright (C) 2025 Daniel H. Huson
+ * TanglegramDisplacementOptimization.java Copyright (C) 2025 Daniel H. Huson
  *
  *  (Some files contain contributions from other authors, who are then mentioned separately.)
  *
@@ -26,14 +26,14 @@ import java.util.concurrent.atomic.DoubleAdder;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 
-import static jloda.phylogeny.dolayout.Common.*;
+import static jloda.phylogeny.utils.GraphUtils.*;
 
 /**
  * Displacement optimized tanglegram for rooted phylogenetic trees and network
  * If you use this code, then please cite: D.H. Huson, Displacement optimized tanglegrams for trees and networks, submitted, 2025
  * Daniel Huson, 10.2025
  */
-public class DoTanglegram {
+public class TanglegramDisplacementOptimization {
 	/**
 	 * Compute a displacement optimized layout tanglegram for tree2, given tree 1
 	 *

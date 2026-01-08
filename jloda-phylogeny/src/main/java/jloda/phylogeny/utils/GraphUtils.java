@@ -1,5 +1,5 @@
 /*
- * Common.java Copyright (C) 2025 Daniel H. Huson
+ *  GraphUtils.java Copyright (C) 2026 Daniel H. Huson
  *
  *  (Some files contain contributions from other authors, who are then mentioned separately.)
  *
@@ -15,10 +15,11 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
-package jloda.phylogeny.dolayout;
+package jloda.phylogeny.utils;
+
+import jloda.phylogeny.dolayout.Value;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -28,7 +29,7 @@ import java.util.function.Function;
  * methods used by both tanglegram and network layout
  * Daniel Huson, 10.2025
  */
-public class Common {
+public class GraphUtils {
 
 	public static <Node> void postOrderTraversal(Node v, Function<Node, List<Node>> children, Consumer<Node> consumer) {
 		if (v != null) {

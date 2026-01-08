@@ -17,15 +17,13 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package jloda.fx.phylo.embed;
+package jloda.phylogeny.layout;
 
-import javafx.scene.control.Label;
 
-@Deprecated
 public enum Averaging {
 	ChildAverage, LeafAverage;
 
-	public static Label createLabel(Averaging t) {
-		return new Label(t == ChildAverage ? "CA" : "LA");
+	public static String createLabel(Averaging t) {
+		return t == ChildAverage ? "CA" : "LA";
 	}
 }

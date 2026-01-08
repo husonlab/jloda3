@@ -1,5 +1,5 @@
 /*
- *  Averaging.java Copyright (C) 2025 Daniel H. Huson
+ *  EdgeType.java Copyright (C) 2026 Daniel H. Huson
  *
  *  (Some files contain contributions from other authors, who are then mentioned separately.)
  *
@@ -17,15 +17,8 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package jloda.fx.phylo.embed;
+package jloda.phylogeny.layout;
 
-import javafx.scene.control.Label;
-
-@Deprecated
-public enum Averaging {
-	ChildAverage, LeafAverage;
-
-	public static Label createLabel(Averaging t) {
-		return new Label(t == ChildAverage ? "CA" : "LA");
-	}
+public enum EdgeType {
+	tree, transfer, transferAcceptor, combining
 }

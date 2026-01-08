@@ -1,5 +1,5 @@
 /*
- *  Averaging.java Copyright (C) 2025 Daniel H. Huson
+ *  Point2D.java Copyright (C) 2026 Daniel H. Huson
  *
  *  (Some files contain contributions from other authors, who are then mentioned separately.)
  *
@@ -17,15 +17,10 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package jloda.fx.phylo.embed;
+package jloda.phylogeny.layout;
 
-import javafx.scene.control.Label;
-
-@Deprecated
-public enum Averaging {
-	ChildAverage, LeafAverage;
-
-	public static Label createLabel(Averaging t) {
-		return new Label(t == ChildAverage ? "CA" : "LA");
+public record Point2D(double x, double y) {
+	public static Point2D computeCartesian(double radius, double angleInDegrees) {
+		return new Point2D(radius * Math.cos(Math.PI / 180.0 * (angleInDegrees)), radius * Math.sin(Math.PI / 180.0 * (angleInDegrees)));
 	}
 }

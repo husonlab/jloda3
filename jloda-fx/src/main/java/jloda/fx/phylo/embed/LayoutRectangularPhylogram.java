@@ -34,6 +34,7 @@ import java.util.Map;
  * todo: make independent of jloda and move to jloda-phylogeny
  * Daniel Huson, 8.2025
  */
+@Deprecated
 public class LayoutRectangularPhylogram {
 	/**
 	 * computes the coordinates of a phylogram

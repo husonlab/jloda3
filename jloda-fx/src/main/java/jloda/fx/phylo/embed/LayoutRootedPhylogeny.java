@@ -25,7 +25,7 @@ import jloda.graph.DAGTraversals;
 import jloda.graph.Node;
 import jloda.phylo.LSAUtils;
 import jloda.phylo.PhyloTree;
-import jloda.phylogeny.dolayout.DoNetworkLayout;
+import jloda.phylogeny.dolayout.NetworkDisplacementOptimization;
 
 import java.util.*;
 import java.util.function.BiConsumer;
@@ -36,6 +36,7 @@ import java.util.function.Function;
  * todo: make independent of jloda and move to jloda-phylogeny
  * Daniel Huson, 12.2021, 3.2025
  */
+@Deprecated
 public class LayoutRootedPhylogeny {
 	public enum Layout {Rectangular, Circular, Radial}
 
@@ -69,7 +70,7 @@ public class LayoutRootedPhylogeny {
 				}
 			}
 			var circular = (layout != Layout.Rectangular);
-			var result = DoNetworkLayout.apply(network.getRoot(), network.getLSAChildrenMap()::get, reticulateMap::get, circular, random, () -> false);
+			var result = NetworkDisplacementOptimization.apply(network.getRoot(), network.getLSAChildrenMap()::get, reticulateMap::get, circular, random, () -> false);
 			network.getLSAChildrenMap().clear();
 			network.getLSAChildrenMap().putAll(result);
 		}

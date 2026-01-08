@@ -37,6 +37,7 @@ import java.util.function.Function;
  * todo: make independent of jloda and move to jloda-phylogeny
  * Daniel Huson, 8.2025
  */
+@Deprecated
 public class LayoutRadialPhylogram {
 	public static void apply(PhyloTree network, Averaging averaging, Map<Node, Double> nodeAngleMap, Map<Node, Point2D> nodePointMap) {
 		var percentOffset = ProgramProperties.get("ReticulationOffsetPercent", 50.0);

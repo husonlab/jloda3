@@ -18,35 +18,33 @@
  *
  */
 
-package jloda.fx.phylo.embed;
+package jloda.phylogeny.layout;
 
-import javafx.geometry.Point2D;
-import jloda.graph.Node;
 
+import java.util.Collection;
 import java.util.Map;
 
 /**
  * utilities for scaling stuff
  * Daniel Huson, 2.2025
  */
-@Deprecated
 public class ScaleUtils {
-	public static void scaleToBox(Map<Node, Point2D> nodePointMap, double xMin, double xMax, double yMin, double yMax) {
-		var pxMin = nodePointMap.values().stream().mapToDouble(Point2D::getX).min().orElse(0);
-		var pxMax = nodePointMap.values().stream().mapToDouble(Point2D::getX).max().orElse(0);
-		var pyMin = nodePointMap.values().stream().mapToDouble(Point2D::getY).min().orElse(0);
-		var pyMax = nodePointMap.values().stream().mapToDouble(Point2D::getY).max().orElse(0);
+	public static <N> void scaleToBox(Collection<N> nodes, Map<N, Double> xCoord, Map<N, Double> yCoord, double xMin, double xMax, double yMin, double yMax) {
+		var pxMin = nodes.stream().mapToDouble(xCoord::get).min().orElse(0);
+		var pxMax = nodes.stream().mapToDouble(xCoord::get).max().orElse(0);
+		var pyMin = nodes.stream().mapToDouble(yCoord::get).min().orElse(0);
+		var pyMax = nodes.stream().mapToDouble(yCoord::get).max().orElse(0);
 
-		for (var v : nodePointMap.keySet()) {
-			var point = nodePointMap.get(v);
-			var px = point.getX();
-			var py = point.getY();
+		for (var v : nodes) {
+			var px = xCoord.get(v);
+			var py = yCoord.get(v);
 
 			var x = xMin + (px - pxMin) * (xMax - xMin) / (pxMax - pxMin);
 
 			var y = yMin + (py - pyMin) * (yMax - yMin) / (pyMax - pyMin);
 
-			nodePointMap.put(v, new Point2D(x, y));
+			xCoord.put(v, x);
+			yCoord.put(v, y);
 		}
 	}
 }
