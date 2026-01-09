@@ -50,7 +50,6 @@ module jloda_fx {
 	exports jloda.fx.thirdparty;
 	exports jloda.fx.windownotifications;
 
-
 	exports jloda.fx.phylo.embed;
 	exports jloda.fx.print;
 }

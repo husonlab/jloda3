@@ -54,7 +54,6 @@ public class LayoutRadialPhylogram {
 
 		try (var nodeDepthMap = network.newNodeDoubleArray()) {
 			computeNodeDepthRec(network.getRoot(), null, weightFunction, nodeDepthMap);
-
 			nodePointMap.clear();
 			assignPointsRec(network.getLSAChildrenMap(), network.getRoot(), null, nodeDepthMap, nodeAngleMap, nodePointMap);
 		}

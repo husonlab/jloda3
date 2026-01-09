@@ -21,8 +21,6 @@
 package jloda.fx.control;
 
 import javafx.application.Platform;
-import javafx.beans.InvalidationListener;
-import javafx.beans.WeakInvalidationListener;
 import javafx.beans.property.*;
 import javafx.scene.Group;
 import javafx.scene.Node;
@@ -104,8 +102,6 @@ public class RichTextLabel extends Group {
 	private boolean _showMarks = true;
 	private BooleanProperty showMarks;
 
-	private final InvalidationListener invalidationListener = e -> update();
-
 	/**
 	 * constructor
 	 */
@@ -113,8 +109,6 @@ public class RichTextLabel extends Group {
 		// inner TextFlow gets sizing constraints
 		textFlow.setMaxWidth(Control.USE_PREF_SIZE);
 		textFlow.setMaxHeight(Control.USE_PREF_SIZE);
-
-		defaultFont.addListener(new WeakInvalidationListener(invalidationListener));
 
 		getChildren().add(textFlow);
 	}
@@ -314,25 +308,39 @@ public class RichTextLabel extends Group {
 		}
 	}
 
+	// add these fields to your class:
+	private static final int MAX_UPRIGHT_TRIES = 5;
+	private int _uprightTryCount = 0;
+
 	/**
 	 * ensure text is upright
 	 */
 	public void ensureUpright() {
 		if (!_inUprighting) {
-			Platform.runLater(this::update);
-			Platform.runLater(() -> {
-				textFlow.setScaleX(1);
-				textFlow.setScaleY(1);
-				textFlow.applyCss();
-			});
+			if (false) {
+				Platform.runLater(this::update);
+
+				Platform.runLater(() -> {
+					textFlow.setScaleX(1);
+					textFlow.setScaleY(1);
+					textFlow.applyCss();
+				});
+			}
+
 			Platform.runLater(() -> {
 				if (!_inUprighting) {
 					_inUprighting = true;
+
+					// Count an "upright attempt" only when we actually enter this block:
+					_uprightTryCount++;
+
 					var same = true;
 					try {
 						var mirrored = BasicFX.isMirrored(textFlow).orElse(false);
 						var screenAngle = BasicFX.getAngleOnScreen(textFlow);
-						var upsideDown = (screenAngle.isPresent() && screenAngle.get() > 90 && screenAngle.get() < 270);
+						var upsideDown = (screenAngle.isPresent()
+										  && screenAngle.get() > 90 && screenAngle.get() < 270);
+
 						if (mirrored) {
 							textFlow.setScaleX(-textFlow.getScaleX());
 							same = false;
@@ -343,8 +351,21 @@ public class RichTextLabel extends Group {
 						}
 					} finally {
 						_inUprighting = false;
-						if (same && getAnchor() != null) {
+
+						// If we made a change, consider this episode "successful" and reset.
+						// Also reset if there is no anchor (no reason to keep retrying).
+						if (!same || getAnchor() == null) {
+							_uprightTryCount = 0;
+							return;
+						}
+
+						// same == true and anchor != null:
+						// only retry up to MAX_UPRIGHT_TRIES attempts
+						if (_uprightTryCount < MAX_UPRIGHT_TRIES) {
 							Platform.runLater(this::update);
+						} else {
+							// give up for this episode; reset so a future external trigger can try again
+							_uprightTryCount = 0;
 						}
 					}
 				}

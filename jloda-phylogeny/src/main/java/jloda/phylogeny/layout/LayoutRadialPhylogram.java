@@ -40,9 +40,7 @@ public class LayoutRadialPhylogram {
 	 * compute coordinates for a rectangular phylogram
 	 *
 	 * @param root         the root node
-	 * @param nodes        all nodes
 	 * @param edges        all edges
-	 * @param inEdges      node in edges
 	 * @param outEdges     node out edges
 	 * @param lsaChildren  children in LSA tree (or null, if phylogeny is tree)
 	 * @param source       edge  source node
@@ -54,13 +52,13 @@ public class LayoutRadialPhylogram {
 	 * @param <Node>       node
 	 * @param <Edge>       edge
 	 */
-	public static <Node, Edge> void apply(Node root, List<Node> nodes, List<Edge> edges,
+	public static <Node, Edge> void apply(Node root, List<Edge> edges,
 										  Function<Node, List<Edge>> outEdges,
 										  Function<Node, List<Node>> lsaChildren,
 										  Function<Edge, Node> source, Function<Edge, Node> target,
 										  ToDoubleFunction<Edge> weight,
 										  Function<Edge, EdgeType> edgeType,
-										  Averaging averaging, Map<Node, Point2D> nodePointMap) {
+										  Averaging averaging, Map<Node, Double> nodeAngleMap, Map<Node, Point2D> nodePointMap) {
 
 
 		var averageWeight = computeAverageWeight(edges, weight);
@@ -72,8 +70,6 @@ public class LayoutRadialPhylogram {
 				return weight.applyAsDouble(e);
 			else return smallOffsetForRecticulateEdge;
 		};
-
-		var nodeAngleMap = new HashMap<Node, Double>();
 
 		HeightAndAngles.computeAngles(root, u -> outEdges.apply(u).stream().map(target).toList(), lsaChildren, nodeAngleMap, averaging, true);
 

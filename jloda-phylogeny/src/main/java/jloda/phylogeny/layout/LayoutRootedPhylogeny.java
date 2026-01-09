@@ -34,7 +34,7 @@ import static jloda.phylogeny.utils.GraphUtils.postOrderTraversal;
  * Daniel Huson, 12.2021, 3.2025
  */
 public class LayoutRootedPhylogeny {
-	public enum Layout {Rectangular, Circular, Radial}
+	public enum Layout {Rectangular, Circular, Radial, Triangular}
 
 	public enum Scaling {ToScale, EarlyBranching, LateBranching}
 
@@ -74,6 +74,7 @@ public class LayoutRootedPhylogeny {
 		}
 
 		var hasReticulations = nodes.stream().anyMatch(v -> inEdges.apply(v).size() > 1);
+
 
 		// setup lsa map:
 		if (lsaChildren.size() < nodes.size()) {
@@ -118,10 +119,19 @@ public class LayoutRootedPhylogeny {
 		nodeAngleMap.clear();
 		nodePointMap.clear();
 
+		if (hasReticulations && layout == Layout.Triangular) {
+			System.err.println("Triangular layout does not work well on reticulations");
+		}
+		if (layout == Layout.Triangular) {
+			Function<Node, List<Node>> children = v -> outEdges.apply(v).stream().map(target).toList();
+			TriangularTreeLayout.apply(root, children, lsaChildren::get, nodePointMap);
+			return;
+		}
+
 		if (scaling != Scaling.ToScale) {
 			LayoutRectangularCladogram.apply(root, nodes, edges, lsaChildren::get, outEdges, source, target, edgeType, averaging, nodePointMap);
 		} else if (layout == Layout.Radial) {
-			LayoutRadialPhylogram.apply(root, nodes, edges, outEdges, lsaChildren::get, source, target, weight, edgeType, averaging, nodePointMap);
+			LayoutRadialPhylogram.apply(root, edges, outEdges, lsaChildren::get, source, target, weight, edgeType, averaging, nodeAngleMap, nodePointMap);
 		} else {
 			LayoutRectangularPhylogram.apply(root, nodes, edges, inEdges, outEdges, lsaChildren::get, source, target, weight, edgeType, averaging, nodePointMap);
 		}
@@ -142,7 +152,7 @@ public class LayoutRootedPhylogeny {
 			for (var v : nodes) {
 				nodePointMap.put(v, Point2D.computeCartesian(nodeRadiusMap.get(v), nodeAngleMap.get(v)));
 			}
-		} else {
+		} else if (layout != Layout.Radial) {
 			for (var v : nodes) {
 				nodeAngleMap.put(v, 0.0);
 			}
