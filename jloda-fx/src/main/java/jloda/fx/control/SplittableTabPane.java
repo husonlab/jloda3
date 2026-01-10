@@ -113,9 +113,9 @@ public class SplittableTabPane extends Pane {
                     for (Tab tab : c.getRemoved()) {
                         // check whether in auxiliary window:
                         boolean gone = false;
-                        for (AuxiliaryWindow auxiliaryWindow : auxiliaryWindows) {
+                        for (AuxiliaryWindow auxiliaryWindow : new ArrayList<>(auxiliaryWindows)) {
                             if (auxiliaryWindow.tab() == tab) {
-                                auxiliaryWindow.stage().close();
+                                redock(auxiliaryWindow);
                                 gone = true;
                                 break;
                             }
@@ -159,14 +159,7 @@ public class SplittableTabPane extends Pane {
             if (n != null && n.getTabPane() != null)
                 n.getTabPane().getSelectionModel().select(n);
             setFocusedTabPane(n != null ? n.getTabPane() : findATabPane(rootSplitPane.getItems()));
-            //System.err.println("Selected: " + n);
         });
-
-        /*
-        focusedTabPane.addListener((c, o, n) -> {
-            System.err.println("Focus: " + o + " -> " + n);
-        });
-        */
 
         tabPane.requestFocus();
     }
@@ -227,12 +220,11 @@ public class SplittableTabPane extends Pane {
      * redock all undocked tabs
      */
     public void redockAll() {
-        for (AuxiliaryWindow auxiliaryWindow : auxiliaryWindows) {
-            moveTab(auxiliaryWindow.tab(), null, getFocusedTabPane());
-            auxiliaryWindow.stage().close();
+        final var copy = new ArrayList<>(auxiliaryWindows);
+        for (AuxiliaryWindow auxiliaryWindow : copy) {
+            redock(auxiliaryWindow);
         }
     }
-
 
     /**
      * show a tab to the right of a reference tab
@@ -311,12 +303,17 @@ public class SplittableTabPane extends Pane {
                 }
 
                 if (newTabPane == null) {
+                    // FIX: select next tab by object (selectionModel is global; index was wrong)
                     if (!oldTabPane.getTabs().isEmpty()) {
                         Platform.runLater(() -> {
                             final int i = Math.min(oldIndex, oldTabPane.getTabs().size() - 1);
-                            if (i >= 0)
-                                selectionModel.select(i);
+                            if (i >= 0) {
+                                final Tab next = oldTabPane.getTabs().get(i);
+                                selectionModel.select(next);
+                            } else selectionModel.clearSelection();
                         });
+                    } else {
+                        Platform.runLater(selectionModel::clearSelection);
                     }
                 }
             }
@@ -372,9 +369,10 @@ public class SplittableTabPane extends Pane {
                         parentSplitPane.getItems().add(lastNode);
                         parentSplitPane.setDividerPositions(dividers);
                     }
+
+                    remapDescendantTabPanes(lastNode, parentSplitPane);
+
                     parentSplitPane.getItems().remove(splitPane);
-                    if (lastNode instanceof TabPane)
-                        tabPane2ParentSplitPane.put((TabPane) lastNode, parentSplitPane);
                 }
             });
 
@@ -459,7 +457,20 @@ public class SplittableTabPane extends Pane {
     }
 
     /**
-     * setup the menu when inserting a tab
+     * remap all descendant TabPanes to a new parent split pane (prevents stale tabPane2ParentSplitPane entries)
+     */
+    private void remapDescendantTabPanes(Node node, SplitPane newParent) {
+        if (node instanceof TabPane tp) {
+            tabPane2ParentSplitPane.put(tp, newParent);
+        } else if (node instanceof SplitPane sp) {
+            for (Node child : sp.getItems()) {
+                remapDescendantTabPanes(child, newParent);
+            }
+        }
+    }
+
+    /**
+     * set up the menu when inserting a tab
      */
     private void setupMenu(Tab tab, TabPane tabPane, SplitPane splitPane) {
         final ArrayList<MenuItem> menuItems = new ArrayList<>();
@@ -494,16 +505,29 @@ public class SplittableTabPane extends Pane {
             menuItems.add(closeAll);
 
             tab.setClosable(true);
-            tab.setOnCloseRequest(e -> close.getOnAction().handle(null));
+
+            tab.setOnCloseRequest(e -> {
+                e.consume();
+                if (tab.isClosable())
+                    tabs.remove(tab);
+            });
+
             menuItems.add(new SeparatorMenuItem());
         } else
             tab.setOnCloseRequest(e -> {
             });
 
-
         if (isAllowUndock()) {
             final MenuItem redock = new MenuItem("Redock");
-            redock.setOnAction(e -> moveTab(tab, null, getFocusedTabPane()));
+            redock.setOnAction(e -> {
+                for (AuxiliaryWindow w : new ArrayList<>(auxiliaryWindows)) {
+                    if (w.tab() == tab) {
+                        redock(w);
+                        return;
+                    }
+                }
+                moveTab(tab, null, getFocusedTabPane());
+            });
             // we don't show the redock menu item because the undocked window doesn't have a tab
 
             final MenuItem undock = new MenuItem("Undock");
@@ -512,11 +536,12 @@ public class SplittableTabPane extends Pane {
                 final double y = tabPane.localToScreen(0, 0).getY();
                 moveTab(tab, tabPane, null);
                 final AuxiliaryWindow auxiliaryWindow = createAuxiliaryWindow(tab, x, y, tabPane.getWidth(), tabPane.getHeight() - 20, redock);
+
                 auxiliaryWindow.stage().setOnCloseRequest((z) -> {
-                    redock.getOnAction().handle(null);
-                    auxiliaryWindow.stage().hide();
-                    auxiliaryWindows.remove(auxiliaryWindow);
+                    z.consume();
+                    redock(auxiliaryWindow);
                 });
+
                 auxiliaryWindow.stage().show();
                 auxiliaryWindows.add(auxiliaryWindow);
             });
@@ -630,7 +655,6 @@ public class SplittableTabPane extends Pane {
             tab.setGraphic(label);
         }
 
-
         tab.textProperty().unbind();
         tab.textProperty().addListener((c, o, n) -> {
             if (n != null && !n.isBlank()) {
@@ -644,6 +668,7 @@ public class SplittableTabPane extends Pane {
                 tab.setGraphic(label);
             }
         }));
+
         label.setOnDragOver(event -> {
             final Dragboard dragboard = event.getDragboard();
             if (dragboard.hasString()
@@ -662,6 +687,8 @@ public class SplittableTabPane extends Pane {
             event.consume();
         });
 
+        label.setOnDragDone(e -> draggingTab.set(null));
+
         label.setOnDragDropped((event -> {
             final int index = tab.getTabPane().getTabs().indexOf(tab);
 
@@ -671,8 +698,14 @@ public class SplittableTabPane extends Pane {
 
                 if (draggedTab.getTabPane() == tab.getTabPane() && index != tab.getTabPane().getTabs().indexOf(draggedTab)) {
                     final TabPane tabPane = draggedTab.getTabPane();
+                    int from = tabPane.getTabs().indexOf(draggedTab);
+                    int to = tabPane.getTabs().indexOf(tab);
+
                     tabPane.getTabs().remove(draggedTab);
-                    tabPane.getTabs().add(index, draggedTab);
+
+                    if (from < to) to--;
+
+                    tabPane.getTabs().add(to, draggedTab);
                     tabPane.getSelectionModel().select(draggedTab);
                 } else {
                     moveTab(draggedTab, draggedTab.getTabPane(), tab.getTabPane(), index);
@@ -711,8 +744,9 @@ public class SplittableTabPane extends Pane {
         final StackPane root = new StackPane();
         tab.setContextMenu(new ContextMenu(redock));
 
-        root.getChildren().add(tab.getContent());
-        //root.getChildren().add(new TabPane(tab)); // need to disable drop targets for this to work
+        final Node content = tab.getContent();
+        tab.setContent(null);
+        root.getChildren().add(content);
 
         final var stage = new Stage();
 
@@ -736,18 +770,38 @@ public class SplittableTabPane extends Pane {
         stage.setWidth(width);
         stage.setHeight(height);
 
-        tab.getContent().getStyleClass().add("viewer-background");
+        content.getStyleClass().add("viewer-background");
 
-        return new AuxiliaryWindow(stage, tab);
+        return new AuxiliaryWindow(stage, tab, root, content);
+    }
+
+    /**
+     * FIX: safely redock an auxiliary window (restore content ownership before moving tab)
+     */
+    private void redock(AuxiliaryWindow auxiliaryWindow) {
+        // restore content into tab:
+        auxiliaryWindow.hostRoot.getChildren().remove(auxiliaryWindow.content);
+        auxiliaryWindow.tab.setContent(auxiliaryWindow.content);
+
+        moveTab(auxiliaryWindow.tab, null, getFocusedTabPane());
+
+        auxiliaryWindow.stage.hide();
+        auxiliaryWindows.remove(auxiliaryWindow);
     }
 
     private static final class AuxiliaryWindow {
         private final Stage stage;
         private final Tab tab;
 
-        private AuxiliaryWindow(Stage stage, Tab tab) {
+        // FIX: keep track of content ownership for safe redock
+        private final StackPane hostRoot;
+        private final Node content;
+
+        private AuxiliaryWindow(Stage stage, Tab tab, StackPane hostRoot, Node content) {
             this.stage = stage;
             this.tab = tab;
+            this.hostRoot = hostRoot;
+            this.content = content;
         }
 
         public Stage stage() {
@@ -778,6 +832,5 @@ public class SplittableTabPane extends Pane {
                    "stage=" + stage + ", " +
                    "tab=" + tab + ']';
         }
-
     }
 }

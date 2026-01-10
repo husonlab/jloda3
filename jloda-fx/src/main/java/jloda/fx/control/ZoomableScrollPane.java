@@ -68,6 +68,8 @@ public class ZoomableScrollPane extends ScrollPane {
 		if (content != null)
 			zoomNode.getChildren().add(content);
 		outerNode = createOuterNode();
+		outerNode.setAlignment(javafx.geometry.Pos.TOP_LEFT);
+
 		outerNode.getChildren().add(zoomNode);
 		setContent(outerNode);
 
@@ -171,7 +173,7 @@ public class ZoomableScrollPane extends ScrollPane {
 		this.updateScaleMethod.set(updateScaleMethod);
 	}
 
-	private void doZoom(double factorX, double factorY, Point2D mousePoint) {
+	private void doZoom(double factorX, double factorY, Point2D mousePointInOuterLocal) {
 		if (lockAspectRatio.get()) {
 			if (factorX != 1.0)
 				//noinspection SuspiciousNameCombination
@@ -181,38 +183,51 @@ public class ZoomableScrollPane extends ScrollPane {
 				factorX = factorY;
 		}
 
+		// Mouse in SCENE coords (this is the stable reference frame):
+		final var mouseScene = outerNode.localToScene(mousePointInOuterLocal);
+
+		// The anchor point in CONTENT local coords BEFORE scaling:
+		final var anchorInContentLocal = content.sceneToLocal(mouseScene);
+
+		// Current scroll offsets in pixels, using the ScrollPane's content node sizes.
+		final var viewportBounds = getViewportBounds();
+		final var contentBounds0 = outerNode.getLayoutBounds();
+
+		final var maxX0 = contentBounds0.getWidth() - viewportBounds.getWidth();
+		final var maxY0 = contentBounds0.getHeight() - viewportBounds.getHeight();
+
+		final var pixelOffsetX0 = (maxX0 > 0 ? getHvalue() * maxX0 : 0);
+		final var pixelOffsetY0 = (maxY0 > 0 ? getVvalue() * maxY0 : 0);
+
+		// must do this for external scaling methods
 		zoomFactorX = factorX;
 		zoomFactorY = factorY;
 
-		zoomX.set(zoomX.get() * zoomFactorX);
-		zoomY.set(zoomY.get() * zoomFactorY);
-
-
-		final Bounds innerBounds = zoomNode.getLayoutBounds();
-		final Bounds viewportBounds = getViewportBounds();
-
-		// calculate pixel offsets from [0, 1] range
-		double valX = this.getHvalue() * (innerBounds.getWidth() - viewportBounds.getWidth());
-		double valY = this.getVvalue() * (innerBounds.getHeight() - viewportBounds.getHeight());
-
+		// Apply zoom:
+		zoomX.set(getZoomX() * factorX);
+		zoomY.set(getZoomY() * factorY);
 		updateScale();
 
-		this.layout(); // refresh ScrollPane scroll positions & target bounds
+		// Force the ScrollPane/skin to recompute sizes/positions:
+		applyCss();
+		layout();
 
+		// Where does the same anchor point end up AFTER scaling (in scene coords)?
+		final var anchorSceneAfter = content.localToScene(anchorInContentLocal);
 
-		// convert target coordinates to zoomTarget coordinates
-		Point2D posInZoomTarget = content.parentToLocal(zoomNode.parentToLocal(mousePoint));
+		// How far did it drift away from the mouse (in scene pixels)?
+		final var driftScene = anchorSceneAfter.subtract(mouseScene);
 
-		posInZoomTarget = new Point2D(posInZoomTarget.getX() * (zoomFactorX - 1), posInZoomTarget.getY() * (zoomFactorY - 1));
+		// Convert drift to scroll pixel adjustments:
+		final var contentBounds1 = outerNode.getLayoutBounds();
+		final var maxX1 = contentBounds1.getWidth() - viewportBounds.getWidth();
+		final var maxY1 = contentBounds1.getHeight() - viewportBounds.getHeight();
 
-		// calculate adjustment of scroll position (pixels)
-		final Point2D adjustment = content.getLocalToParentTransform().deltaTransform(posInZoomTarget);
+		final var pixelOffsetX1 = pixelOffsetX0 + driftScene.getX();
+		final var pixelOffsetY1 = pixelOffsetY0 + driftScene.getY();
 
-		// convert back to [0, 1] range
-		// (too large/small values are automatically corrected by ScrollPane)
-		final Bounds updatedInnerBounds = zoomNode.getBoundsInLocal();
-		setHvalue((valX + adjustment.getX()) / (updatedInnerBounds.getWidth() - viewportBounds.getWidth()));
-		setVvalue((valY + adjustment.getY()) / (updatedInnerBounds.getHeight() - viewportBounds.getHeight()));
+		if (maxX1 > 0) setHvalue(pixelOffsetX1 / maxX1);
+		if (maxY1 > 0) setVvalue(pixelOffsetY1 / maxY1);
 	}
 
 	public boolean isLockAspectRatio() {
