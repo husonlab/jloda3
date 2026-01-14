@@ -35,6 +35,7 @@ import java.util.function.Function;
  * Daniel Huson, 10/2022
  */
 public class ProgramProperties extends jloda.util.ProgramProperties {
+	private static boolean desktop = true;
 
 	static private javafx.scene.text.Font defaultFontFX = null;
 
@@ -189,4 +190,16 @@ public class ProgramProperties extends jloda.util.ProgramProperties {
 		}
 	}
 
+	public static boolean isDesktop() {
+		return desktop;
+	}
+
+	public static void setDesktop(boolean desktop) {
+		ProgramProperties.desktop = desktop;
+	}
+
+	public static boolean isIOS() {
+		var osName = System.getProperty("os.name").toLowerCase();
+		return osName.contains("ios") || osName.contains("iphone");
+	}
 }
