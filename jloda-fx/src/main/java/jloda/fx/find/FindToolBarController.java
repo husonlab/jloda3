@@ -95,7 +95,7 @@ public class FindToolBarController {
         MaterialIcons.setIcon(findButton, MaterialIcons.start, "-fx-font-size: 10;", false);
         MaterialIcons.setIcon(nextButton, MaterialIcons.navigate_next, "-fx-font-size: 10;", false);
         MaterialIcons.setIcon(allButton, MaterialIcons.select_all, "-fx-font-size: 10;", false);
-        MaterialIcons.setIcon(findFromFileButton, MaterialIcons.file_open, "-fx-font-size: 10;", true);
+        MaterialIcons.setIcon(findFromFileButton, MaterialIcons.file_download, "-fx-font-size: 10;", true);
 
         if (findList == null)
             findList = FXCollections.observableArrayList();
