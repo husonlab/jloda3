@@ -169,6 +169,12 @@ public class ZoomableScrollPane extends ScrollPane {
 		return updateScaleMethod;
 	}
 
+	/**
+	 * set the update scale method
+	 * Note that updateScaleMethod must keep content scale consistent with zoomX/zoomY
+	 *
+	 * @param updateScaleMethod
+	 */
 	public void setUpdateScaleMethod(Runnable updateScaleMethod) {
 		this.updateScaleMethod.set(updateScaleMethod);
 	}
@@ -219,15 +225,17 @@ public class ZoomableScrollPane extends ScrollPane {
 		final var driftScene = anchorSceneAfter.subtract(mouseScene);
 
 		// Convert drift to scroll pixel adjustments:
+		final var viewportBounds1 = getViewportBounds();
 		final var contentBounds1 = outerNode.getLayoutBounds();
-		final var maxX1 = contentBounds1.getWidth() - viewportBounds.getWidth();
-		final var maxY1 = contentBounds1.getHeight() - viewportBounds.getHeight();
+
+		final var maxX1 = contentBounds1.getWidth() - viewportBounds1.getWidth();
+		final var maxY1 = contentBounds1.getHeight() - viewportBounds1.getHeight();
 
 		final var pixelOffsetX1 = pixelOffsetX0 + driftScene.getX();
 		final var pixelOffsetY1 = pixelOffsetY0 + driftScene.getY();
 
-		if (maxX1 > 0) setHvalue(pixelOffsetX1 / maxX1);
-		if (maxY1 > 0) setVvalue(pixelOffsetY1 / maxY1);
+		if (maxX1 > 0) setHvalue(clamp(pixelOffsetX1 / maxX1, 0, 1));
+		if (maxY1 > 0) setVvalue(clamp(pixelOffsetY1 / maxY1, 0, 1));
 	}
 
 	public boolean isLockAspectRatio() {
@@ -257,7 +265,7 @@ public class ZoomableScrollPane extends ScrollPane {
 	public void zoomBy(double zoomFactorX, double zoomFactorY) {
 		if (isAllowZoom()) {
 			doZoom(zoomFactorX, zoomFactorY, new Point2D(0.5 * getWidth(), 0.5 * getHeight())); // zoom to center
-			updateScale();
+			// updateScale();
 		}
 	}
 
@@ -277,32 +285,45 @@ public class ZoomableScrollPane extends ScrollPane {
 	 * ensure the node is showing
 	 */
 	public void ensureVisible(Node node) {
-		if (node != null && getContent().getScene() != null) {
-			final Bounds viewportBounds = getViewportBounds();
-			final Bounds contentBounds = getContent().localToScene(getContent().getBoundsInLocal());
-			Bounds nodeBounds = node.localToScene(node.getBoundsInLocal());
+		if (node == null || getScene() == null) return;
 
-			// this adjusts for the fact that the scrollpane might not fill out the whole scene:
-			final double offsetH = (getContent().getScene().getWidth() - viewportBounds.getWidth());
-			final double offsetV = (getContent().getScene().getHeight() - viewportBounds.getHeight());
-			nodeBounds = new BoundingBox(nodeBounds.getMinX() - offsetH, nodeBounds.getMinY() - offsetV, nodeBounds.getWidth(), nodeBounds.getHeight());
+		// Ensure CSS/layout are current (especially after zoom changes)
+		applyCss();
+		layout();
 
-			if (nodeBounds.getMaxX() < 0) {
-				final double hValueDelta = (nodeBounds.getMinX() - viewportBounds.getWidth()) / contentBounds.getWidth();
-				setHvalue(getHvalue() + hValueDelta);
-			} else if (nodeBounds.getMinX() > viewportBounds.getWidth()) {
-				final double hValueDelta = (nodeBounds.getMinX() + viewportBounds.getWidth()) / contentBounds.getWidth();
-				setHvalue(getHvalue() + hValueDelta);
-			}
+		final Bounds viewport = getViewportBounds();
 
-			if (nodeBounds.getMaxY() < 0) {
-				final double vValueDelta = (nodeBounds.getMinY() - viewportBounds.getHeight()) / contentBounds.getHeight();
-				setVvalue(getVvalue() + vValueDelta);
-			} else if (nodeBounds.getMinY() > viewportBounds.getHeight()) {
-				final double vValueDelta = (nodeBounds.getMinY() + viewportBounds.getHeight()) / contentBounds.getHeight();
-				setVvalue(getVvalue() + vValueDelta);
-			}
+		// Viewport top-left in outerNode local coordinates:
+		final Bounds contentBounds = outerNode.getLayoutBounds();
+		final double maxX = contentBounds.getWidth() - viewport.getWidth();
+		final double maxY = contentBounds.getHeight() - viewport.getHeight();
+
+		final double pixelX = (maxX > 0 ? getHvalue() * maxX : 0);
+		final double pixelY = (maxY > 0 ? getVvalue() * maxY : 0);
+
+		// The viewport rectangle in outerNode local coordinates:
+		final Bounds viewportInOuter = new BoundingBox(pixelX, pixelY, viewport.getWidth(), viewport.getHeight());
+
+		// Node bounds in outerNode local coordinates:
+		Bounds nodeInOuter = outerNode.sceneToLocal(node.localToScene(node.getBoundsInLocal()));
+
+		double newPixelX = pixelX;
+		double newPixelY = pixelY;
+
+		if (nodeInOuter.getMinX() < viewportInOuter.getMinX()) {
+			newPixelX -= (viewportInOuter.getMinX() - nodeInOuter.getMinX());
+		} else if (nodeInOuter.getMaxX() > viewportInOuter.getMaxX()) {
+			newPixelX += (nodeInOuter.getMaxX() - viewportInOuter.getMaxX());
 		}
+
+		if (nodeInOuter.getMinY() < viewportInOuter.getMinY()) {
+			newPixelY -= (viewportInOuter.getMinY() - nodeInOuter.getMinY());
+		} else if (nodeInOuter.getMaxY() > viewportInOuter.getMaxY()) {
+			newPixelY += (nodeInOuter.getMaxY() - viewportInOuter.getMaxY());
+		}
+
+		if (maxX > 0) setHvalue(clamp(newPixelX / maxX, 0, 1));
+		if (maxY > 0) setVvalue(clamp(newPixelY / maxY, 0, 1));
 	}
 
 	public boolean isRequireShiftOrControlToZoom() {
@@ -322,6 +343,9 @@ public class ZoomableScrollPane extends ScrollPane {
 	}
 
 	public void setMouseScrollZoomFactor(double mouseScrollZoomFactor) {
+		if (mouseScrollZoomFactor <= 0.0) {
+			throw new IllegalArgumentException("mouseScrollZoomFactor must be > 0");
+		}
 		this.mouseScrollZoomFactor = mouseScrollZoomFactor;
 	}
 
@@ -347,5 +371,7 @@ public class ZoomableScrollPane extends ScrollPane {
 		return null;
 	}
 
-
+	private static double clamp(double v, double lo, double hi) {
+		return (v < lo ? lo : (Math.min(v, hi)));
+	}
 }
