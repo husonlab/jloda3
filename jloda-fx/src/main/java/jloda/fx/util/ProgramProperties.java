@@ -199,7 +199,10 @@ public class ProgramProperties extends jloda.util.ProgramProperties {
 	}
 
 	public static boolean isIOS() {
-		var osName = System.getProperty("os.name").toLowerCase();
-		return osName.contains("ios") || osName.contains("iphone");
+		return "ios".equalsIgnoreCase(System.getProperty("javafx.platform"));
+	}
+
+	public static boolean isAndroid() {
+		return "android".equalsIgnoreCase(System.getProperty("javafx.platform"));
 	}
 }

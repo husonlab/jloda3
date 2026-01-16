@@ -6,6 +6,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.input.TouchEvent;
 import javafx.scene.layout.Pane;
+import jloda.fx.util.ProgramProperties;
 
 import java.util.HashSet;
 
@@ -20,7 +21,8 @@ public class MultiTouchGestureMonitor {
 	 * @param pane the pane
 	 * @return boolean property
 	 */
-	public static BooleanProperty setup(ScrollPane scrollPane, Pane pane, boolean suppressSingleTouchPanning) {
+	public static BooleanProperty setup(ScrollPane scrollPane, Pane pane) {
+		var suppressSingleTouchPanning = (ProgramProperties.isIOS() || ProgramProperties.isAndroid());
 		var multiTouchGestureInProgress = new SimpleBooleanProperty(false);
 
 		// this code ensures that panning requires at least two touch points on a mobile device:
