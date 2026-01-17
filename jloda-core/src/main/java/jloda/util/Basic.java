@@ -146,6 +146,14 @@ public class Basic {
         System.setOut(origOut);
     }
 
+    public static PrintStream getOrigErr() {
+        return origErr;
+    }
+
+    public static PrintStream getOrigOut() {
+        return origOut;
+    }
+
     /**
      * gets the current date
      *
@@ -382,6 +390,8 @@ public class Basic {
         var stackTrace = Thread.currentThread().getStackTrace();
         return stackTrace[2].getMethodName();
     }
+
+
 }
 
 /**

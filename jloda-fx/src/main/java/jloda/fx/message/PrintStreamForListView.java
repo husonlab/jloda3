@@ -22,6 +22,7 @@ package jloda.fx.message;
 
 import javafx.application.Platform;
 import javafx.scene.control.ListView;
+import jloda.util.Basic;
 import jloda.util.StringUtils;
 
 import java.io.PrintStream;
@@ -31,6 +32,7 @@ import java.io.PrintStream;
  * Daniel Huson, 11.2022
  */
 public class PrintStreamForListView extends PrintStream {
+	public boolean echoToConsole = false;
 	private final ListView<String> listView;
 	private final int maxLines;
 
@@ -125,6 +127,8 @@ public class PrintStreamForListView extends PrintStream {
 	}
 
 	private void add(String message) {
+		if (echoToConsole)
+			Basic.getOrigErr().print(message);
 		Platform.runLater(() -> {
 			listView.getItems().add(message);
 			if (listView.getItems().size() > maxLines) {
