@@ -24,12 +24,8 @@ import javafx.scene.Node;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
 import javafx.scene.control.Labeled;
-import javafx.scene.text.Font;
 
-import java.io.IOException;
-import java.util.Map;
-import java.util.Objects;
-import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * gives access to Google's material icons
@@ -2190,16 +2186,15 @@ public enum MaterialIcons {
 
 	public static String ADDITIONAL_FORMATTING = "";
 
-	private static MaterialIcons instance;
-
-	private final Map<String, String> nameCodePointMap = new TreeMap<>();
+	private static final AtomicBoolean INIT = new AtomicBoolean(false);
 	private static String styleSheet;
 
-	{
-		initialize();
+	static {
+		ensureInitialized();
 	}
 
 	public static String getStyleSheet() {
+		ensureInitialized();
 		return styleSheet;
 	}
 
@@ -2246,7 +2241,9 @@ public enum MaterialIcons {
 	}
 
 	public static void setIcon(Labeled labeled, MaterialIcons icon, String style, boolean graphicOnly) {
-		labeled.getStylesheets().add(getStyleSheet());
+		ensureInitialized();
+		StylesheetUtil.ensureOnScene(labeled, MaterialIcons::getStyleSheet);
+
 		labeled.setGraphic(graphic(icon, style));
 		if (graphicOnly)
 			labeled.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
@@ -2254,12 +2251,19 @@ public enum MaterialIcons {
 			labeled.setContentDisplay(ContentDisplay.LEFT);
 	}
 
-	private static void initialize() {
-		try (var ins = Objects.requireNonNull(MaterialIcons.class.getResource("MaterialIconsOutlined-Regular.otf.dat")).openStream()) {
-			Font.loadFont(ins, 10);
-		} catch (IOException ex) {
+	private static void ensureInitialized() {
+		if (!INIT.compareAndSet(false, true)) {
+			return; // already initialized
+		}
+		try (var ins = java.util.Objects.requireNonNull(
+				MaterialIcons.class.getResource("MaterialIconsOutlined-Regular.otf.dat")
+		).openStream()) {
+			javafx.scene.text.Font.loadFont(ins, 10);
+		} catch (java.io.IOException ex) {
+			// If you prefer not to hard-crash, log and continue with fallback font.
 			throw new RuntimeException(ex);
 		}
-		styleSheet = Objects.requireNonNull(MaterialIcons.class.getResource("button.css")).toExternalForm();
+
+		styleSheet = java.util.Objects.requireNonNull(MaterialIcons.class.getResource("button.css")).toExternalForm();
 	}
 }
