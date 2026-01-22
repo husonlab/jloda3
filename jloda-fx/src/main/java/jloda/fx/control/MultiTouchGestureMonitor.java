@@ -25,7 +25,6 @@ public class MultiTouchGestureMonitor {
 		var suppressSingleTouchPanning = (ProgramProperties.isIOS() || ProgramProperties.isAndroid());
 		var multiTouchGestureInProgress = new SimpleBooleanProperty(false);
 
-		// this code ensures that panning requires at least two touch points on a mobile device:
 		var activeTouches = new HashSet<Integer>();
 
 		if (pane != null) {
@@ -63,6 +62,7 @@ public class MultiTouchGestureMonitor {
 			});
 		}
 
+		// this code ensures that panning requires at least two touch points on a mobile device:
 		if (suppressSingleTouchPanning) {
 			if (scrollPane != null) {
 				multiTouchGestureInProgress.addListener((v, o, n) -> {
@@ -84,7 +84,6 @@ public class MultiTouchGestureMonitor {
 				});
 			}
 		}
-
 
 		return multiTouchGestureInProgress;
 	}
