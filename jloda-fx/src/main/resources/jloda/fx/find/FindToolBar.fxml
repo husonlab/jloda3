@@ -46,8 +46,6 @@
                     <Tooltip text="Load search terms from file, one per line"/>
                 </tooltip>
             </Button>
-            <Separator fx:id="fromFileSeparator" maxHeight="20.0" minHeight="20.0" orientation="VERTICAL"
-                       prefHeight="20.0"/>
             <Button fx:id="findButton" alignment="CENTER" mnemonicParsing="false" text="Find">
                 <font>
                     <Font size="10.0"/>
@@ -75,8 +73,6 @@
                     <Tooltip text="Find all"/>
                 </tooltip>
             </Button>
-            <Separator layoutX="158.0" layoutY="10.0" maxHeight="20.0" minHeight="20.0" orientation="VERTICAL"
-                       prefHeight="20.0"/>
             <ToggleButton fx:id="caseSensitiveCheckBox" alignment="CENTER" mnemonicParsing="false" text="cC">
                 <font>
                     <Font size="10.0"/>
@@ -104,8 +100,6 @@
                     <Tooltip text="Regular expressions"/>
                 </tooltip>
             </ToggleButton>
-            <Separator layoutX="284.0" layoutY="10.0" maxHeight="20.0" minHeight="20.0" orientation="VERTICAL"
-                       prefHeight="20.0"/>
             <Label fx:id="label" style="-fx-text-fill: darkgray;" text="label">
                 <font>
                     <Font size="10.0"/>

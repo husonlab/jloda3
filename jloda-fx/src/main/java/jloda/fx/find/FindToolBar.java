@@ -262,7 +262,7 @@ public class FindToolBar extends VBox {
                 }
             });
         } else
-            controller.getToolBar().getItems().removeAll(controller.getFindFromFileButton(), controller.getFromFileSeparator());
+            controller.getToolBar().getItems().remove(controller.getFindFromFileButton());
 
         controller.getReplaceButton().disableProperty().bind(searchManager.disabledProperty().or(searchManager.searchTextProperty().isEmpty()));
         controller.getReplaceButton().setOnAction(e -> {

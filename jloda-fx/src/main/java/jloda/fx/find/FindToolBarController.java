@@ -20,6 +20,7 @@
 
 package jloda.fx.find;
 
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
@@ -50,9 +51,6 @@ public class FindToolBarController {
 
     @FXML
     private Button findFromFileButton;
-
-    @FXML
-    private Separator fromFileSeparator;
 
     @FXML
     private ToggleButton caseSensitiveCheckBox;
@@ -92,10 +90,13 @@ public class FindToolBarController {
 
     @FXML
     private void initialize() {
-        MaterialIcons.setIcon(findButton, MaterialIcons.start, "-fx-font-size: 10;", false);
-        MaterialIcons.setIcon(nextButton, MaterialIcons.navigate_next, "-fx-font-size: 10;", false);
-        MaterialIcons.setIcon(allButton, MaterialIcons.select_all, "-fx-font-size: 10;", false);
-        MaterialIcons.setIcon(findFromFileButton, MaterialIcons.file_download, "-fx-font-size: 10;", true);
+        Platform.runLater(() -> {
+            MaterialIcons.setIcon(findButton, MaterialIcons.start, "-fx-font-size: 10;", false);
+            MaterialIcons.setIcon(nextButton, MaterialIcons.navigate_next, "-fx-font-size: 10;", false);
+            MaterialIcons.setIcon(allButton, MaterialIcons.select_all, "-fx-font-size: 10;", false);
+            MaterialIcons.setIcon(findFromFileButton, MaterialIcons.file_download, "-fx-font-size: 10;", true);
+            MaterialIcons.setIcon(closeButton, MaterialIcons.close, "-fx-font-size: 10;", true);
+        });
 
         if (findList == null)
             findList = FXCollections.observableArrayList();
@@ -170,10 +171,6 @@ public class FindToolBarController {
 
     public Button getFindFromFileButton() {
         return findFromFileButton;
-    }
-
-    public Separator getFromFileSeparator() {
-        return fromFileSeparator;
     }
 
     public ToggleButton getCaseSensitiveCheckBox() {
