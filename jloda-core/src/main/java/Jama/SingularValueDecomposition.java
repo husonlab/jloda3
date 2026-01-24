@@ -284,7 +284,7 @@ public class SingularValueDecomposition implements java.io.Serializable {
 		while (p > 0) {
 			int k, kase;
 
-			// Here is where a test for too many iterations would go.
+			// Here is where a getInfo for too many iterations would go.
 
 			// This section of the program inspects for
 			// negligible elements in the s and e arrays.  On

@@ -453,7 +453,7 @@ public class ReorderListDialog extends JDialog implements DropTargetListener, Ac
 	}
 
 	/**
-	 * test program
+	 * getInfo program
 	 */
 	static public void main(String[] args) throws Exception {
 		final Vector superClasses = new Vector();

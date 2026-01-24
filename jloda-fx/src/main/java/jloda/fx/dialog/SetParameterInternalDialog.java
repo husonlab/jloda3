@@ -197,7 +197,7 @@ public class SetParameterInternalDialog extends Pane {
 		 */
 		final var focusListener = (javafx.beans.value.ChangeListener<Boolean>) (v, o, n) -> {
 			if (!n) {
-				// Defer to allow focus to settle; then test if focus is outside this dialog.
+				// Defer to allow focus to settle; then getInfo if focus is outside this dialog.
 				Platform.runLater(() -> {
 					if (getScene() == null) return;
 					final var owner = getScene().getFocusOwner();

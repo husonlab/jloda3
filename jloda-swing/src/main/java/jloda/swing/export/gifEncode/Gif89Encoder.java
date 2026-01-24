@@ -376,7 +376,7 @@ public class Gif89Encoder {
     //----------------------------------------------------------------------------
 
     /**
-     * A simple driver to test the installation and to demo usage.  Put the JAR
+	 * A simple driver to getInfo the installation and to demo usage.  Put the JAR
      * on your classpath and run ala
      * <blockquote>java net.jmge.gif.Gif89Encoder {filename}</blockquote>
      * The filename must be either (1) a JPEG file with extension 'jpg', for
@@ -384,7 +384,7 @@ public class Gif89Encoder {
      * JPEGs, one per line, to be combined into an animated GIF.  The output will
      * appear in the current directory as 'gif89out.gif'.
      * <p/>
-     * (N.B. This test program will abort if the input file(s) exceed(s) 256 total
+	 * (N.B. This getInfo program will abort if the input file(s) exceed(s) 256 total
      * RGB colors, so in its present form it has no value as a generic JPEG to GIF
      * converter.  Also, when multiple files are input, you need to be wary of the
      * total color count, regardless of file type.)
