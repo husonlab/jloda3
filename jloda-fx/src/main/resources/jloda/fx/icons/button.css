@@ -17,7 +17,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-.button, .toggle-button, .menu-button {
+/* Only affects controls that have the 'mi' style class */
+
+.button.mi,
+.toggle-button.mi,
+.menu-button.mi {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
     -fx-background-radius: 0;
@@ -25,27 +29,30 @@
     -fx-border-width: 0;
 }
 
-.toggle-button:selected {
+.toggle-button.mi:selected {
     -fx-background-color: derive(-fx-base, -15%);
 }
 
-.button:hover, .toggle-button:hover, .menu-button:hover {
+.button.mi:hover,
+.toggle-button.mi:hover,
+.menu-button.mi:hover {
     -fx-background-color: derive(-fx-base, 60%);
 }
 
-.check-box {
-    -fx-padding: 0; /* Remove padding */
+/* Only affects checkboxes you explicitly mark */
+.check-box.mi {
+    -fx-padding: 0;
 }
 
-.check-box .box {
+.check-box.mi .box {
     -fx-background-color: transparent;
     -fx-border-color: derive(-fx-base, -15%);
     -fx-border-width: 1px;
 }
 
-.button:armed,
-.button:armed .graphic,
-.toggle-button:armed,
-.toggle-button:armed .graphic {
+.button.mi:armed,
+.button.mi:armed .graphic,
+.toggle-button.mi:armed,
+.toggle-button.mi:armed .graphic {
     -fx-background-color: lightgray;
 }

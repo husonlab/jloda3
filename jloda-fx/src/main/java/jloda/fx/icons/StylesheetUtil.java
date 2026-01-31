@@ -24,6 +24,8 @@ import javafx.beans.value.ObservableValue;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -64,19 +66,55 @@ public final class StylesheetUtil {
 	}
 
 	private static void ensure(Scene scene, java.util.function.Supplier<String> stylesheetSupplier) {
-		if (!INITIALIZED.add(scene)) {
-			return; // already done
-		}
-
 		final String url;
 		try {
 			url = stylesheetSupplier.get();
 		} catch (RuntimeException ex) {
 			// Make the real cause obvious in the console
-			System.err.println("MaterialIcons: failed to obtain stylesheet URL: " + ex);
+			System.err.println("StylesheetUtil: failed to obtain stylesheet URL: " + ex);
 			throw ex;
 		}
 
-		scene.getStylesheets().add(url);
+		// If it's already present, we're done (even if we haven't "initialized" this scene before)
+		if (containsStylesheet(scene, url)) {
+			INITIALIZED.add(scene); // optional: record as initialized to suppress future checks
+			return;
+		}
+
+		// Optional: avoid doing any further work more than once per scene.
+		// (We still did the contains-check above, which is cheap.)
+		if (!INITIALIZED.add(scene)) {
+			// Another call already handled adding it (or decided it wasn't needed)
+			return;
+		}
+
+		scene.getStylesheets().add(0, url);
+	}
+
+	private static boolean containsStylesheet(Scene scene, String url) {
+		final String norm = normalizeUrl(url);
+		for (String existing : scene.getStylesheets()) {
+			if (norm.equals(normalizeUrl(existing))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Normalize URLs enough to avoid duplicates caused by minor string differences.
+	 * We avoid aggressive normalization to preserve JavaFX URL semantics.
+	 */
+	private static String normalizeUrl(String url) {
+		if (url == null) return "";
+		try {
+			var uri = new URI(url);
+			// Normalize path segments like /a/../b
+			uri = uri.normalize();
+			return uri.toString();
+		} catch (URISyntaxException e) {
+			// Fall back to trimmed original if it's not a strict URI (should be rare)
+			return url.trim();
+		}
 	}
 }

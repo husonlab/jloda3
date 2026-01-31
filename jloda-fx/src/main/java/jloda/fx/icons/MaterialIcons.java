@@ -2240,9 +2240,14 @@ public enum MaterialIcons {
 		setIcon(labeled, icon, null, graphicOnly);
 	}
 
+	private static final String MI_CLASS = "mi";
+
 	public static void setIcon(Labeled labeled, MaterialIcons icon, String style, boolean graphicOnly) {
 		ensureInitialized();
 		StylesheetUtil.ensureOnScene(labeled, MaterialIcons::getStyleSheet);
+		if (!labeled.getStyleClass().contains(MI_CLASS)) {
+			labeled.getStyleClass().add(MI_CLASS);
+		}
 
 		labeled.setGraphic(graphic(icon, style));
 		if (graphicOnly)
