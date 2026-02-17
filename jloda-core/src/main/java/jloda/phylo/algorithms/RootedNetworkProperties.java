@@ -22,6 +22,7 @@ package jloda.phylo.algorithms;
 
 import jloda.graph.*;
 import jloda.graph.algorithms.CutPoints;
+import jloda.phylo.NewickIO;
 import jloda.phylo.PhyloTree;
 import jloda.util.BitSetUtils;
 import jloda.util.CanceledException;
@@ -29,6 +30,7 @@ import jloda.util.IteratorUtils;
 import jloda.util.Single;
 import jloda.util.progress.ProgressSilent;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -38,258 +40,291 @@ import java.util.stream.Collectors;
  * Daniel Huson, 1.2020
  */
 public class RootedNetworkProperties {
-    /**
-     * is this a non-empty forest?
-     *
-     * @return true, if non-empty forest
-     */
-    public static boolean isNonEmptyForest(Graph graph) {
-        if (graph.getNumberOfNodes() == 0)
-            return false;
-        try (var visited = new NodeSet(graph)) {
-            var queue = new LinkedList<>(findRoots(graph));
-            while (!queue.isEmpty()) {
-                var w = queue.remove();
-                if (visited.contains(w))
-                    return false;
-                else
-                    visited.add(w);
-                queue.addAll(IteratorUtils.asList(w.children()));
-            }
-        }
-        return true;
-    }
+	/**
+	 * is this a non-empty forest?
+	 *
+	 * @return true, if non-empty forest
+	 */
+	public static boolean isNonEmptyForest(Graph graph) {
+		if (graph.getNumberOfNodes() == 0)
+			return false;
+		try (var visited = new NodeSet(graph)) {
+			var queue = new LinkedList<>(findRoots(graph));
+			while (!queue.isEmpty()) {
+				var w = queue.remove();
+				if (visited.contains(w))
+					return false;
+				else
+					visited.add(w);
+				queue.addAll(IteratorUtils.asList(w.children()));
+			}
+		}
+		return true;
+	}
 
-    /**
-     * is this a non-empty DAG?
-     *
-     * @return true, if non-empty DAG
-     */
-    public static boolean isNonEmptyDAG(Graph graph) {
-        if (graph.getNumberOfNodes() == 0)
-            return false;
-        final var g = new Graph();
-        g.copy(graph);
+	/**
+	 * is this a non-empty DAG?
+	 *
+	 * @return true, if non-empty DAG
+	 */
+	public static boolean isNonEmptyDAG(Graph graph) {
+		if (graph.getNumberOfNodes() == 0)
+			return false;
+		final var g = new Graph();
+		g.copy(graph);
 
-        while (g.getNumberOfNodes() > 0) {
-            var found = false;
-            for (var v : g.nodes()) {
-                if (v.getOutDegree() == 0) {
-                    g.deleteNode(v);
-                    found = true;
-                    break;
-                }
-            }
-            if (!found)
-                return false;
-        }
-        return true;
-    }
+		while (g.getNumberOfNodes() > 0) {
+			var found = false;
+			for (var v : g.nodes()) {
+				if (v.getOutDegree() == 0) {
+					g.deleteNode(v);
+					found = true;
+					break;
+				}
+			}
+			if (!found)
+				return false;
+		}
+		return true;
+	}
 
-    /**
-     * are all leaves labeled?
-     *
-     * @return true, if all leaves are labeled
-     */
-    public static boolean isLeafLabeled(Graph graph) {
-        return graph.nodeStream().noneMatch(v -> v.getOutDegree() == 0 && (graph.getLabel(v) == null || (graph.getLabel(v).isEmpty())));
-    }
+	/**
+	 * are all leaves labeled?
+	 *
+	 * @return true, if all leaves are labeled
+	 */
+	public static boolean isLeafLabeled(Graph graph) {
+		return graph.nodeStream().noneMatch(v -> v.getOutDegree() == 0 && (graph.getLabel(v) == null || (graph.getLabel(v).isEmpty())));
+	}
 
-    /**
-     * find all roots
-     *
-     * @return list of roots of this graph
-     */
-    public static List<Node> findRoots(Graph graph) {
-        return graph.nodeStream().filter(v -> v.getInDegree() == 0).collect(Collectors.toList());
-    }
+	/**
+	 * find all roots
+	 *
+	 * @return list of roots of this graph
+	 */
+	public static List<Node> findRoots(Graph graph) {
+		return graph.nodeStream().filter(v -> v.getInDegree() == 0).collect(Collectors.toList());
+	}
 
-    /**
-     * compute label to node mapping
-     *
-     * @return label to node mapping
-     */
-    public static Map<String, Node> getLabel2Node(Graph graph) {
-        var map = new TreeMap<String, Node>();
-        for (var v : graph.nodes()) {
-            var label = graph.getLabel(v);
-            if (label != null)
-                map.put(label, v);
-        }
-        return map;
-    }
+	/**
+	 * compute label to node mapping
+	 *
+	 * @return label to node mapping
+	 */
+	public static Map<String, Node> getLabel2Node(Graph graph) {
+		var map = new TreeMap<String, Node>();
+		for (var v : graph.nodes()) {
+			var label = graph.getLabel(v);
+			if (label != null)
+				map.put(label, v);
+		}
+		return map;
+	}
 
-    /**
-     * compute node to label mapping
-     *
-     * @return node to label mapping
-     */
-    public static NodeArray<String> getNode2Label(Graph graph) {
-        var map = new NodeArray<String>(graph);
-        for (var v : graph.nodes()) {
-            var label = graph.getLabel(v);
-            if (label != null)
-                map.put(v, label);
-        }
-        return map;
-    }
+	/**
+	 * compute node to label mapping
+	 *
+	 * @return node to label mapping
+	 */
+	public static NodeArray<String> getNode2Label(Graph graph) {
+		var map = new NodeArray<String>(graph);
+		for (var v : graph.nodes()) {
+			var label = graph.getLabel(v);
+			if (label != null)
+				map.put(v, label);
+		}
+		return map;
+	}
 
-    /**
-     * is this graph a tree-child network?
-     *
-     * @return true, if tree or tree-child network
-     */
-    public static boolean isTreeChild(PhyloTree graph) {
-        for (var v : graph.nodes()) {
-            if (v.getOutDegree() > 0) {
-                var ok = false;
-                for (var w : v.children()) {
-                    if (w.getInDegree() == 1) {
-                        ok = true;
-                        break;
-                    }
-                }
-                if (!ok)
-                    return false;
-            }
-        }
-        return true;
-    }
+	/**
+	 * is this graph a tree-child network?
+	 *
+	 * @return true, if tree or tree-child network
+	 */
+	public static boolean isTreeChild(PhyloTree graph) {
+		for (var v : graph.nodes()) {
+			if (v.getOutDegree() > 0) {
+				var ok = false;
+				for (var w : v.children()) {
+					if (w.getInDegree() <= 1) {
+						ok = true;
+						break;
+					}
+				}
+				if (!ok)
+					return false;
+			}
+		}
+		return true;
+	}
 
-    /**
-     * compute all visible nodes
-     *
-     * @return set of visible nodes
-     */
-    public static NodeSet computeAllVisibleNodes(PhyloTree graph, Collection<Node> roots) {
-        if (roots == null)
-            roots = graph.nodeStream().filter(v -> v.getInDegree() == 0).collect(Collectors.toList());
+	public static boolean isNormal(PhyloTree graph) {
+		if (!isTreeChild(graph))
+			return false;
+		return graph.edgeStream().noneMatch(RootedNetworkProperties::isShortCut);
+	}
 
-        var result = graph.newNodeSet();
+	/**
+	 * determines whether e is a reticulate edge that is a shortcut
+	 *
+	 * @param e edge
+	 * @return true, if there is a directed path from source of e to target of e that is not e
+	 */
+	public static boolean isShortCut(Edge e) {
+		if (e.getTarget().getInDegree() > 1) {
+			var source = e.getSource();
+			var target = e.getTarget();
+			var stack = new Stack<Node>();
+			for (var f : target.inEdges()) {
+				if (f != e)
+					stack.push(f.getSource());
+			}
+			while (!stack.isEmpty()) {
+				var v = stack.pop();
+				for (var p : v.parents()) {
+					if (p == source)
+						return true;
+					stack.push(p);
+				}
+			}
+		}
+		return false;
+	}
 
-        for (var root : roots) {
-            result.add(root);
+	/**
+	 * compute all visible nodes
+	 *
+	 * @return set of visible nodes
+	 */
+	public static NodeSet computeAllVisibleNodes(PhyloTree graph, Collection<Node> roots) {
+		if (roots == null)
+			roots = graph.nodeStream().filter(v -> v.getInDegree() == 0).collect(Collectors.toList());
 
-            try (NodeArray<BitSet> leavesBelow = graph.newNodeArray()) {
-                depthFirstDAG(root, v -> {
-                    if (v.getOutDegree() == 0) {
-                        leavesBelow.put(v, BitSetUtils.asBitSet(v.getId()));
-                        result.add(v);
-                    } else {
-                        var set = new BitSet();
-                        for (var w : v.children()) {
-                            set.or(leavesBelow.get(w));
-                        }
-                        leavesBelow.put(v, set);
-                    }
-                });
+		var result = graph.newNodeSet();
 
-                for (var nodeId : BitSetUtils.members(leavesBelow.get(root))) {
-                    result.addAll(CutPoints.apply(graph, v -> leavesBelow.get(v).get(nodeId)));
-                }
-            }
-        }
-        return result;
-    }
+		for (var root : roots) {
+			result.add(root);
 
-    /**
-     * perform depth-first DAG traversal, visiting some nodes multiple times
-     *
-     * @param root        root node
-     * @param calculation calculation to be performed
-     */
-    public static void depthFirstDAG(Node root, Consumer<Node> calculation) {
-        for (var w : root.children()) {
-            depthFirstDAG(w, calculation);
-        }
-        calculation.accept(root);
-    }
+			try (NodeArray<BitSet> leavesBelow = graph.newNodeArray()) {
+				depthFirstDAG(root, v -> {
+					if (v.getOutDegree() == 0) {
+						leavesBelow.put(v, BitSetUtils.asBitSet(v.getId()));
+						result.add(v);
+					} else {
+						var set = new BitSet();
+						for (var w : v.children()) {
+							set.or(leavesBelow.get(w));
+						}
+						leavesBelow.put(v, set);
+					}
+				});
 
-    private static void computeAllVisibleNodesRec(Node v, NodeSet stableNodes, NodeSet result) {
-        if (stableNodes.contains(v))
-            result.add(v);
+				for (var nodeId : BitSetUtils.members(leavesBelow.get(root))) {
+					result.addAll(CutPoints.apply(graph, v -> leavesBelow.get(v).get(nodeId)));
+				}
+			}
+		}
+		return result;
+	}
 
-        for (var w : v.children()) {
-            computeAllVisibleNodesRec(w, stableNodes, result);
-            if (w.getInDegree() == 1 && (result.contains(w) || w.getOutDegree() == 0)) {
-                result.add(v);
-            }
-        }
-    }
+	/**
+	 * perform depth-first DAG traversal, visiting some nodes multiple times
+	 *
+	 * @param root        root node
+	 * @param calculation calculation to be performed
+	 */
+	public static void depthFirstDAG(Node root, Consumer<Node> calculation) {
+		for (var w : root.children()) {
+			depthFirstDAG(w, calculation);
+		}
+		calculation.accept(root);
+	}
 
-    /**
-     * determines all completely stable nodes, which are nodes that lie on all paths to all of their children
-     */
-    public static NodeSet computeAllCompletelyStableInternal(PhyloTree graph) {
-        var result = graph.newNodeSet();
+	private static void computeAllVisibleNodesRec(Node v, NodeSet stableNodes, NodeSet result) {
+		if (stableNodes.contains(v))
+			result.add(v);
 
-        if (isNonEmptyDAG(graph)) {
-            for (var root : findRoots(graph))
-                computeAllCompletelyStableInternalRec(root, new HashSet<>(), new HashSet<>(), result);
-        }
-        return result;
-    }
+		for (var w : v.children()) {
+			computeAllVisibleNodesRec(w, stableNodes, result);
+			if (w.getInDegree() == 1 && (result.contains(w) || w.getOutDegree() == 0)) {
+				result.add(v);
+			}
+		}
+	}
 
-    /**
-     * recursively determines all stable nodes
-     */
-    private static void computeAllCompletelyStableInternalRec(Node v, Set<Node> below, Set<Node> parentsOfBelow, NodeSet result) {
-        if (v.getOutDegree() == 0) {
-            below.add(v);
-            parentsOfBelow.addAll(IteratorUtils.asList(v.parents()));
-        } else {
-            var belowV = new HashSet<Node>();
-            var parentsOfBelowV = new HashSet<Node>();
+	/**
+	 * determines all completely stable nodes, which are nodes that lie on all paths to all of their children
+	 */
+	public static NodeSet computeAllCompletelyStableInternal(PhyloTree graph) {
+		var result = graph.newNodeSet();
 
-            for (var w : v.children()) {
-                computeAllCompletelyStableInternalRec(w, belowV, parentsOfBelowV, result);
-            }
-            belowV.forEach(u -> parentsOfBelowV.addAll(IteratorUtils.asList(u.parents())));
-            belowV.add(v);
+		if (isNonEmptyDAG(graph)) {
+			for (var root : findRoots(graph))
+				computeAllCompletelyStableInternalRec(root, new HashSet<>(), new HashSet<>(), result);
+		}
+		return result;
+	}
 
-            if (belowV.containsAll(parentsOfBelowV)) {
-                result.add(v);
-            }
-            below.addAll(belowV);
-            parentsOfBelow.addAll(parentsOfBelowV);
-        }
-    }
+	/**
+	 * recursively determines all stable nodes
+	 */
+	private static void computeAllCompletelyStableInternalRec(Node v, Set<Node> below, Set<Node> parentsOfBelow, NodeSet result) {
+		if (v.getOutDegree() == 0) {
+			below.add(v);
+			parentsOfBelow.addAll(IteratorUtils.asList(v.parents()));
+		} else {
+			var belowV = new HashSet<Node>();
+			var parentsOfBelowV = new HashSet<Node>();
 
-    /**
-     * is the tree a temporal network?
-     *
-     * @return true, if temporal
-     */
-    public static boolean isTemporal(PhyloTree tree) {
-        try {
-            var contractedGraph = new PhyloTree(tree);
+			for (var w : v.children()) {
+				computeAllCompletelyStableInternalRec(w, belowV, parentsOfBelowV, result);
+			}
+			belowV.forEach(u -> parentsOfBelowV.addAll(IteratorUtils.asList(u.parents())));
+			belowV.add(v);
 
-            var reticulateEdges = contractedGraph.edgeStream().filter(e -> e.getTarget().getInDegree() > 1).collect(Collectors.toSet());
+			if (belowV.containsAll(parentsOfBelowV)) {
+				result.add(v);
+			}
+			below.addAll(belowV);
+			parentsOfBelow.addAll(parentsOfBelowV);
+		}
+	}
 
-            if (reticulateEdges.isEmpty())
-                return true;
-            else {
-                var selfEdgeEncountered = new Single<>(false);
-                contractEdges(contractedGraph, reticulateEdges, selfEdgeEncountered);
-                return !selfEdgeEncountered.get() && isNonEmptyDAG(contractedGraph);
-            }
-        } catch (Exception ignored) {
-            return false;
-        }
-    }
+	/**
+	 * is the tree a temporal network?
+	 *
+	 * @return true, if temporal
+	 */
+	public static boolean isTemporal(PhyloTree tree) {
+		try {
+			var contractedGraph = new PhyloTree(tree);
 
-    /**
-     * is this rooted phylogenetic network tree-based?
-     *
-     * @return true, if tree-based
-     */
-    public static boolean isTreeBased(PhyloTree tree) {
-        try (var match = OffspringGraphMatching.compute(tree, new ProgressSilent())) {
-            return OffspringGraphMatching.isTreeBased(tree, match);
-        } catch (CanceledException neverHappens) {
-            return false;
-        }
-    }
+			var reticulateEdges = contractedGraph.edgeStream().filter(e -> e.getTarget().getInDegree() > 1).collect(Collectors.toSet());
+
+			if (reticulateEdges.isEmpty())
+				return true;
+			else {
+				var selfEdgeEncountered = new Single<>(false);
+				contractEdges(contractedGraph, reticulateEdges, selfEdgeEncountered);
+				return !selfEdgeEncountered.get() && isNonEmptyDAG(contractedGraph);
+			}
+		} catch (Exception ignored) {
+			return false;
+		}
+	}
+
+	/**
+	 * is this rooted phylogenetic network tree-based?
+	 *
+	 * @return true, if tree-based
+	 */
+	public static boolean isTreeBased(PhyloTree tree) {
+		try (var match = OffspringGraphMatching.compute(tree, new ProgressSilent())) {
+			return OffspringGraphMatching.isTreeBased(tree, match);
+		} catch (CanceledException neverHappens) {
+			return false;
+		}
+	}
 
 	public static int distanceFromTreeBased(PhyloTree tree) {
 		try (EdgeSet matching = OffspringGraphMatching.compute(tree, new ProgressSilent())) {
@@ -300,19 +335,19 @@ public class RootedNetworkProperties {
 	}
 
 
-    /**
-     * compute an info string
-     *
-     * @return info string
-     */
-    public static String computeInfoString(PhyloTree phyloTree) {
-        if (phyloTree == null)
-            return "null";
-        else if (phyloTree.isReticulated()) {
-            var buf = new StringBuilder(String.format("nodes=%,d edges=%,d leaves=%,d h=%,d",
-                    phyloTree.getNumberOfNodes(), phyloTree.getNumberOfEdges(),
-                    phyloTree.nodeStream().filter(Node::isLeaf).count(),
-                    phyloTree.nodeStream().filter(v -> v.getInDegree() > 1).mapToInt(v -> v.getInDegree() - 1).sum()));
+	/**
+	 * compute an info string
+	 *
+	 * @return info string
+	 */
+	public static String computeInfoString(PhyloTree phyloTree) {
+		if (phyloTree == null)
+			return "null";
+		else if (phyloTree.isReticulated()) {
+			var buf = new StringBuilder(String.format("nodes=%,d edges=%,d leaves=%,d h=%,d",
+					phyloTree.getNumberOfNodes(), phyloTree.getNumberOfEdges(),
+					phyloTree.nodeStream().filter(Node::isLeaf).count(),
+					phyloTree.nodeStream().filter(v -> v.getInDegree() > 1).mapToInt(v -> v.getInDegree() - 1).sum()));
 
 			if (isTreeChild(phyloTree)) {
 				buf.append(" tree-child");
@@ -322,77 +357,85 @@ public class RootedNetworkProperties {
 					buf.append(" tree-based");
 				else buf.append(" tree-based-dist=").append(distanceFromTreeBased);
 			}
-            if (isTemporal(phyloTree))
-                buf.append(" temporal");
-            buf.append(" network");
-            return buf.toString();
-        } else {
-            return String.format("nodes=%d edges=%d leaves=%d",
-                    phyloTree.getNumberOfNodes(), phyloTree.getNumberOfEdges(),
-                    phyloTree.nodeStream().filter(Node::isLeaf).count());
-        }
-    }
+			if (isTemporal(phyloTree))
+				buf.append(" temporal");
+			buf.append(" network");
+			return buf.toString();
+		} else {
+			return String.format("nodes=%d edges=%d leaves=%d",
+					phyloTree.getNumberOfNodes(), phyloTree.getNumberOfEdges(),
+					phyloTree.nodeStream().filter(Node::isLeaf).count());
+		}
+	}
 
-    /**
-     * contracts all edges below min length
-     * @return true, if anything contracted
-     */
-    public static boolean contractShortEdges(PhyloTree tree, double minLength) {
-        return contractEdges(tree, tree.edgeStream().filter(e -> tree.getWeight(e) < minLength).collect(Collectors.toSet()), null);
-    }
+	/**
+	 * contracts all edges below min length
+	 *
+	 * @return true, if anything contracted
+	 */
+	public static boolean contractShortEdges(PhyloTree tree, double minLength) {
+		return contractEdges(tree, tree.edgeStream().filter(e -> tree.getWeight(e) < minLength).collect(Collectors.toSet()), null);
+	}
 
-    /**
-     * contracts a set of edges
-     *
-     * @return true, if anything contracted
-     */
-    public static boolean contractEdges(PhyloTree tree, Set<Edge> edgesToContract, Single<Boolean> selfEdgeEncountered) {
-        boolean hasContractedOne = !edgesToContract.isEmpty();
+	/**
+	 * contracts a set of edges
+	 *
+	 * @return true, if anything contracted
+	 */
+	public static boolean contractEdges(PhyloTree tree, Set<Edge> edgesToContract, Single<Boolean> selfEdgeEncountered) {
+		boolean hasContractedOne = !edgesToContract.isEmpty();
 
-        while (!edgesToContract.isEmpty()) {
-            final var e = edgesToContract.iterator().next();
-            edgesToContract.remove(e);
+		while (!edgesToContract.isEmpty()) {
+			final var e = edgesToContract.iterator().next();
+			edgesToContract.remove(e);
 
-            final var v = e.getSource();
-            final var w = e.getTarget();
+			final var v = e.getSource();
+			final var w = e.getTarget();
 
-            for (Edge f : v.adjacentEdges()) { // will remove e from edgesToContract here
-                if (f != e) {
-                    final var u = f.getOpposite(v);
-                    final var needsContracting = edgesToContract.contains(f);
-                    if (needsContracting)
-                        edgesToContract.remove(f);
+			for (Edge f : v.adjacentEdges()) { // will remove e from edgesToContract here
+				if (f != e) {
+					final var u = f.getOpposite(v);
+					final var needsContracting = edgesToContract.contains(f);
+					if (needsContracting)
+						edgesToContract.remove(f);
 
-                    if (u != w) {
-                        final Edge z;
-                        if (u == f.getSource())
-                            z = tree.newEdge(u, w);
-                        else
-                            z = tree.newEdge(w, u);
-                        if (tree.hasEdgeWeights())
-                            tree.setWeight(z, tree.getWeight(f));
-                        if (tree.hasEdgeConfidences())
-                            tree.setConfidence(z, tree.getConfidence(f));
-                        if (tree.hasEdgeProbabilities())
-                            tree.setProbability(z, tree.getProbability(f));
+					if (u != w) {
+						final Edge z;
+						if (u == f.getSource())
+							z = tree.newEdge(u, w);
+						else
+							z = tree.newEdge(w, u);
+						if (tree.hasEdgeWeights())
+							tree.setWeight(z, tree.getWeight(f));
+						if (tree.hasEdgeConfidences())
+							tree.setConfidence(z, tree.getConfidence(f));
+						if (tree.hasEdgeProbabilities())
+							tree.setProbability(z, tree.getProbability(f));
 
-                        tree.setLabel(z, tree.getLabel(z));
-                        if (needsContracting) {
-                            edgesToContract.add(z);
-                        }
-                    } else if (selfEdgeEncountered != null)
-                        selfEdgeEncountered.set(true);
-                }
-            }
-            for (var taxon : tree.getTaxa(v))
-                tree.addTaxon(w, taxon);
+						tree.setLabel(z, tree.getLabel(z));
+						if (needsContracting) {
+							edgesToContract.add(z);
+						}
+					} else if (selfEdgeEncountered != null)
+						selfEdgeEncountered.set(true);
+				}
+			}
+			for (var taxon : tree.getTaxa(v))
+				tree.addTaxon(w, taxon);
 
-            if (tree.getRoot() == v)
-                tree.setRoot(w);
+			if (tree.getRoot() == v)
+				tree.setRoot(w);
 
-            tree.deleteNode(v);
-        }
+			tree.deleteNode(v);
+		}
 
-        return hasContractedOne;
-    }
+		return hasContractedOne;
+	}
+
+	public static void main(String[] args) throws IOException {
+		var tree = NewickIO.valueOf("(((((t2,((t1,t5),(t4,t9))),(t3,(t8,t10))),(t7,(t6)##H1)),#H1));");
+
+		System.err.println("Tree-Child: " + isTreeChild(tree));
+		System.err.println("Normal: " + isNormal(tree));
+	}
 }

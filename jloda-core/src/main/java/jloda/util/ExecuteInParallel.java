@@ -86,7 +86,12 @@ public class ExecuteInParallel {
                     }
                 }));
                 service.shutdown();
-                service.awaitTermination(1000, TimeUnit.DAYS);
+                var finished = service.awaitTermination(1000, TimeUnit.DAYS);
+                if (!finished) {
+                    exception.setIfCurrentValueIsNull(new RuntimeException("Executor did not terminate: possible hung tasks"));
+                    service.shutdownNow();
+                    service.awaitTermination(1, TimeUnit.MINUTES);
+                }
             } catch (Exception e) {
                 exception.setIfCurrentValueIsNull(e);
             } finally {
@@ -121,10 +126,9 @@ public class ExecuteInParallel {
      * @param numberOfThreads threads to use
      * @param progress program
      * @param <S> input type
-     * @param <T> output type
      * @throws Exception could be that user canceled
      */
-    public static <S, T> void apply(int numberOfJobs, Iterable<S> jobs, ConsumerWithException<S> computation, int numberOfThreads, ProgressListener progress) throws Exception {
+    public static <S> void apply(int numberOfJobs, Iterable<S> jobs, ConsumerWithException<S> computation, int numberOfThreads, ProgressListener progress) throws Exception {
         if (numberOfJobs >= 0)
             progress.setMaximum(numberOfJobs);
         progress.setProgress(0);
@@ -147,7 +151,12 @@ public class ExecuteInParallel {
                     }
                 }));
                 service.shutdown();
-                service.awaitTermination(1000, TimeUnit.DAYS);
+                var finished = service.awaitTermination(1000, TimeUnit.DAYS);
+                if (!finished) {
+                    exception.setIfCurrentValueIsNull(new RuntimeException("Executor did not terminate: possible hung tasks"));
+                    service.shutdownNow();
+                    service.awaitTermination(1, TimeUnit.MINUTES);
+                }
             } catch (Exception e) {
                 exception.setIfCurrentValueIsNull(e);
             } finally {

@@ -113,6 +113,34 @@ public class GraphUtils {
 		}
 	}
 
+	/**
+	 * determines whether e is a reticulate edge that is a shortcut
+	 *
+	 * @param e edge
+	 * @return true, if there is a directed path from source of e to target of e that is not e
+	 */
+	public static <Node, Edge> boolean isShortCut(Edge e, Function<Edge, Node> getSource, Function<Edge, Node> getTarget, Function<Node, List<Edge>> getInEdges) {
+		var target = getTarget.apply(e);
+		if (getInEdges.apply(target).size() > 1) {
+			var source = getSource.apply(e);
+			var stack = new Stack<Node>();
+			for (var f : getInEdges.apply(target)) {
+				if (f != e)
+					stack.push(getSource.apply(f));
+			}
+			while (!stack.isEmpty()) {
+				var v = stack.pop();
+				for (var f : getInEdges.apply(v)) {
+					var p = getSource.apply(f);
+					if (p == source)
+						return true;
+					stack.push(p);
+				}
+			}
+		}
+		return false;
+	}
+
 	public record Bounds(double min, double max) {
 	}
 }

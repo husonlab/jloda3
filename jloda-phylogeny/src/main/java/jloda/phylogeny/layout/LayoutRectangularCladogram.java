@@ -21,6 +21,8 @@
 package jloda.phylogeny.layout;
 
 
+import jloda.phylogeny.utils.GraphUtils;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +52,7 @@ public class LayoutRectangularCladogram {
 	 */
 	public static <Node, Edge> void apply(Node root, List<Node> nodes, List<Edge> edges,
 										  Function<Node, List<Node>> lsaChildren,
+										  Function<Node, List<Edge>> inEdges,
 										  Function<Node, List<Edge>> outEdges,
 										  Function<Edge, Node> source, Function<Edge, Node> target, Function<Edge, EdgeType> edgeType,
 										  Averaging averaging, Map<Node, Point2D> nodePointMap) {
@@ -60,7 +63,7 @@ public class LayoutRectangularCladogram {
 			var changed = false;
 			for (var e : edges) {
 				var type = (edgeType == null ? EdgeType.tree : edgeType.apply(e));
-				if (type == EdgeType.transfer) {
+				if (type == EdgeType.transfer && !GraphUtils.isShortCut(e, source, target, inEdges)) {
 					var longestPathSource = longestPath.get(source.apply(e));
 					var longestPathTarget = longestPath.get(target.apply(e));
 					if (longestPathTarget > longestPathSource) {

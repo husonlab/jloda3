@@ -129,7 +129,7 @@ public class LayoutRootedPhylogeny {
 		}
 
 		if (scaling != Scaling.ToScale) {
-			LayoutRectangularCladogram.apply(root, nodes, edges, lsaChildren::get, outEdges, source, target, edgeType, averaging, nodePointMap);
+			LayoutRectangularCladogram.apply(root, nodes, edges, lsaChildren::get, inEdges, outEdges, source, target, edgeType, averaging, nodePointMap);
 		} else if (layout == Layout.Radial) {
 			LayoutRadialPhylogram.apply(root, edges, outEdges, lsaChildren::get, source, target, weight, edgeType, averaging, nodeAngleMap, nodePointMap);
 		} else {

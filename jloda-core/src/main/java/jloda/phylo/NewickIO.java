@@ -251,6 +251,7 @@ public class NewickIO {
 								label = getLabelForWriting(w) + PhyloTreeNetworkIOUtils.makeReticulateNodeLabel(isAcceptorEdge, outputNodeReticulationNumberMap.get(w));
 							else
 								label = PhyloTreeNetworkIOUtils.makeReticulateNodeLabel(isAcceptorEdge, outputNodeReticulationNumberMap.get(w));
+
 							writeRec(tree, writer, w, f, format, nodeId2Number, edgeId2Number, label);
 						} else {
 							String label;
@@ -261,12 +262,6 @@ public class NewickIO {
 
 							writer.write(label);
 							writer.write(getEdgeString(tree, format, f));
-							if (getNewickNodeCommentSupplier() != null) {
-								var comment = getNewickNodeCommentSupplier().apply(w);
-								if (comment != null && !comment.trim().isEmpty()) {
-									writer.write("[" + comment.trim() + "]");
-								}
-							}
 						}
 					} else
 						writeRec(tree, writer, w, f, format, nodeId2Number, edgeId2Number, getLabelForWriting(w));
@@ -277,15 +272,18 @@ public class NewickIO {
 				writer.write(nodeLabel);
 			}
 		}
-		if (e != null) {
-			writer.write(getEdgeString(tree, format, e));
-		}
+		// node comment before ':'
 		if (getNewickNodeCommentSupplier() != null) {
 			var comment = getNewickNodeCommentSupplier().apply(v);
 			if (comment != null && !comment.trim().isEmpty()) {
 				writer.write("[" + comment.trim() + "]");
 			}
 		}
+		if (e != null) {
+			writer.write(getEdgeString(tree, format, e));
+		}
+		// todo: add edge comment after ':'
+
 	}
 
 	public String getEdgeString(PhyloTree tree, OutputFormat format, Edge e) {
@@ -589,6 +587,17 @@ public class NewickIO {
 				if (label.isEmpty())
 					throw new IOException("Expected label at position " + pos0);
 			}
+			if (str.charAt(pos) == '[') // edge label
+			{
+				int x = str.indexOf('[', pos + 1);
+				int j = str.indexOf(']', pos + 1);
+				if (j == -1 || (x != -1 && x < j))
+					throw new IOException("Error in node comment at position: " + pos);
+				if (getNewickNodeCommentConsumer() != null)
+					getNewickNodeCommentConsumer().accept(v, str.substring(pos + 1, j));
+				pos = j + 1;
+			}
+
 			Edge e = null;
 			if (v != null)
 				e = tree.newEdge(v, w);
@@ -674,18 +683,9 @@ public class NewickIO {
 				else
 					throw new IOException("Unexpected end of line");
 			}
-			if (str.charAt(pos) == '[') // edge label
-			{
-				int x = str.indexOf('[', pos + 1);
-				int j = str.indexOf(']', pos + 1);
-				if (j == -1 || (x != -1 && x < j))
-					throw new IOException("Error in edge label at position: " + pos);
-				if (getNewickNodeCommentConsumer() != null)
-					getNewickNodeCommentConsumer().accept(v, str.substring(pos + 1, j));
-				pos = j + 1;
-			}
-			if (str.charAt(pos) == ';' && depth == 0)
+			// todo: add edge comment parsing here
 
+			if (str.charAt(pos) == ';' && depth == 0)
 				return pos; // finished parsing tree
 			else if (str.charAt(pos) == ')')
 				return pos;
