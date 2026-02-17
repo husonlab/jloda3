@@ -349,7 +349,9 @@ public class RootedNetworkProperties {
 					phyloTree.nodeStream().filter(Node::isLeaf).count(),
 					phyloTree.nodeStream().filter(v -> v.getInDegree() > 1).mapToInt(v -> v.getInDegree() - 1).sum()));
 
-			if (isTreeChild(phyloTree)) {
+			if (isNormal(phyloTree)) {
+				buf.append(" normal");
+			} else if (isTreeChild(phyloTree)) {
 				buf.append(" tree-child");
 			} else {
 				var distanceFromTreeBased = distanceFromTreeBased(phyloTree);
