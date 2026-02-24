@@ -36,6 +36,8 @@ public class PrintStreamForListView extends PrintStream {
 	private final ListView<String> listView;
 	private final int maxLines;
 
+	private final StringBuilder currentLine = new StringBuilder();
+
 	public PrintStreamForListView(ListView<String> listView) {
 		this(listView, Integer.MAX_VALUE);
 	}
@@ -126,15 +128,39 @@ public class PrintStreamForListView extends PrintStream {
 	public void setError() {
 	}
 
+
 	private void add(String message) {
 		if (echoToConsole)
 			Basic.getOrigErr().print(message);
+
 		Platform.runLater(() -> {
-			listView.getItems().add(message);
-			if (listView.getItems().size() > maxLines) {
-				listView.getItems().remove(0, listView.getItems().size() - maxLines);
+			int start = 0;
+			int idx;
+
+			while ((idx = message.indexOf('\n', start)) >= 0) {
+				// append up to newline
+				currentLine.append(message, start, idx);
+
+				// complete line → add to ListView
+				listView.getItems().add(currentLine.toString());
+				currentLine.setLength(0);
+
+				start = idx + 1;
 			}
-			listView.scrollTo(listView.getItems().size() - 1);
+
+			// remainder (no newline at end)
+			if (start < message.length()) {
+				currentLine.append(message.substring(start));
+			}
+
+			// enforce maxLines
+			if (listView.getItems().size() > maxLines) {
+				listView.getItems().remove(0,
+						listView.getItems().size() - maxLines);
+			}
+
+			if (!listView.getItems().isEmpty())
+				listView.scrollTo(listView.getItems().size() - 1);
 		});
 	}
 

@@ -122,6 +122,17 @@ public class CommentData {
 		else return Optional.empty();
 	}
 
+	/**
+	 * parse a node or edge comment string.
+	 *
+	 * @param string the comment string, without or with enclosing [,]
+	 *               If the string starts with &, then expects key=value,key=value,... pairs and stores them
+	 *               Value can be a double, an array of doubles in the format {x,y,z,...},
+	 *               an int, a set of ints in the format {i-j,k,...} or a string.
+	 *               Else, if the string does not start with & and can be parsed as a single number,
+	 *               stores as double with key 'double', else, stores as string with key 'string'
+	 * @return number of values stored
+	 */
 	public int parse(String string) {
 		if (string == null)
 			return 0;
@@ -133,10 +144,20 @@ public class CommentData {
 
 		string = string.trim();
 
-		var oldSize = values.size();
-
-		if (!string.startsWith("&"))
+		if (string.isBlank())
 			return 0;
+
+		if (!string.startsWith("&")) {
+			try { // is the whole comment just a value?
+				values.put("double", (new DoubleValue()).setValue(Double.parseDouble(string)));
+				return 1;
+			} catch (NumberFormatException ignored) {
+			}
+			values.put("string", (new StringValue()).setValue(string));
+			return 1;
+		}
+
+		var oldSize = values.size();
 
 		// remove leading '&'
 		string = string.substring(1).trim();
@@ -155,7 +176,7 @@ public class CommentData {
 			while (i < string.length() && isKeyRest(string.charAt(i)))
 				i++;
 
-			String key = string.substring(keyStart, i);
+			var key = string.substring(keyStart, i);
 
 			// ---- skip whitespace ----
 			while (i < string.length() && Character.isWhitespace(string.charAt(i)))
@@ -212,7 +233,7 @@ public class CommentData {
 				}
 			}
 
-			String valueText = string.substring(valueStart, i).trim();
+			var valueText = string.substring(valueStart, i).trim();
 
 			// store parsed value
 			values.put(key, parseValue(valueText));
