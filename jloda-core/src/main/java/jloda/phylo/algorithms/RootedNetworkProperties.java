@@ -434,6 +434,10 @@ public class RootedNetworkProperties {
 		return hasContractedOne;
 	}
 
+	public static int computeHybridizationNumber(PhyloTree tree) {
+		return tree.nodeStream().filter(v -> v.getInDegree() > 0).mapToInt(v -> v.getInDegree() - 1).sum();
+	}
+
 	public static void main(String[] args) throws IOException {
 		var tree = NewickIO.valueOf("(((((t2,((t1,t5),(t4,t9))),(t3,(t8,t10))),(t7,(t6)##H1)),#H1));");
 

@@ -35,7 +35,7 @@ import java.util.function.Supplier;
 
 /**
  * input and output of a tree or rooted network in extended rich Newick format
- * Daniel Huson, 2002-2023
+ * Daniel Huson, 2002-2023-2026
  */
 public class NewickIO {
 	public static boolean WARN_HAS_MULTILABELS = true;
@@ -261,7 +261,17 @@ public class NewickIO {
 								label = PhyloTreeNetworkIOUtils.makeReticulateNodeLabel(isAcceptorEdge, outputNodeReticulationNumberMap.get(w));
 
 							writer.write(label);
-							writer.write(getEdgeString(tree, format, f));
+							var edgeString = getEdgeString(tree, format, f);
+
+							writer.write(edgeString);
+							if (getNewickEdgeCommentSupplier() != null) {
+								var comment = getNewickEdgeCommentSupplier().apply(f);
+								if (comment != null && !comment.trim().isEmpty()) {
+									if (!edgeString.contains(":"))
+										writer.write(":");
+									writer.write("[" + comment + "]");
+								}
+							}
 						}
 					} else
 						writeRec(tree, writer, w, f, format, nodeId2Number, edgeId2Number, getLabelForWriting(w));
@@ -280,10 +290,17 @@ public class NewickIO {
 			}
 		}
 		if (e != null) {
+			var edgeString = getEdgeString(tree, format, e);
 			writer.write(getEdgeString(tree, format, e));
+			if (getNewickEdgeCommentSupplier() != null) {
+				var comment = getNewickEdgeCommentSupplier().apply(e);
+				if (comment != null && !comment.trim().isEmpty()) {
+					if (!edgeString.contains(":"))
+						writer.write(":");
+					writer.write("[" + comment + "]");
+				}
+			}
 		}
-		// todo: add edge comment after ':'
-
 	}
 
 	public String getEdgeString(PhyloTree tree, OutputFormat format, Edge e) {
@@ -587,14 +604,14 @@ public class NewickIO {
 				if (label.isEmpty())
 					throw new IOException("Expected label at position " + pos0);
 			}
-			if (str.charAt(pos) == '[') // edge label
+			if (str.charAt(pos) == '[') // node label
 			{
 				int x = str.indexOf('[', pos + 1);
 				int j = str.indexOf(']', pos + 1);
 				if (j == -1 || (x != -1 && x < j))
 					throw new IOException("Error in node comment at position: " + pos);
 				if (getNewickNodeCommentConsumer() != null)
-					getNewickNodeCommentConsumer().accept(v, str.substring(pos + 1, j));
+					getNewickNodeCommentConsumer().accept(w, str.substring(pos + 1, j));
 				pos = j + 1;
 			}
 
@@ -611,13 +628,18 @@ public class NewickIO {
 
 			// read edge weights
 			var didReadWeight = false;
+			var sawColon = false;
 
 			for (var which = 0; which < 3; which++) {
 				if (pos < str.length() && str.charAt(pos) == ':') { // edge weight is following
 					pos = StringUtils.skipSpaces(str, pos + 1);
+					sawColon = true;
 					if (pos < str.length() && str.charAt(pos) == ':') {
 						continue;
 					}
+					if (which == 0 && str.charAt(pos) == '[')
+						break; // the colon is only here to delimit an edge comment
+
 					var pos0 = pos;
 					var numberStr = StringUtils.getStringUptoDelimiter(str, pos0, punctuationCharacters);
 					if (!NumberUtils.isDouble(numberStr))
@@ -676,14 +698,23 @@ public class NewickIO {
 				}
 			}
 
-			// now i should be pointing to a ',', a ')' or '[' (for a label)
+			// now i should be pointing to a ',', a ')'. Or '[' for an edge label after a colon
 			if (pos >= str.length()) {
 				if (depth == 0)
 					return pos; // finished parsing tree
 				else
 					throw new IOException("Unexpected end of line");
 			}
-			// todo: add edge comment parsing here
+			if (sawColon && str.charAt(pos) == '[') // edge label
+			{
+				int x = str.indexOf('[', pos + 1);
+				int j = str.indexOf(']', pos + 1);
+				if (j == -1 || (x != -1 && x < j))
+					throw new IOException("Error in edge comment at position: " + pos);
+				if (getNewickEdgeCommentConsumer() != null)
+					getNewickEdgeCommentConsumer().accept(e, str.substring(pos + 1, j));
+				pos = j + 1;
+			}
 
 			if (str.charAt(pos) == ';' && depth == 0)
 				return pos; // finished parsing tree
@@ -750,6 +781,7 @@ public class NewickIO {
 								tree.setReticulate(f, true);
 							if (tree.isTransferAcceptorEdge(e))
 								tree.setTransferAcceptor(f, true);
+							f.setData(e.getData());
 							tree.setLabel(f, tree.getLabel(e));
 						}
 						tree.deleteNode(v);
@@ -811,8 +843,12 @@ public class NewickIO {
 
 	private Consumer<String> newickLeadingCommentConsumer;
 	private BiConsumer<Node, String> newickNodeCommentConsumer;
+	private BiConsumer<Edge, String> newickEdgeCommentConsumer;
+
 	private Supplier<String> newickLeadingCommentSupplier;
 	private Function<Node, String> newickNodeCommentSupplier;
+	private Function<Edge, String> newickEdgeCommentSupplier;
+
 
 	public Consumer<String> getNewickLeadingCommentConsumer() {
 		return newickLeadingCommentConsumer;
@@ -830,6 +866,14 @@ public class NewickIO {
 		this.newickNodeCommentConsumer = newickNodeCommentConsumer;
 	}
 
+	public BiConsumer<Edge, String> getNewickEdgeCommentConsumer() {
+		return newickEdgeCommentConsumer;
+	}
+
+	public void setNewickEdgeCommentConsumer(BiConsumer<Edge, String> newickEdgeCommentConsumer) {
+		this.newickEdgeCommentConsumer = newickEdgeCommentConsumer;
+	}
+
 	public Supplier<String> getNewickLeadingCommentSupplier() {
 		return newickLeadingCommentSupplier;
 	}
@@ -844,6 +888,14 @@ public class NewickIO {
 
 	public void setNewickNodeCommentSupplier(Function<Node, String> newickNodeCommentSupplier) {
 		this.newickNodeCommentSupplier = newickNodeCommentSupplier;
+	}
+
+	public Function<Edge, String> getNewickEdgeCommentSupplier() {
+		return newickEdgeCommentSupplier;
+	}
+
+	public void setNewickEdgeCommentSupplier(Function<Edge, String> newickEdgeCommentSupplier) {
+		this.newickEdgeCommentSupplier = newickEdgeCommentSupplier;
 	}
 
 	public boolean isNumbersOnInternalNodesAreConfidenceValues() {

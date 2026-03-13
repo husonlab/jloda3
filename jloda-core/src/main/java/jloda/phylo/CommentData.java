@@ -20,10 +20,12 @@
 
 package jloda.phylo;
 
+import jloda.graph.Edge;
 import jloda.graph.Node;
 import jloda.util.BitSetUtils;
 import jloda.util.StringUtils;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -606,6 +608,14 @@ public class CommentData {
 		};
 	}
 
+	public static Function<Edge, String> createDataEdgeSupplier() {
+		return e -> {
+			if (e.getData() instanceof CommentData data) {
+				return data.toString();
+			} else return null;
+		};
+	}
+
 	public static BiConsumer<Node, String> createDataNodeConsumer() {
 		return (v, comment) -> {
 			if (v != null) {
@@ -615,13 +625,52 @@ public class CommentData {
 				} else {
 					var data = CommentData.valueOf(comment);
 					if (data != null) {
-						v.getOwner().setData(v, data);
+						v.setData(data);
 					}
 				}
 			}
 		};
 	}
 
+	public static BiConsumer<Edge, String> createDataEdgeConsumer() {
+		return (e, comment) -> {
+			if (e != null) {
+				var data = CommentData.valueOf(comment);
+				if (data != null) {
+					e.setData(data);
+				}
+			}
+		};
+	}
+
+	public static void main(String[] args) throws IOException {
+		var input = "(((a[&IS={1,2}],(b[&IS={1,2}],(c[&IS={1,2}])#H1[&IS={1,2,3}]:[&IS={2}])[&IS={1,2}])[&IS={1,2}],#H1:[&IS={1,2,4}])[&IS={1}])[&IS={1,2}];";
+
+		var newickIO = new NewickIO();
+		newickIO.setNewickNodeCommentSupplier(CommentData.createDataNodeSupplier());
+		newickIO.setNewickEdgeCommentSupplier(CommentData.createDataEdgeSupplier());
+		newickIO.setNewickNodeCommentConsumer(CommentData.createDataNodeConsumer());
+		newickIO.setNewickEdgeCommentConsumer(CommentData.createDataEdgeConsumer());
+
+		var tree = new PhyloTree();
+		newickIO.parseBracketNotation(tree, input, true);
+
+		System.err.println("In:  " + input);
+		System.err.println("Out: " + newickIO.toBracketString(tree, false) + ";");
+
+		System.err.println("Nodes:");
+		for (var v : tree.nodes()) {
+			System.err.println(v + ": " + v.getData());
+		}
+		System.err.println("Edges:");
+		for (var e : tree.edges()) {
+			System.err.println(e + ": " + e.getData());
+		}
+
+
+	}
+
+	/*
 	public static void main(String[] args) {
 		var string = """
 				[&height=0.008196721311605872,
@@ -651,4 +700,5 @@ public class CommentData {
 
 		System.err.println("String:\n" + nodeCommentData.toString());
 	}
+	 */
 }
