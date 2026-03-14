@@ -644,8 +644,10 @@ public class CommentData {
 	}
 
 	public static void main(String[] args) throws IOException {
-		var input = "(((a[&IS={1,2}],(b[&IS={1,2}],(c[&IS={1,2}])#H1[&IS={1,2,3}]:[&IS={2}])[&IS={1,2}])[&IS={1,2}],#H1:[&IS={1,2,4}])[&IS={1}])[&IS={1,2}];";
+		var input = "(((a[&IS={1,2}],(b[&IS={1,2}],(c[&IS={1,2}])#H1[&IS={1,2,3}]:::0.1[&IS={2}])[&IS={1,2}]):0.8:95[&IS={1,2}],#H1:::0.9[&IS={1,2,4}])[&IS={1}])[&IS={1,2}];";
+		System.err.println("In:  " + input);
 
+		PhyloTree.SUPPORT_RICH_NEWICK = true;
 		var newickIO = new NewickIO();
 		newickIO.setNewickNodeCommentSupplier(CommentData.createDataNodeSupplier());
 		newickIO.setNewickEdgeCommentSupplier(CommentData.createDataEdgeSupplier());
@@ -655,8 +657,7 @@ public class CommentData {
 		var tree = new PhyloTree();
 		newickIO.parseBracketNotation(tree, input, true);
 
-		System.err.println("In:  " + input);
-		System.err.println("Out: " + newickIO.toBracketString(tree, false) + ";");
+		System.err.println("Out: " + newickIO.toBracketString(tree, true) + ";");
 
 		System.err.println("Nodes:");
 		for (var v : tree.nodes()) {
@@ -664,7 +665,7 @@ public class CommentData {
 		}
 		System.err.println("Edges:");
 		for (var e : tree.edges()) {
-			System.err.println(e + ": " + e.getData());
+			System.err.println(e + ": " + e.getData() + " weight: " + tree.getWeight(e) + " confidence: " + tree.getConfidence(e) + " probability: " + tree.getProbability(e));
 		}
 
 
