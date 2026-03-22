@@ -150,12 +150,8 @@ public final class RunThrottled {
 
 	private static void runOnFx(Runnable r) {
 		if (r == null) return;
-		if (true)
-			r.run();
-		else {
-			if (Platform.isFxApplicationThread()) r.run();
+		if (Platform.isFxApplicationThread()) r.run();
 			else Platform.runLater(r);
-		}
 	}
 
 	public static void main(String[] args) {

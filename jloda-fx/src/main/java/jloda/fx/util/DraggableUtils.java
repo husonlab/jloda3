@@ -21,8 +21,11 @@
 package jloda.fx.util;
 
 import javafx.event.EventHandler;
+import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.AnchorPane;
+import jloda.util.Pair;
 
 /**
  * utilities for making nodes draggable
@@ -95,5 +98,44 @@ public class DraggableUtils {
 			});
 		}
 		node.setOnMouseDragged(mouseDraggedHandlerLayout);
+	}
+
+	/**
+	 * if node is contained in an anchor pane, makes it press-draggable
+	 *
+	 * @param node contained in anchor pane
+	 */
+	public static void makeDraggableInAnchorPane(Node node) {
+		var right = AnchorPane.getRightAnchor(node);
+		var left = AnchorPane.getLeftAnchor(node);
+		var top = AnchorPane.getTopAnchor(node);
+		var bottom = AnchorPane.getBottomAnchor(node);
+
+		if ((right == null || left == null) && (top == null || bottom == null)) {
+			final var mouseDown = new Pair<Double, Double>();
+
+			node.setOnMousePressed((e -> {
+				mouseDown.set(e.getScreenX(), e.getScreenY());
+				node.setCursor(Cursor.CLOSED_HAND);
+				e.consume();
+			}));
+
+			node.setOnMouseDragged((e -> {
+				double deltaX = e.getScreenX() - mouseDown.getFirst();
+				double deltaY = e.getScreenY() - mouseDown.getSecond();
+				if (right != null)
+					AnchorPane.setRightAnchor(node, AnchorPane.getRightAnchor(node) - deltaX);
+				if (left != null)
+					AnchorPane.setLeftAnchor(node, AnchorPane.getLeftAnchor(node) + deltaX);
+				if (top != null)
+					AnchorPane.setTopAnchor(node, AnchorPane.getTopAnchor(node) + deltaY);
+				if (bottom != null)
+					AnchorPane.setBottomAnchor(node, AnchorPane.getBottomAnchor(node) - deltaY);
+				mouseDown.set(e.getScreenX(), e.getScreenY());
+				e.consume();
+			}));
+
+			node.setOnMouseReleased(e -> node.setCursor(Cursor.DEFAULT));
+		}
 	}
 }
