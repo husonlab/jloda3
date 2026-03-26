@@ -276,18 +276,6 @@ public class CommentData {
 
 	public static Value parseValue(String valueText) {
 		{
-			var value = new DoubleValue();
-			if (value.valueOf(valueText)) {
-				return value;
-			}
-		}
-		{
-			var value = new DoubleArrayValue();
-			if (value.valueOf(valueText)) {
-				return value;
-			}
-		}
-		{
 			var value = new IntValue();
 			if (value.valueOf(valueText)) {
 				return value;
@@ -295,6 +283,18 @@ public class CommentData {
 		}
 		{
 			var value = new IntSetValue();
+			if (value.valueOf(valueText)) {
+				return value;
+			}
+		}
+		{
+			var value = new DoubleValue();
+			if (value.valueOf(valueText)) {
+				return value;
+			}
+		}
+		{
+			var value = new DoubleArrayValue();
 			if (value.valueOf(valueText)) {
 				return value;
 			}
@@ -661,14 +661,13 @@ public class CommentData {
 
 		System.err.println("Nodes:");
 		for (var v : tree.nodes()) {
-			System.err.println(v + ": " + v.getData());
+			var data = v.getData();
+			System.err.println(v + ": " + data);
 		}
 		System.err.println("Edges:");
 		for (var e : tree.edges()) {
 			System.err.println(e + ": " + e.getData() + " weight: " + tree.getWeight(e) + " confidence: " + tree.getConfidence(e) + " probability: " + tree.getProbability(e));
 		}
-
-
 	}
 
 	/*
