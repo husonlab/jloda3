@@ -437,7 +437,6 @@ public class CommentData {
 				}
 			}
 			return false;
-
 		}
 
 		@Override
@@ -588,6 +587,10 @@ public class CommentData {
 		}
 	}
 
+	public boolean hasKey(String key) {
+		return values.containsKey(key);
+	}
+
 	private static boolean isKeyFirst(char c) {
 		return (c >= 'A' && c <= 'Z')
 			   || (c >= 'a' && c <= 'z')
@@ -644,7 +647,7 @@ public class CommentData {
 	}
 
 	public static void main(String[] args) throws IOException {
-		var input = "(((a[&IS={1,2}],(b[&IS={1,2}],(c[&IS={1,2}])#H1[&IS={1,2,3}]:::0.1[&IS={2}])[&IS={1,2}]):0.8:95[&IS={1,2}],#H1:::0.9[&IS={1,2,4}])[&IS={1}])[&IS={1,2}];";
+		var input = "(((Trithuria_inconspicua_NC_020372[&TT={1}]:0.02555259,Trithuria_filamentosa_KF696682[&TT={1}]:0.01134565)[&TT={1}]:0.33491858,(((((Barclaya_kunstleri_KY392762[&TT={1}]:0.02347781,Barclaya_longifolia_KY284156[&TT={1}]:0.01925969)[&TT={1}]:0.02100688,(((Victoria_cruziana_KY001813[&TT={1}]:0.0225811,Euryale_ferox_KY392765[&TT={1}]:0.02237966)[&TT={1}]:0.0164912,(Nymphaea_ampla_KU189255[&TT={1}]:0.01920625,Nymphaea_jamesoniana_NC_031826[&TT={1}]:0.00400631)[&TT={1}]:0)[&TT={1}]:0,(Nymphaea_mexicana_NC_024542[&TT={1}]:0.00692694,(Nymphaea_alba_KU234277[&TT={1}]:0.00000495,Nymphaea_alba_NC_006050[&TT={1}]:0.00000495)[&TT={1}]:0.00691279)[&TT={1}]:0.00957361)[&TT={1}]:0.03179237)[&TT={1}]:0.03183968,((Cabomba_caroliniana_KT705317[&TT={1}]:0.10094715,Brasenia_schreberi_NC_031343[&TT={1}]:0.03236284)[&TT={1}]:0.05116847)#H1[&TT={1}]:0.05116847[&TT={1}])[&TT={1}]:0.02149289,((Nuphar_advena_NC_008788[&TT={1}]:0.00000495,Nuphar_longifolia_MH050795[&TT={1}]:0.00000495)[&TT={1}]:0.01813706,(Nuphar_shimadae_MH050797[&TT={1}]:0.00001276,Nuphar_pumila_MH050796[&TT={1}]:0.00132336)[&TT={1}]:0)[&TT={1}]:0.01111184)[&TT={1}]:0.19832542,#H1:0.05116847[&TT={}])[&TT={1}]:0.19832542)[&TT={1}]:0.000001)[&TT={1}];";
 		System.err.println("In:  " + input);
 
 		PhyloTree.SUPPORT_RICH_NEWICK = true;
@@ -664,9 +667,11 @@ public class CommentData {
 			var data = v.getData();
 			System.err.println(v + ": " + data);
 		}
-		System.err.println("Edges:");
+		System.err.println("Reticulate dges:");
 		for (var e : tree.edges()) {
-			System.err.println(e + ": " + e.getData() + " weight: " + tree.getWeight(e) + " confidence: " + tree.getConfidence(e) + " probability: " + tree.getProbability(e));
+			if (e.getTarget().getInDegree() > 1)
+				System.err.println(e + ": " + e.getData() + " weight: " + tree.getWeight(e) + " confidence: " + tree.getConfidence(e) + " probability: " + tree.getProbability(e));
+
 		}
 	}
 
