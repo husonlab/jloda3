@@ -131,7 +131,11 @@ public class PhyloTree extends PhyloSplitsGraph {
 					if (children != null) {
 						var newChildren = new ArrayList<Node>();
 						for (var w : children) {
-							newChildren.add(oldNode2NewNode.get(w));
+							if (w != null && w.getOwner() != null) {
+								var u = oldNode2NewNode.get(w);
+								if (u != null && u.getOwner() != null)
+									newChildren.add(u);
+							}
 						}
 						getLSAChildrenMap().put(oldNode2NewNode.get(v), newChildren);
 					}

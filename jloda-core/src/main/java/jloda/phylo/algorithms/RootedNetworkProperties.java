@@ -22,7 +22,6 @@ package jloda.phylo.algorithms;
 
 import jloda.graph.*;
 import jloda.graph.algorithms.CutPoints;
-import jloda.phylo.NewickIO;
 import jloda.phylo.PhyloTree;
 import jloda.util.BitSetUtils;
 import jloda.util.CanceledException;
@@ -30,7 +29,6 @@ import jloda.util.IteratorUtils;
 import jloda.util.Single;
 import jloda.util.progress.ProgressSilent;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -435,13 +433,6 @@ public class RootedNetworkProperties {
 	}
 
 	public static int computeHybridizationNumber(PhyloTree tree) {
-		return tree.nodeStream().filter(v -> v.getInDegree() > 0).mapToInt(v -> v.getInDegree() - 1).sum();
-	}
-
-	public static void main(String[] args) throws IOException {
-		var tree = NewickIO.valueOf("(((((t2,((t1,t5),(t4,t9))),(t3,(t8,t10))),(t7,(t6)##H1)),#H1));");
-
-		System.err.println("Tree-Child: " + isTreeChild(tree));
-		System.err.println("Normal: " + isNormal(tree));
+		return tree.nodeStream().filter(v -> v.getInDegree() >= 2).mapToInt(v -> v.getInDegree() - 1).sum();
 	}
 }
