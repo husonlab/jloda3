@@ -20,58 +20,56 @@
 
 package jloda.fx.window;
 
+import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
-import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.input.KeyCharacterCombination;
 import javafx.scene.input.KeyCombination;
-import javafx.stage.Stage;
-import jloda.util.ProgramProperties;
+import jloda.fx.util.ProgramProperties;
 
 import java.util.ArrayList;
 
 /**
- * setup the window menu
- * Daniel Huson, 9.2019
+ * set up the window menu
+ * Daniel Huson, 9.2019, 4.2026
  */
 public class SetupWindowMenu {
 	public static void apply(IMainWindow window, Menu windowMenu) {
 		final ArrayList<MenuItem> originalWindowMenuItems = new ArrayList<>(windowMenu.getItems());
 
 		final InvalidationListener invalidationListener = observable -> {
-			windowMenu.getItems().setAll(originalWindowMenuItems);
-			int count = 0;
-			for (IMainWindow mainWindow : MainWindowManager.getInstance().getMainWindows()) {
+			var newMenuItems = new ArrayList<>(originalWindowMenuItems);
+			var count = 0;
+			for (var mainWindow : MainWindowManager.getInstance().getMainWindows()) {
 				if (mainWindow.getStage() != null) {
-					final String title = mainWindow.getStage().getTitle();
+					var title = mainWindow.getStage().getTitle();
 					if (title != null) {
-						final MenuItem menuItem = new MenuItem(title.replaceAll("- " + ProgramProperties.getProgramName(), ""));
+						var menuItem = new MenuItem(title.replaceAll("- " + jloda.fx.util.ProgramProperties.getProgramName(), ""));
 						menuItem.setOnAction((e) -> mainWindow.getStage().toFront());
-						menuItem.setAccelerator(new KeyCharacterCombination("" + (++count), KeyCombination.SHORTCUT_DOWN));
-						if (count > 0)
-							windowMenu.getItems().add(new SeparatorMenuItem());
-						windowMenu.getItems().add(menuItem);
+						if (count < 9)
+							menuItem.setAccelerator(new KeyCharacterCombination("" + (++count), KeyCombination.SHORTCUT_DOWN));
+						newMenuItems.add(menuItem);
 					}
 				}
 				if (MainWindowManager.getInstance().getAuxiliaryWindows(mainWindow) != null) {
-					for (Stage auxStage : MainWindowManager.getInstance().getAuxiliaryWindows(mainWindow)) {
-						final String title = auxStage.getTitle();
+					for (var auxStage : MainWindowManager.getInstance().getAuxiliaryWindows(mainWindow)) {
+						var title = auxStage.getTitle();
 						if (title != null) {
-							final MenuItem menuItem = new MenuItem(title.replaceAll("- " + ProgramProperties.getProgramName(), ""));
-							menuItem.setOnAction(e -> {
-								auxStage.show();
-								auxStage.toFront();
-							});
-							windowMenu.getItems().add(menuItem);
+							var menuItem = new MenuItem(title.replaceAll("- " + ProgramProperties.getProgramName(), ""));
+							menuItem.setOnAction((e) -> auxStage.toFront());
+							newMenuItems.add(menuItem);
+
 						}
 					}
 				}
 			}
+			windowMenu.getItems().setAll(newMenuItems);
 		};
-		MainWindowManager.getInstance().changedProperty().addListener(invalidationListener);
-		invalidationListener.invalidated(null);
-
-		window.getStage().titleProperty().addListener((c) -> MainWindowManager.getInstance().fireChanged());
+		Platform.runLater(() -> {
+			MainWindowManager.getInstance().changedProperty().addListener(invalidationListener);
+			invalidationListener.invalidated(null);
+			window.getStage().titleProperty().addListener(e -> MainWindowManager.getInstance().fireChanged());
+		});
 	}
 }
