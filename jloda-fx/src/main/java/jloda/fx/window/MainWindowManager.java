@@ -184,10 +184,10 @@ public class MainWindowManager {
 
 			WindowGeometry.listenToStage(stage);
 
-			newWindow.show(stage, stage.getX(), stage.getY(), stage.getWidth(), stage.getHeight());
-
 			if (!mainWindows.contains(newWindow))
 				addMainWindow(newWindow);
+
+			newWindow.show(stage, stage.getX(), stage.getY(), stage.getWidth(), stage.getHeight());
 
 			return newWindow;
 		}
