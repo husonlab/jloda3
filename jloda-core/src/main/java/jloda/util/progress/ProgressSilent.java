@@ -30,6 +30,7 @@ import jloda.util.CanceledException;
  */
 public class ProgressSilent implements ProgressListener {
 	private boolean canceled = false;
+
 	/**
 	 * constructor
 	 */

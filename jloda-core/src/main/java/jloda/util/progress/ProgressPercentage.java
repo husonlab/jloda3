@@ -219,5 +219,4 @@ public class ProgressPercentage implements ProgressListener {
 	public boolean getPause() {
 		return false;
 	}
-
 }

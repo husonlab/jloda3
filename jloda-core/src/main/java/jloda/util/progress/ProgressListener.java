@@ -125,4 +125,8 @@ public interface ProgressListener extends AutoCloseable {
 	 */
 	boolean getPause();
 
+	default void setProgress(long progress, long total) throws CanceledException {
+		setMaximum(total);
+		setProgress(progress);
+	}
 }
