@@ -1612,16 +1612,48 @@ public class StringUtils {
 		return pos;
 	}
 
-
+	/**
+	 * get trimmed string for value
+	 *
+	 * @param value double
+	 * @return trimmed string
+	 * @deprecated use trim()
+	 */
+	@Deprecated
 	public static String removeTrailingZerosAfterDot(double value) {
-		return removeTrailingZerosAfterDot("%f", value);
+		return trim("%f", value);
 	}
 
+	/**
+	 * get trimmed string for value
+	 * @param format string
+	 * @param value double
+	 * @return trimmed string
+	 * @deprecated use trim()
+	 */
+	@Deprecated
 	public static String removeTrailingZerosAfterDot(String format, double value) {
-		return removeTrailingZerosAfterDot(String.format(format, value));
+		return trim(String.format(format, value));
 	}
 
+	/**
+	 * get trimmed string for value
+	 * @param text double as text
+	 * @return trimmed string
+	 * @deprecated use trim()
+	 */
+	@Deprecated
 	public static String removeTrailingZerosAfterDot(String text) {
+		return trim(text);
+	}
+
+	/**
+	 * get trimmed string for value
+	 *
+	 * @param text double as text
+	 * @return trimmed string
+	 */
+	public static String trim(String text) {
 		if (text.contains("."))
 			return text.replaceAll("\\.([0-9]+?)0*$", ".$1") // note: *? lazy, does keep trailing 0's
 					.replaceAll("\\.([0-9]+?)0+(\\s)", ".$1$2")
@@ -1631,7 +1663,28 @@ public class StringUtils {
 	}
 
 	/**
-	 * gets members of bit set as as string
+	 * get trimmed string for value
+	 *
+	 * @param value double
+	 * @return trimmed string
+	 */
+	public static String trim(double value) {
+		return removeTrailingZerosAfterDot("%f", value);
+	}
+
+	/**
+	 * get trimmed string for value
+	 *
+	 * @param format string
+	 * @param value  double
+	 * @return trimmed string
+	 */
+	public static String trim(String format, double value) {
+		return removeTrailingZerosAfterDot(format, value);
+	}
+
+	/**
+	 * gets members of bit set as a string
 	 *
 	 * @return string
 	 */

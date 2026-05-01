@@ -20,10 +20,7 @@
 
 package jloda.util;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
+import java.util.*;
 
 /**
  * some simple set utilities
@@ -165,5 +162,11 @@ public class SetUtils {
 
 	public static <T> boolean intersect(Collection<T> a, Collection<T> b) {
 		return intersection(a, b).iterator().hasNext();
+	}
+
+	public static Set<Integer> fullIndexSet(int n) {
+		var s = new TreeSet<Integer>();
+		for (int i = 0; i < n; i++) s.add(i);
+		return s;
 	}
 }

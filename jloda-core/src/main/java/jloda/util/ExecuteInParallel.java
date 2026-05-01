@@ -29,6 +29,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * run jobs in parallel on a fixed number of threads
@@ -65,7 +66,6 @@ public class ExecuteInParallel {
     public static <S, T> void apply(int numberOfJobs, Iterable<S> jobs, FunctionWithException<S, Collection<T>> computation, Collection<T> results, int numberOfThreads, ProgressListener progress) throws Exception {
         if (numberOfJobs >= 0)
             progress.setMaximum(numberOfJobs);
-        progress.setMaximum(numberOfJobs);
         progress.setProgress(0);
         if (numberOfJobs == 1) {
             results.addAll(computation.apply(jobs.iterator().next()));
@@ -79,7 +79,9 @@ public class ExecuteInParallel {
                     if (exception.isNull()) {
                         try {
                             queue.addAll(computation.apply(job));
-                            progress.incrementProgress();
+                            synchronized (progress) {
+                                progress.incrementProgress();
+                            }
                         } catch (Exception e) {
                             exception.setIfCurrentValueIsNull(e);
                         }
@@ -128,43 +130,53 @@ public class ExecuteInParallel {
      * @param <S> input type
      * @throws Exception could be that user canceled
      */
-    public static <S> void apply(int numberOfJobs, Iterable<S> jobs, ConsumerWithException<S> computation, int numberOfThreads, ProgressListener progress) throws Exception {
-        if (numberOfJobs >= 0)
-            progress.setMaximum(numberOfJobs);
+    public static <S> void apply(int numberOfJobs, Iterable<S> jobs,
+                                 ConsumerWithException<S> computation,
+                                 int numberOfThreads, ProgressListener progress) throws Exception {
+        progress.setMaximum(Math.max(0, numberOfJobs));
         progress.setProgress(0);
-        if (numberOfJobs == 1)
-            computation.accept(jobs.iterator().next());
-        else if (numberOfJobs != 0) {
-            final Single<Exception> exception = new Single<>();
-            final ExecutorService service = Executors.newFixedThreadPool(Math.max(1, numberOfThreads));
-            try {
-                jobs.forEach(job -> service.submit(() -> {
-                    if (exception.isNull()) {
-                        try {
-                            computation.accept(job);
-                            synchronized (progress) {
-                                progress.incrementProgress();
-                            }
-                        } catch (Exception e) {
-                            exception.setIfCurrentValueIsNull(e);
-                        }
-                    }
-                }));
-                service.shutdown();
-                var finished = service.awaitTermination(1000, TimeUnit.DAYS);
-                if (!finished) {
-                    exception.setIfCurrentValueIsNull(new RuntimeException("Executor did not terminate: possible hung tasks"));
-                    service.shutdownNow();
-                    service.awaitTermination(1, TimeUnit.MINUTES);
-                }
-            } catch (Exception e) {
-                exception.setIfCurrentValueIsNull(e);
-            } finally {
-                service.shutdownNow();
-            }
-            if (exception.isNotNull())
-                throw exception.get();
+
+        if (numberOfJobs == 0) {
+            progress.reportTaskCompleted();
+            return;
         }
+        if (numberOfJobs == 1) {
+            computation.accept(jobs.iterator().next());
+            synchronized (progress) {
+                progress.incrementProgress();
+            }
+            progress.reportTaskCompleted();
+            return;
+        }
+
+        final var firstException = new AtomicReference<Exception>();
+        final var service = Executors.newFixedThreadPool(Math.max(1, numberOfThreads));
+        try {
+            for (var job : jobs) {
+                service.submit(() -> {
+                    if (firstException.get() != null) return;          // skip if already failed
+                    try {
+                        computation.accept(job);
+                        synchronized (progress) {
+                            progress.incrementProgress();
+                        }
+                    } catch (Exception e) {
+                        firstException.compareAndSet(null, e);
+                    }
+                });
+            }
+            service.shutdown();
+            while (!service.awaitTermination(1, TimeUnit.SECONDS)) {
+                if (progress.isUserCancelled()) {
+                    service.shutdownNow();
+                    break;
+                }
+            }
+        } finally {
+            if (!service.isTerminated()) service.shutdownNow();
+        }
+        var ex = firstException.get();
+        if (ex != null) throw ex;
         progress.reportTaskCompleted();
     }
 
