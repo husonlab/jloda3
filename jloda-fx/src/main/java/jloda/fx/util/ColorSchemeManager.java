@@ -25,6 +25,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.ObservableMap;
 import javafx.scene.chart.PieChart;
+import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
 import jloda.util.ProgramProperties;
 import jloda.util.StringUtils;
@@ -176,5 +177,45 @@ public class ColorSchemeManager {
 				}
 			}
 		}
+	}
+
+	public WritableImage createIcon(String colorSchemeName) {
+		var colors = getColorScheme(colorSchemeName);
+
+		final var size = 64; // 64x64 icon
+		var image = new WritableImage(size, size);
+		var pw = image.getPixelWriter();
+
+
+		if (colors == null || colors.isEmpty()) {
+			return image; // empty (transparent)
+		}
+		var n = colors.size();
+		// Compute grid dimensions (as square as possible)
+		var cols = (int) Math.ceil(Math.sqrt(n));
+		var rows = (int) Math.ceil((double) n / cols);
+
+		// Cell size
+		var cellWidth = (double) size / cols;
+		var cellHeight = (double) size / rows;
+
+		var i = 0;
+		for (var color : colors) {
+			var col = i % cols;
+			var row = i / cols;
+
+			var xStart = (int) Math.round(col * cellWidth);
+			var xEnd = (int) Math.round((col + 1) * cellWidth);
+			var yStart = (int) Math.round(row * cellHeight);
+			var yEnd = (int) Math.round((row + 1) * cellHeight);
+
+			for (var y = yStart; y < yEnd; y++) {
+				for (var x = xStart; x < xEnd; x++) {
+					pw.setColor(x, y, color);
+				}
+			}
+			i++;
+		}
+		return image;
 	}
 }
