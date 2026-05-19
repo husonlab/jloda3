@@ -21,7 +21,6 @@
 package jloda.fx.util;
 
 import javafx.application.Platform;
-import jloda.util.Pair;
 import jloda.util.ProgramExecutorService;
 
 import java.util.*;
@@ -38,28 +37,28 @@ public class RunAfterAWhile {
 		instance = new RunAfterAWhile();
 	}
 
-	private final Map<Object, Pair<Long, Runnable>> keyTimeRunnableMap;
+	private final Map<Object, Job> keyJobMap;
 
 	private RunAfterAWhile() {
-		keyTimeRunnableMap = new HashMap<>();
+		keyJobMap = new HashMap<>();
 
 		var timer = new Timer(true);
 		timer.schedule(new TimerTask() {
 			@Override
 			public void run() {
-				synchronized (keyTimeRunnableMap) {
+				synchronized (keyJobMap) {
 					var time = System.currentTimeMillis();
 					var toDelete = new ArrayList<>();
-					for (var entry : keyTimeRunnableMap.entrySet()) {
-						var entryTime = entry.getValue().getFirst();
+					for (var entry : keyJobMap.entrySet()) {
+						var entryTime = entry.getValue().time();
 						if (time > entryTime + DELAY) {
 							toDelete.add(entry.getKey());
-							var entryJob = entry.getValue().getSecond();
+							var entryJob = entry.getValue().runnable();
 							if (entryJob != null)
 								ProgramExecutorService.submit(entryJob);
 						}
 					}
-					toDelete.forEach(keyTimeRunnableMap.keySet()::remove);
+					toDelete.forEach(keyJobMap.keySet()::remove);
 				}
 			}
 		}, DELAY / 2, DELAY / 2);
@@ -72,14 +71,14 @@ public class RunAfterAWhile {
 	 * @param runnable the runnable
 	 */
 	public static void apply(Object key, Runnable runnable) {
-		synchronized (instance.keyTimeRunnableMap) {
-			instance.keyTimeRunnableMap.put(key, new Pair<>(System.currentTimeMillis(), runnable));
+		synchronized (instance.keyJobMap) {
+			instance.keyJobMap.put(key, new Job(System.currentTimeMillis(), runnable));
 		}
 	}
 
 	public static void apply(Object key, Runnable runnable, long waitingTimeMilliSeconds) {
-		synchronized (instance.keyTimeRunnableMap) {
-			instance.keyTimeRunnableMap.put(key, new Pair<>(System.currentTimeMillis() + Math.max(DELAY, waitingTimeMilliSeconds) - DELAY, runnable));
+		synchronized (instance.keyJobMap) {
+			instance.keyJobMap.put(key, new Job(System.currentTimeMillis() + Math.max(DELAY, waitingTimeMilliSeconds) - DELAY, runnable));
 		}
 	}
 
@@ -90,12 +89,12 @@ public class RunAfterAWhile {
 	 * @param runnable
 	 */
 	public static void applyOrClearIfAlreadyWaiting(Object key, Runnable runnable) {
-		synchronized (instance.keyTimeRunnableMap) {
-			var pair = instance.keyTimeRunnableMap.get(key);
-			if (pair != null)
-				instance.keyTimeRunnableMap.put(key, new Pair<>(pair.getFirst(), null));
+		synchronized (instance.keyJobMap) {
+			var job = instance.keyJobMap.get(key);
+			if (job != null)
+				instance.keyJobMap.put(key, new Job(job.time(), null));
 			else
-				instance.keyTimeRunnableMap.put(key, new Pair<>(System.currentTimeMillis(), runnable));
+				instance.keyJobMap.put(key, new Job(System.currentTimeMillis(), runnable));
 		}
 	}
 
@@ -103,14 +102,23 @@ public class RunAfterAWhile {
 	 * The runnable will be executed in the FX thread after a delay, unless the same key is submitted again
 	 *
 	 * @param key      the key
-	 * @param runnable the runnable
+	 * @param runnables 0 or more runnables
 	 */
-	public static void applyInFXThread(Object key, Runnable runnable) {
-		apply(key, () -> Platform.runLater(runnable));
-	}
+	public static void applyInFXThread(Object key, Runnable... runnables) {
 
+		apply(key, () -> Platform.runLater(() -> {
+			for (var runnable : runnables)
+				runnable.run();
+		}));
+	}
 
 	public static void applyInFXThreadOrClearIfAlreadyWaiting(Object key, Runnable runnable) {
 		applyOrClearIfAlreadyWaiting(key, () -> Platform.runLater(runnable));
+	}
+
+	private record Job(long time, Runnable runnable, Runnable excuteOnSuccess) {
+		public Job(long time, Runnable runnable) {
+			this(time, runnable, null);
+		}
 	}
 }
