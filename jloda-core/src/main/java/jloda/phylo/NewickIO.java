@@ -628,12 +628,26 @@ public class NewickIO {
 
 			// read edge weights
 			var didReadWeight = false;
-			var sawColon = false;
 
 			for (var which = 0; which < 3; which++) {
 				if (pos < str.length() && str.charAt(pos) == ':') { // edge weight is following
+
+
 					pos = StringUtils.skipSpaces(str, pos + 1);
-					sawColon = true;
+
+					{
+						if (pos < str.length() && str.charAt(pos) == '[') // edge comment after :
+						{
+							int x = str.indexOf('[', pos + 1);
+							int j = str.indexOf(']', pos + 1);
+							if (j == -1 || (x != -1 && x < j))
+								throw new IOException("Error in edge comment at position: " + pos);
+							if (getNewickEdgeCommentConsumer() != null)
+								getNewickEdgeCommentConsumer().accept(e, str.substring(pos + 1, j));
+							pos = j + 1;
+						}
+					}
+
 					if (pos < str.length() && str.charAt(pos) == ':') {
 						continue;
 					}
@@ -705,16 +719,7 @@ public class NewickIO {
 				else
 					throw new IOException("Unexpected end of line");
 			}
-			if (sawColon && str.charAt(pos) == '[') // edge label
-			{
-				int x = str.indexOf('[', pos + 1);
-				int j = str.indexOf(']', pos + 1);
-				if (j == -1 || (x != -1 && x < j))
-					throw new IOException("Error in edge comment at position: " + pos);
-				if (getNewickEdgeCommentConsumer() != null)
-					getNewickEdgeCommentConsumer().accept(e, str.substring(pos + 1, j));
-				pos = j + 1;
-			}
+
 
 			if (str.charAt(pos) == ';' && depth == 0)
 				return pos; // finished parsing tree

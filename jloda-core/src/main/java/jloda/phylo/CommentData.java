@@ -647,7 +647,8 @@ public class CommentData {
 	}
 
 	public static void main(String[] args) throws IOException {
-		var input = "(((Trithuria_inconspicua_NC_020372[&TT={1}]:0.02555259,Trithuria_filamentosa_KF696682[&TT={1}]:0.01134565)[&TT={1}]:0.33491858,(((((Barclaya_kunstleri_KY392762[&TT={1}]:0.02347781,Barclaya_longifolia_KY284156[&TT={1}]:0.01925969)[&TT={1}]:0.02100688,(((Victoria_cruziana_KY001813[&TT={1}]:0.0225811,Euryale_ferox_KY392765[&TT={1}]:0.02237966)[&TT={1}]:0.0164912,(Nymphaea_ampla_KU189255[&TT={1}]:0.01920625,Nymphaea_jamesoniana_NC_031826[&TT={1}]:0.00400631)[&TT={1}]:0)[&TT={1}]:0,(Nymphaea_mexicana_NC_024542[&TT={1}]:0.00692694,(Nymphaea_alba_KU234277[&TT={1}]:0.00000495,Nymphaea_alba_NC_006050[&TT={1}]:0.00000495)[&TT={1}]:0.00691279)[&TT={1}]:0.00957361)[&TT={1}]:0.03179237)[&TT={1}]:0.03183968,((Cabomba_caroliniana_KT705317[&TT={1}]:0.10094715,Brasenia_schreberi_NC_031343[&TT={1}]:0.03236284)[&TT={1}]:0.05116847)#H1[&TT={1}]:0.05116847[&TT={1}])[&TT={1}]:0.02149289,((Nuphar_advena_NC_008788[&TT={1}]:0.00000495,Nuphar_longifolia_MH050795[&TT={1}]:0.00000495)[&TT={1}]:0.01813706,(Nuphar_shimadae_MH050797[&TT={1}]:0.00001276,Nuphar_pumila_MH050796[&TT={1}]:0.00132336)[&TT={1}]:0)[&TT={1}]:0.01111184)[&TT={1}]:0.19832542,#H1:0.05116847[&TT={}])[&TT={1}]:0.19832542)[&TT={1}]:0.000001)[&TT={1}];";
+		//var input = "(((Trithuria_inconspicua_NC_020372[&TT={1}]:0.02555259,Trithuria_filamentosa_KF696682[&TT={1}]:0.01134565)[&TT={1}]:0.33491858,(((((Barclaya_kunstleri_KY392762[&TT={1}]:0.02347781,Barclaya_longifolia_KY284156[&TT={1}]:0.01925969)[&TT={1}]:0.02100688,(((Victoria_cruziana_KY001813[&TT={1}]:0.0225811,Euryale_ferox_KY392765[&TT={1}]:0.02237966)[&TT={1}]:0.0164912,(Nymphaea_ampla_KU189255[&TT={1}]:0.01920625,Nymphaea_jamesoniana_NC_031826[&TT={1}]:0.00400631)[&TT={1}]:0)[&TT={1}]:0,(Nymphaea_mexicana_NC_024542[&TT={1}]:0.00692694,(Nymphaea_alba_KU234277[&TT={1}]:0.00000495,Nymphaea_alba_NC_006050[&TT={1}]:0.00000495)[&TT={1}]:0.00691279)[&TT={1}]:0.00957361)[&TT={1}]:0.03179237)[&TT={1}]:0.03183968,((Cabomba_caroliniana_KT705317[&TT={1}]:0.10094715,Brasenia_schreberi_NC_031343[&TT={1}]:0.03236284)[&TT={1}]:0.05116847)#H1[&TT={1}]:0.05116847[&TT={1}])[&TT={1}]:0.02149289,((Nuphar_advena_NC_008788[&TT={1}]:0.00000495,Nuphar_longifolia_MH050795[&TT={1}]:0.00000495)[&TT={1}]:0.01813706,(Nuphar_shimadae_MH050797[&TT={1}]:0.00001276,Nuphar_pumila_MH050796[&TT={1}]:0.00132336)[&TT={1}]:0)[&TT={1}]:0.01111184)[&TT={1}]:0.19832542,#H1:0.05116847[&TT={}])[&TT={1}]:0.19832542)[&TT={1}]:0.000001)[&TT={1}];";
+		var input = "((((5:[&rate=1.0]0.017786904614403024,3:[&rate=1.0]0.017786904614403024):[&rate=1.0]0.19942075719827432,7:[&rate=1.0]0.21720766181267734):[&rate=1.0]1.2388721342756406,((1:[&rate=1.0]0.1119190314959141,4:[&rate=1.0]0.1119190314959141):[&rate=1.0]0.16173899210003817,6:[&rate=1.0]0.27365802359595226):[&rate=1.0]1.1824217724923656):[&rate=1.0]0.1854578463092984,2:[&rate=1.0]1.6415376423976162);";
 		System.err.println("In:  " + input);
 
 		PhyloTree.SUPPORT_RICH_NEWICK = true;
@@ -667,7 +668,13 @@ public class CommentData {
 			var data = v.getData();
 			System.err.println(v + ": " + data);
 		}
-		System.err.println("Reticulate dges:");
+		System.err.println("Edges:");
+		for (var e : tree.edges()) {
+			var data = e.getData();
+			System.err.println(e + ": " + data);
+		}
+
+		System.err.println("Reticulate edges:");
 		for (var e : tree.edges()) {
 			if (e.getTarget().getInDegree() > 1)
 				System.err.println(e + ": " + e.getData() + " weight: " + tree.getWeight(e) + " confidence: " + tree.getConfidence(e) + " probability: " + tree.getProbability(e));
