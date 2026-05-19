@@ -264,14 +264,6 @@ public class NewickIO {
 							var edgeString = getEdgeString(tree, format, f);
 
 							writer.write(edgeString);
-							if (getNewickEdgeCommentSupplier() != null) {
-								var comment = getNewickEdgeCommentSupplier().apply(f);
-								if (comment != null && !comment.trim().isEmpty()) {
-									if (!edgeString.contains(":"))
-										writer.write(":");
-									writer.write("[" + comment + "]");
-								}
-							}
 						}
 					} else
 						writeRec(tree, writer, w, f, format, nodeId2Number, edgeId2Number, getLabelForWriting(w));
@@ -292,24 +284,34 @@ public class NewickIO {
 		if (e != null) {
 			var edgeString = getEdgeString(tree, format, e);
 			writer.write(getEdgeString(tree, format, e));
-			if (getNewickEdgeCommentSupplier() != null) {
-				var comment = getNewickEdgeCommentSupplier().apply(e);
-				if (comment != null && !comment.trim().isEmpty()) {
-					if (!edgeString.contains(":"))
-						writer.write(":");
-					writer.write("[" + comment + "]");
-				}
-			}
 		}
 	}
 
 	public String getEdgeString(PhyloTree tree, OutputFormat format, Edge e) {
 		var buf = new StringBuilder();
+		if (format.edgeLabelsAsComments() && tree.getLabel(e) != null) {  // todo: may collide with use of getNewickEdgeCommentSupplier
+			buf.append("[").append(getLabelForWriting(e)).append("]");
+		}
+
 		var colons = 0;
+		if (getNewickEdgeCommentSupplier() != null) {
+			while (colons < 1) {
+				buf.append(":");
+				colons++;
+			}
+			var comment = getNewickEdgeCommentSupplier().apply(e);
+			if (comment != null && !comment.trim().isEmpty()) {
+				buf.append("[").append(comment).append("]");
+			}
+		}
+
 		if (format.weights() && tree.getWeight(e) != -1.0) {
 			if (tree.getEdgeWeights().containsKey(e)) {
-				buf.append(":").append(StringUtils.removeTrailingZerosAfterDot(String.format(format.weightFormat(), tree.getWeight(e))));
-				colons++;
+				while (colons < 1) {
+					buf.append(":");
+					colons++;
+				}
+				buf.append(StringUtils.trim(String.format(format.weightFormat(), tree.getWeight(e))));
 			}
 		}
 		if (format.confidenceUsingColon() && tree.hasEdgeConfidences() && tree.getEdgeConfidences().containsKey(e)) {
@@ -317,17 +319,14 @@ public class NewickIO {
 				buf.append(":");
 				colons++;
 			}
-			buf.append(StringUtils.removeTrailingZerosAfterDot(String.format(format.confidenceFormat(), tree.getConfidence(e))));
+			buf.append(StringUtils.trim(String.format(format.confidenceFormat(), tree.getConfidence(e))));
 		}
 		if (format.probabilityUsingColon() && tree.hasEdgeProbabilities() && tree.getEdgeProbabilities().containsKey(e)) {
 			while (colons < 3) {
 				buf.append(":");
 				colons++;
 			}
-			buf.append(StringUtils.removeTrailingZerosAfterDot(String.format(format.probabilityFormat(), tree.getProbability(e))));
-		}
-		if (format.edgeLabelsAsComments() && tree.getLabel(e) != null) {
-			buf.append("[").append(getLabelForWriting(e)).append("]");
+			buf.append(StringUtils.trim(String.format(format.probabilityFormat(), tree.getProbability(e))));
 		}
 		return buf.toString();
 	}
@@ -632,7 +631,6 @@ public class NewickIO {
 			for (var which = 0; which < 3; which++) {
 				if (pos < str.length() && str.charAt(pos) == ':') { // edge weight is following
 
-
 					pos = StringUtils.skipSpaces(str, pos + 1);
 
 					{
@@ -646,13 +644,14 @@ public class NewickIO {
 								getNewickEdgeCommentConsumer().accept(e, str.substring(pos + 1, j));
 							pos = j + 1;
 						}
+						if (pos <= str.length() && ",)".indexOf(str.charAt(pos)) != -1) {
+							continue;
+						}
 					}
 
 					if (pos < str.length() && str.charAt(pos) == ':') {
 						continue;
 					}
-					if (which == 0 && str.charAt(pos) == '[')
-						break; // the colon is only here to delimit an edge comment
 
 					var pos0 = pos;
 					var numberStr = StringUtils.getStringUptoDelimiter(str, pos0, punctuationCharacters);
