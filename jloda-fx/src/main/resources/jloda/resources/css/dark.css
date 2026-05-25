@@ -135,6 +135,10 @@
     -fx-background-color: rgb(43, 43, 43);
 }
 
+.background-stroke {
+    -fx-stroke: black;
+}
+
 .paragraph-text .text {
     -fx-fill: white;
 }
