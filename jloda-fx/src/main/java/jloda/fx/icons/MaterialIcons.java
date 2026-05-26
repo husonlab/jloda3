@@ -2240,7 +2240,7 @@ public enum MaterialIcons {
 		setIcon(labeled, icon, null, graphicOnly);
 	}
 
-	private static final String MI_CLASS = "mi";
+	public static final String MI_CLASS = "mi";
 
 	public static void setIcon(Labeled labeled, MaterialIcons icon, String style, boolean graphicOnly) {
 		ensureInitialized();
