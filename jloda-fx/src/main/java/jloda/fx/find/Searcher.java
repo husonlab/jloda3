@@ -178,7 +178,7 @@ public class Searcher<T> implements IObjectSearcher<T> {
 
     @Override
     public String getName() {
-        return null;
+        return nameProperty().get();
     }
 
     @Override

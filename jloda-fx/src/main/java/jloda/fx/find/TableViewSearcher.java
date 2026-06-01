@@ -34,6 +34,7 @@ public class TableViewSearcher<S> implements IObjectSearcher<String> {
 	private final TableView<S> tableView;
 	private int row = -1;
 	private int col = -1;
+	private String name = "Table";
 
 	private final BooleanProperty hasData = new SimpleBooleanProperty(false);
 
@@ -144,7 +145,7 @@ public class TableViewSearcher<S> implements IObjectSearcher<String> {
 
 	@Override
 	public String getName() {
-		return "table";
+		return name;
 	}
 
 	@Override
@@ -173,7 +174,6 @@ public class TableViewSearcher<S> implements IObjectSearcher<String> {
 			tableView.getSelectionModel().selectAll();
 		else
 			tableView.getSelectionModel().clearSelection();
-
 	}
 
 	private int getRowCount() {
@@ -182,5 +182,9 @@ public class TableViewSearcher<S> implements IObjectSearcher<String> {
 
 	private int getColCount() {
 		return tableView.getColumns().size();
+	}
+
+	public void setName(String name) {
+		this.name = name;
 	}
 }

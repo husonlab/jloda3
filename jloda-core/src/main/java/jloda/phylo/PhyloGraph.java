@@ -273,7 +273,7 @@ public class PhyloGraph extends Graph {
 		return taxon2node == null ? 0 : taxon2node.size();
 	}
 
-	public Iterable<Integer> getTaxa() {
+	public Collection<Integer> getTaxa() {
 		if (getTaxonNodeMap() == null)
 			return Collections.emptyList();
 		else
