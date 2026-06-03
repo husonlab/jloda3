@@ -1,6 +1,6 @@
 /*
  * NodeSetWithGetRandomNode.java (updated & documented)
- * Copyright (C) 2024 Daniel H. Huson
+ * Copyright (C) 2026 Daniel H. Huson
  *
  *  (Some files contain contributions from other authors, who are then mentioned separately.)
  *

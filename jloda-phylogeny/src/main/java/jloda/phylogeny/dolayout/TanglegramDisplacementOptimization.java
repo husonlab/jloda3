@@ -1,5 +1,5 @@
 /*
- * TanglegramDisplacementOptimization.java Copyright (C) 2025 Daniel H. Huson
+ * TanglegramDisplacementOptimization.java Copyright (C) 2026 Daniel H. Huson
  *
  *  (Some files contain contributions from other authors, who are then mentioned separately.)
  *
