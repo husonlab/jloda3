@@ -603,7 +603,7 @@ public class NewickIO {
 				if (label.isEmpty())
 					throw new IOException("Expected label at position " + pos0);
 			}
-			if (str.charAt(pos) == '[') // node label
+			if (pos < str.length() && str.charAt(pos) == '[') // node label
 			{
 				int x = str.indexOf('[', pos + 1);
 				int j = str.indexOf(']', pos + 1);
