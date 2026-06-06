@@ -29,8 +29,8 @@ import java.util.ServiceLoader;
 public interface UpdateService {
 	SimpleBooleanProperty DISABLED = new SimpleBooleanProperty(true);
 
-	default void checkForUpdates(Window owner, String programName, String programVersion) {
-		System.err.printf("checkForUpdates(%s,%s,%s) NoOp%n", owner == null ? "null" : "owner", programName, programVersion);
+	default void checkForUpdates(Window owner, String homeURL, String programName, String programVersion) {
+		System.err.printf("checkForUpdates(%s,%s,%s,%s) NoOp%n", owner == null ? "null" : "owner", homeURL, programName, programVersion);
 	}
 
 	default ReadOnlyBooleanProperty disabledProperty() {
