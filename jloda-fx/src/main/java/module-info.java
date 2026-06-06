@@ -1,4 +1,5 @@
 module jloda_fx {
+	uses jloda.fx.service.UpdateService;
 	requires javafx.controls;
 	requires javafx.graphics;
 	requires javafx.fxml;
@@ -24,6 +25,8 @@ module jloda_fx {
 	exports jloda.fx.notifications;
 
 	exports jloda.fx.selection;
+	exports jloda.fx.service;
+
 	exports jloda.fx.shapes;
 	exports jloda.fx.undo;
 	exports jloda.fx.util;
