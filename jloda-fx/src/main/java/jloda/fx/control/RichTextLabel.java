@@ -929,6 +929,16 @@ public class RichTextLabel extends Group {
 		setText(setTextFill(getText(), textFill));
 	}
 
+	public static String setFontSize(String text, Double size) {
+		var prefixElement = getPrefixElement(text, Event.Change.fontSizeStart.type());
+		if (prefixElement != null)
+			text = removePrefixElement(text, prefixElement);
+		if (size != null)
+			return insertPrefix(text, String.format("<size \"%.1f\">", size));
+		else
+			return text;
+	}
+
 	public Paint getTextFill() {
 		return getTextFill(getText());
 	}
@@ -938,16 +948,6 @@ public class RichTextLabel extends Group {
 		textFill.addListener((v, o, n) -> setTextFill(n));
 		textProperty().addListener(e -> textFill.set(getTextFill()));
 		return textFill;
-	}
-
-	public static String setFontSize(String text, Double size) {
-		var prefixElement = getPrefixElement(text, Event.Change.fontSizeStart.type());
-		if (prefixElement != null)
-			text = removePrefixElement(text, prefixElement);
-		if (size != null)
-			return insertPrefix(text, String.format("<size \"%.1f\">", size));
-		else
-			return text;
 	}
 
 	public void setFontSize(double size) {

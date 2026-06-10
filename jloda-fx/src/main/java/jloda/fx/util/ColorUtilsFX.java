@@ -31,7 +31,7 @@ import java.util.Random;
  */
 public class ColorUtilsFX {
 	public static boolean isColor(String text) {
-		if (text.equals("random"))
+		if ("random".equals(text))
 			return true;
 		{
 			try {
