@@ -84,7 +84,7 @@ public class SaveToPNG {
 		if (preserveAspectRatio)
 			xFactor = yFactor = Math.min(xFactor, yFactor);
 		parameters.setTransform(new Scale(xFactor, yFactor));
-		parameters.setViewport(new Rectangle2D(0, 0, xFactor * bounds.getWidth(), yFactor * bounds.getHeight()));
+		parameters.setViewport(new Rectangle2D(0, 0, xFactor * bounds.getWidth() + 80, yFactor * bounds.getHeight() + 80));
 		return node.snapshot(parameters, null);
 	}
 }
