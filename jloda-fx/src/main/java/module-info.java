@@ -36,6 +36,7 @@ module jloda_fx {
 	exports jloda.fx.qr;
 
 	opens jloda.fx.colorscale;
+	opens jloda.fx.dialog;
 	opens jloda.fx.label;
 	opens jloda.fx.control.table;
 	opens jloda.fx.control.sliderhistogram;
