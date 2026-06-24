@@ -26,7 +26,6 @@ import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.input.KeyCharacterCombination;
 import javafx.scene.input.KeyCombination;
-import jloda.fx.util.ProgramProperties;
 
 import java.util.ArrayList;
 
@@ -47,7 +46,7 @@ public class SetupWindowMenu {
 						if (otherWindow.getStage() != null) {
 							var title = otherWindow.getStage().getTitle();
 							if (title != null) {
-								var menuItem = new MenuItem(title.replaceAll("- " + jloda.fx.util.ProgramProperties.getProgramName(), ""));
+								var menuItem = new MenuItem(title.replaceAll(" - .*", ""));
 								menuItem.setOnAction((e) -> otherWindow.getStage().toFront());
 								if (count < 9)
 									menuItem.setAccelerator(new KeyCharacterCombination("" + (++count), KeyCombination.SHORTCUT_DOWN));
@@ -58,7 +57,7 @@ public class SetupWindowMenu {
 							for (var auxStage : MainWindowManager.getInstance().getAuxiliaryWindows(otherWindow)) {
 								var title = auxStage.getTitle();
 								if (title != null) {
-									var menuItem = new MenuItem(title.replaceAll("- " + ProgramProperties.getProgramName(), ""));
+									var menuItem = new MenuItem(title.replaceAll(" - .*", ""));
 									menuItem.setOnAction((e) -> auxStage.toFront());
 									newMenuItems.add(menuItem);
 
