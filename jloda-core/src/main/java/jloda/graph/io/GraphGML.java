@@ -154,6 +154,7 @@ public class GraphGML {
 			};
 		}
 
+
 		final var np = new NexusStreamParser(r);
 		np.setSyntaxNoQuote();
 		np.setSquareBracketsSurroundComments(false);
@@ -161,31 +162,7 @@ public class GraphGML {
 
 		graph.clear();
 
-		np.matchIgnoreCase("graph [");
-		String graphComment;
-		if (np.peekMatchIgnoreCase("comment")) {
-			np.matchIgnoreCase("comment");
-			graphComment = asUnquotedString(np);
-		} else
-			graphComment = null;
-
-		boolean graphDirected;
-		if (np.peekMatchIgnoreCase("directed")) {
-			np.matchIgnoreCase("directed");
-			graphDirected = (np.getInt(0, 1) == 1);
-		} else
-			graphDirected = false;
-
-		np.matchIgnoreCase("id");
-		var graphId = np.getInt();
-
-		String graphLabel;
-
-		if (np.peekMatchIgnoreCase("label")) {
-			np.matchIgnoreCase("label");
-			graphLabel = asUnquotedString(np);
-		} else
-			graphLabel = null;
+		var gmlInfo = readGMLInfo(np);
 
 		var id2node = new HashMap<Integer, Node>();
 		while (np.peekMatchIgnoreCase("node")) {
@@ -220,8 +197,46 @@ public class GraphGML {
 			np.matchIgnoreCase("]");
 		}
 		np.matchIgnoreCase("]");
+		return gmlInfo;
+	}
+
+	public static GMLInfo readGMLInfo(Reader r) throws IOException {
+		final var np = new NexusStreamParser(r);
+		np.setSyntaxNoQuote();
+		np.setSquareBracketsSurroundComments(false);
+		np.setPunctuationCharacters("(),;:=\"{}`");
+		return readGMLInfo(np);
+	}
+
+	private static GMLInfo readGMLInfo(NexusStreamParser np) throws IOException {
+		np.matchIgnoreCase("graph [");
+		String graphComment;
+		if (np.peekMatchIgnoreCase("comment")) {
+			np.matchIgnoreCase("comment");
+			graphComment = asUnquotedString(np);
+		} else
+			graphComment = null;
+
+		boolean graphDirected;
+		if (np.peekMatchIgnoreCase("directed")) {
+			np.matchIgnoreCase("directed");
+			graphDirected = (np.getInt(0, 1) == 1);
+		} else
+			graphDirected = false;
+
+		np.matchIgnoreCase("id");
+		var graphId = np.getInt();
+
+		String graphLabel;
+
+		if (np.peekMatchIgnoreCase("label")) {
+			np.matchIgnoreCase("label");
+			graphLabel = asUnquotedString(np);
+		} else
+			graphLabel = null;
 		return new GMLInfo(graphComment, graphDirected, graphId, graphLabel);
 	}
+
 
 	public static String asQuotedString(String text) {
 		if (text.contains("\""))
