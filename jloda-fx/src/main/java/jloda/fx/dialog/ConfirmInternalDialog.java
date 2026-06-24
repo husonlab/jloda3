@@ -25,12 +25,10 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.TextArea;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Pane;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
 import jloda.fx.icons.MaterialIcons;
 import jloda.fx.util.BasicFX;
 
@@ -62,6 +60,11 @@ public class ConfirmInternalDialog extends Pane {
 		this.host = Objects.requireNonNull(host, "Host panel must not be null");
 		this.onOk = Objects.requireNonNull(onOk, "OK action must not be null");
 
+		try {
+			getStylesheets().add(Objects.requireNonNull(getClass().getResource("message-dialog.css")).toExternalForm());
+		} catch (Exception ignored) {
+		}
+
 		setPrefWidth(350);
 
 		vBox = new VBox(8);
@@ -83,9 +86,16 @@ public class ConfirmInternalDialog extends Pane {
 		}
 
 		if (prompt != null) {
-			var promptLabel = new Label(prompt);
-			promptLabel.setWrapText(true);
-			vBox.getChildren().add(promptLabel);
+			var textArea = new TextArea(prompt);
+			textArea.getStyleClass().add("copyable-label");
+			textArea.setEditable(false);
+			textArea.setWrapText(true);
+			textArea.setFocusTraversable(false);
+
+			textArea.setPrefRowCount(Math.max(1, prompt.split("\\R", -1).length));
+			textArea.setMinHeight(Region.USE_PREF_SIZE);
+			textArea.setMaxHeight(Region.USE_PREF_SIZE);
+			vBox.getChildren().add(textArea);
 		}
 
 		cancelButton = new Button("Cancel");

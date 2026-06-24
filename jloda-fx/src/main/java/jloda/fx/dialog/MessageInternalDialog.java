@@ -61,7 +61,7 @@ public class MessageInternalDialog extends Pane {
 			getStylesheets().add(Objects.requireNonNull(getClass().getResource("message-dialog.css")).toExternalForm());
 		} catch (Exception ignored) {
 		}
-		
+
 		setPrefWidth(350);
 		setPrefHeight(Pane.USE_COMPUTED_SIZE);
 
@@ -84,11 +84,6 @@ public class MessageInternalDialog extends Pane {
 		}
 
 		if (message != null) {
-			if (false) {
-				var promptLabel = new Label(message);
-				promptLabel.setWrapText(true);
-				vBox.getChildren().add(promptLabel);
-			} else {
 				var textArea = new TextArea(message);
 				textArea.getStyleClass().add("copyable-label");
 				textArea.setEditable(false);
@@ -100,8 +95,6 @@ public class MessageInternalDialog extends Pane {
 				textArea.setMaxHeight(Region.USE_PREF_SIZE);
 
 				vBox.getChildren().add(textArea);
-			}
-
 		}
 
 		okButton = new Button("OK");
