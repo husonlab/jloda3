@@ -11,6 +11,7 @@ module jloda_fx {
 	requires jloda_phylogeny;
 	requires org.apache.fontbox;
 	requires org.apache.pdfbox;
+	requires org.apache.commons.numbers.gamma;
 
 	exports jloda.fx.dialog;
 	exports jloda.fx.colorscale;

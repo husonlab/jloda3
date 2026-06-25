@@ -84,16 +84,18 @@ public class StateToggleButton<E> {
 			}
 		}
 		label.setOnMouseClicked(e -> {
-			var next = states.get((states.indexOf(currentState.get()) + 1) % states.size());
-			currentState.set(next);
+			for (var i = 0; i < stateButton.getItems().size(); i++) {
+				var next = (states.indexOf(currentState.get()) + i + 1) % states.size();
+				var menuItem = getMenuItem(states.get(next));
+				if (menuItem == null || !menuItem.isDisable()) {
+					currentState.set(states.get(next));
+					break;
+				}
+			}
 			e.consume();
 		});
 		label.setOnMousePressed(Event::consume);
 		label.setOnMouseReleased(Event::consume);
-		var menuItem = getMenuItem(currentState.get());
-		if (menuItem != null) {
-			label.setDisable(menuItem.isDisable());
-		}
 		label.setUserData(currentState.get());
 		stateButton.setGraphic(label);
 	}
