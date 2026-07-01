@@ -9,8 +9,13 @@ module jloda_fx {
 
 	requires jloda_core;
 	requires jloda_phylogeny;
-	requires org.apache.fontbox;
-	requires org.apache.pdfbox;
+
+	requires org.apache.xmlgraphics.batik.anim;
+	requires org.apache.xmlgraphics.batik.bridge;
+	requires org.apache.xmlgraphics.batik.gvt;
+	requires org.apache.xmlgraphics.batik.util;
+	requires org.apache.xmlgraphics.fop.core;
+	requires org.apache.xmlgraphics.commons;
 
 	exports jloda.fx.dialog;
 	exports jloda.fx.colorscale;

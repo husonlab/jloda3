@@ -201,15 +201,15 @@ public class Basic {
     public static String getMemorySizeString(long bytes) {
 
         if (Math.abs(bytes) >= tera)
-            return StringUtils.removeTrailingZerosAfterDot(String.format("%3.1f TB", (bytes / (double) tera)));
+            return StringUtils.trim(String.format("%3.1f TB", (bytes / (double) tera)));
         else if (Math.abs(bytes) >= giga)
-            return StringUtils.removeTrailingZerosAfterDot(String.format("%3.1f GB", (bytes / (double) giga)));
+            return StringUtils.trim(String.format("%3.1f GB", (bytes / (double) giga)));
         else if (Math.abs(bytes) >= mega)
-            return StringUtils.removeTrailingZerosAfterDot(String.format("%3.1f MB", (bytes / (double) mega)));
+            return StringUtils.trim(String.format("%3.1f MB", (bytes / (double) mega)));
         else if (Math.abs(bytes) >= kilo)
-            return StringUtils.removeTrailingZerosAfterDot(String.format("%3.1f kB", (bytes / (double) kilo)));
+            return StringUtils.trim(String.format("%3.1f kB", (bytes / (double) kilo)));
         else
-            return StringUtils.removeTrailingZerosAfterDot(String.format("%3d B", bytes));
+            return StringUtils.trim(String.format("%3d B", bytes));
     }
 
 

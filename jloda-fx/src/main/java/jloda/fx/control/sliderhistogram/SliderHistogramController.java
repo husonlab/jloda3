@@ -57,7 +57,7 @@ public class SliderHistogramController {
 		reportLabel.setText("");
 
 		thresholdSlider.setValue(Double.MIN_VALUE);
-		thresholdSlider.valueProperty().addListener((v, o, n) -> thresholdTextField.setText(StringUtils.removeTrailingZerosAfterDot(n.floatValue())));
+		thresholdSlider.valueProperty().addListener((v, o, n) -> thresholdTextField.setText(StringUtils.trim(n.floatValue())));
 		thresholdTextField.setTextFormatter(new TextFormatter<>(new DoubleStringConverter()));
 		thresholdTextField.textProperty().addListener((v, o, n) -> thresholdSlider.setValue(NumberUtils.isDouble(n) ? Double.parseDouble(n) : 0.0));
 	}

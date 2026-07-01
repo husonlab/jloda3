@@ -65,7 +65,7 @@ public class SliderHistogramPresenter {
 						for (var i = 0; i < bars; i++) {
 							var bucketMinValue = min + i * barWidth;
 							var count = barContentSize[i];
-							series.getData().add(new XYChart.Data<>(StringUtils.removeTrailingZerosAfterDot(bucketMinValue), count));
+							series.getData().add(new XYChart.Data<>(StringUtils.trim(bucketMinValue), count));
 							if (bucketMinValue < currentThreshold)
 								barChart.lookup(String.format(".data%d.chart-bar", i)).setStyle("-fx-bar-fill: gray;");
 							else {

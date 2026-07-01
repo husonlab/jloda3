@@ -21,12 +21,21 @@
 package jloda.fx.dialog;
 
 import javafx.scene.Node;
+import javafx.scene.SnapshotParameters;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.image.WritableImage;
+import javafx.scene.paint.Color;
+import javafx.scene.transform.Affine;
+import javafx.scene.transform.NonInvertibleTransformException;
+import javafx.scene.transform.Transform;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import jloda.fx.print.SaveToPDF;
+import jloda.fx.print.SaveToPNG;
+import jloda.fx.print.SaveToSVG;
 import jloda.fx.util.ProgramProperties;
-import jloda.fx.util.SaveToPDF;
-import jloda.fx.util.SaveToPNG;
-import jloda.fx.util.SaveToSVG;
 import jloda.fx.window.MainWindowManager;
 import jloda.fx.window.NotificationManager;
 import jloda.util.FileUtils;
@@ -41,6 +50,30 @@ import java.util.Arrays;
  * Daniel Huson, 4.2023
  */
 public class ExportImageDialog {
+	public static void show(String fileName, Stage stage, Node root, boolean autoCrop, ScrollPane scrollPane) {
+		ScrollPane.ScrollBarPolicy hbar = null, vbar = null;
+		if (scrollPane != null) {
+			hbar = scrollPane.getHbarPolicy();
+			vbar = scrollPane.getVbarPolicy();
+			scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+			scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		}
+		var useDarkTheme = MainWindowManager.isUseDarkTheme();
+		if (useDarkTheme)
+			MainWindowManager.setUseDarkTheme(false);
+
+		try {
+			show(fileName, stage, root);
+		} finally {
+			if (scrollPane != null) {
+				scrollPane.setHbarPolicy(hbar);
+				scrollPane.setVbarPolicy(vbar);
+			}
+			if (useDarkTheme)
+				MainWindowManager.setUseDarkTheme(true);
+		}
+	}
+
 	/**
 	 * show a dialog for saving as an images in PNG, SVG or PDF format.
 	 * Currently, the format is determined by the suffix that the user provides
@@ -87,15 +120,88 @@ public class ExportImageDialog {
 		try {
 			if (dark)
 				MainWindowManager.setUseDarkTheme(false);
-		switch (formatName.toLowerCase()) {
-			case "pdf" -> SaveToPDF.apply(node, file);
-			case "svg" -> SaveToSVG.apply(node, file);
-			case "png" -> SaveToPNG.apply(node, file);
-			default -> throw new IOException("Write failed: format not supported: " + formatName);
-		}
+			switch (formatName.toLowerCase()) {
+				case "pdf" -> SaveToPDF.apply(node, file);
+				case "svg" -> SaveToSVG.apply(node, file);
+				case "png" -> SaveToPNG.apply(node, file);
+				default -> throw new IOException("Write failed: format not supported: " + formatName);
+			}
 		} finally {
 			if (dark)
 				MainWindowManager.setUseDarkTheme(true);
 		}
+	}
+
+	/**
+	 * Export pixel density relative to on-screen 1:1. 2–4 is typical; higher = sharper + larger.
+	 */
+	private static final double EXPORT_PIXEL_SCALE = 3.0;
+
+	/**
+	 * Snapshots {@code root} at high resolution, independent of its current zoom/pan, and hands the
+	 * resulting image to the standard export dialog. If {@code scrollPane} is non-null, its scrollbars
+	 * are hidden for the duration of the snapshot and restored afterwards.
+	 * ignores dark mode
+	 *
+	 * @param autoCrop automatically crop the image
+	 */
+	public static void show_ALT(String fileName, Stage stage, Node root, boolean autoCrop, ScrollPane scrollPane) {
+		ScrollPane.ScrollBarPolicy hbar = null, vbar = null;
+		if (scrollPane != null) {
+			hbar = scrollPane.getHbarPolicy();
+			vbar = scrollPane.getVbarPolicy();
+			scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+			scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		}
+		var useDarkTheme = MainWindowManager.isUseDarkTheme();
+		if (useDarkTheme)
+			MainWindowManager.setUseDarkTheme(false);
+
+		Image image;
+		try {
+			image = createHighResSnapshot(root, EXPORT_PIXEL_SCALE);
+			if (autoCrop)
+				image = jloda.fx.print.ImageCropper.cropWhiteMargins(image, 20, 0.02, 0.1);
+		} finally {
+			if (scrollPane != null) {
+				scrollPane.setHbarPolicy(hbar);
+				scrollPane.setVbarPolicy(vbar);
+			}
+			if (useDarkTheme)
+				MainWindowManager.setUseDarkTheme(true);
+		}
+
+		show(fileName, stage, new ImageView(image));
+	}
+
+	/**
+	 * Renders {@code root} to an image at {@code pixelScale} density without altering the node: the
+	 * snapshot transform cancels the node's live transform (zoom/pan) and re-applies a clean scale, so
+	 * the export is 1:1 regardless of on-screen zoom and the scene graph is left untouched.
+	 */
+	private static Image createHighResSnapshot(Node root, double pixelScale) {
+		var bounds = root.getBoundsInLocal();
+
+		Transform inverse;
+		try {
+			inverse = root.getLocalToParentTransform().createInverse();
+		} catch (NonInvertibleTransformException e) {
+			inverse = new Affine(); // degenerate transform: fall back to identity
+		}
+
+		var transform = new Affine();
+		transform.appendScale(pixelScale, pixelScale);
+		transform.appendTranslation(-bounds.getMinX(), -bounds.getMinY());
+		transform.append(inverse);
+
+		var params = new SnapshotParameters();
+		params.setFill(Color.WHITE);
+		params.setTransform(transform);
+
+		var image = new WritableImage(
+				(int) Math.ceil(bounds.getWidth() * pixelScale),
+				(int) Math.ceil(bounds.getHeight() * pixelScale));
+
+		return root.snapshot(params, image);
 	}
 }

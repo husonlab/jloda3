@@ -165,7 +165,7 @@ public class EditableMenuButton {
 				if (!inUpdate.get()) {
 					inUpdate.set(true);
 					try {
-						value.set(StringUtils.removeTrailingZerosAfterDot(n.doubleValue()));
+						value.set(StringUtils.trim(n.doubleValue()));
 					} finally {
 						inUpdate.set(false);
 					}

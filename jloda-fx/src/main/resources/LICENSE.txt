@@ -1,4 +1,4 @@
-JLODA https://github.com/husonlab/jloda2
+JLODA https://github.com/husonlab/jloda3
 
                     GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007

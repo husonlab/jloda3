@@ -65,8 +65,8 @@ public class ColorScalePane extends Pane {
         if (!colors.isEmpty()) {
             getChildren().setAll(root);
             setTitleText(title != null ? title + ":" : "");
-            setLeftText(StringUtils.removeTrailingZerosAfterDot(String.format("%,.2f", leftValue)));
-            setRightText(StringUtils.removeTrailingZerosAfterDot(String.format("%,.2f", rightValue)));
+            setLeftText(StringUtils.trim(String.format("%,.2f", leftValue)));
+            setRightText(StringUtils.trim(String.format("%,.2f", rightValue)));
 
             final Canvas canvas = controller.getCanvas();
             final GraphicsContext gc = canvas.getGraphicsContext2D();

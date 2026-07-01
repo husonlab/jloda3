@@ -22,6 +22,7 @@ package jloda.phylo.algorithms;
 
 import jloda.graph.*;
 import jloda.graph.algorithms.CutPoints;
+import jloda.phylo.PhyloGraph;
 import jloda.phylo.PhyloTree;
 import jloda.util.BitSetUtils;
 import jloda.util.CanceledException;
@@ -382,7 +383,7 @@ public class RootedNetworkProperties {
 	 *
 	 * @return true, if anything contracted
 	 */
-	public static boolean contractEdges(PhyloTree tree, Set<Edge> edgesToContract, Single<Boolean> selfEdgeEncountered) {
+	public static boolean contractEdges(PhyloGraph graph, Set<Edge> edgesToContract, Single<Boolean> selfEdgeEncountered) {
 		boolean hasContractedOne = !edgesToContract.isEmpty();
 
 		while (!edgesToContract.isEmpty()) {
@@ -402,17 +403,17 @@ public class RootedNetworkProperties {
 					if (u != w) {
 						final Edge z;
 						if (u == f.getSource())
-							z = tree.newEdge(u, w);
+							z = graph.newEdge(u, w);
 						else
-							z = tree.newEdge(w, u);
-						if (tree.hasEdgeWeights())
-							tree.setWeight(z, tree.getWeight(f));
-						if (tree.hasEdgeConfidences())
-							tree.setConfidence(z, tree.getConfidence(f));
-						if (tree.hasEdgeProbabilities())
-							tree.setProbability(z, tree.getProbability(f));
+							z = graph.newEdge(w, u);
+						if (graph.hasEdgeWeights())
+							graph.setWeight(z, graph.getWeight(f));
+						if (graph.hasEdgeConfidences())
+							graph.setConfidence(z, graph.getConfidence(f));
+						if (graph.hasEdgeProbabilities())
+							graph.setProbability(z, graph.getProbability(f));
 
-						tree.setLabel(z, tree.getLabel(z));
+						graph.setLabel(z, graph.getLabel(z));
 						if (needsContracting) {
 							edgesToContract.add(z);
 						}
@@ -420,13 +421,16 @@ public class RootedNetworkProperties {
 						selfEdgeEncountered.set(true);
 				}
 			}
-			for (var taxon : tree.getTaxa(v))
-				tree.addTaxon(w, taxon);
+			for (var taxon : graph.getTaxa(v))
+				graph.addTaxon(w, taxon);
 
-			if (tree.getRoot() == v)
-				tree.setRoot(w);
 
-			tree.deleteNode(v);
+			if (graph instanceof PhyloTree tree) {
+				if (tree.getRoot() == v)
+					tree.setRoot(w);
+			}
+
+			graph.deleteNode(v);
 		}
 
 		return hasContractedOne;
