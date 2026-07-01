@@ -24,13 +24,19 @@ import javafx.geometry.Insets;
 import javafx.print.PageLayout;
 import javafx.print.PrinterJob;
 import javafx.scene.Node;
+import javafx.scene.SnapshotParameters;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextInputControl;
+import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
+import javafx.scene.transform.Affine;
+import javafx.scene.transform.NonInvertibleTransformException;
+import javafx.scene.transform.Transform;
 import javafx.stage.*;
 import jloda.fx.window.MainWindowManager;
 
@@ -145,24 +151,37 @@ public class Print {
 	}
 
 	public static void printNode(Stage owner, Node node) {
-		if (node == null) return;
-		var dark = MainWindowManager.isUseDarkTheme();
-		MainWindowManager.setUseDarkTheme(false);
-		WritableImage snapshot;
-		try {
-			var bbox = ContentBoundsUtil.computeContentBoundsLocal(node);
-			snapshot = TightSnapshot.snapshotBBoxTight(node, bbox, Color.WHITE, 300, 8);
-			if (snapshot == null) return;
-			snapshot = ImageCropper.cropWhiteMargins(snapshot, 20, 0.1, 0.1);
-			if (snapshot == null) return;
-		} finally {
-			MainWindowManager.setUseDarkTheme(dark);
-		}
-		printSnapshot(owner, snapshot);
-
+		printNode(owner, node, null);
 	}
 
-	public static void printSnapshot(Stage owner, WritableImage snapshot) {
+	public static void printNode(Stage owner, Node node, ScrollPane scrollPane) {
+		if (node == null) return;
+
+		ScrollPane.ScrollBarPolicy hbar = null, vbar = null;
+		if (scrollPane != null) {
+			hbar = scrollPane.getHbarPolicy();
+			vbar = scrollPane.getVbarPolicy();
+			scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+			scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		}
+
+		var dark = MainWindowManager.isUseDarkTheme();
+		if (dark)
+			MainWindowManager.setUseDarkTheme(false);
+		try {
+			var image = createHighResSnapshot(node, 4);
+			image = ImageCropper.cropWhiteMargins(image, 20, 0.02, 0.1);
+			printSnapshot(owner, image);
+		} finally {
+			if (scrollPane != null) {
+				scrollPane.setHbarPolicy(hbar);
+				scrollPane.setVbarPolicy(vbar);
+			}
+			MainWindowManager.setUseDarkTheme(dark);
+		}
+	}
+
+	public static void printSnapshot(Stage owner, Image snapshot) {
 		try {
 			if (snapshot == null) return;
 
@@ -269,5 +288,36 @@ public class Print {
 				});
 			}
 		});
+	}
+
+	/**
+	 * Renders {@code root} to an image at {@code pixelScale} density without altering the node: the
+	 * snapshot transform cancels the node's live transform (zoom/pan) and re-applies a clean scale, so
+	 * the export is 1:1 regardless of on-screen zoom and the scene graph is left untouched.
+	 */
+	public static Image createHighResSnapshot(Node root, double pixelScale) {
+		var bounds = root.getBoundsInLocal();
+
+		Transform inverse;
+		try {
+			inverse = root.getLocalToParentTransform().createInverse();
+		} catch (NonInvertibleTransformException e) {
+			inverse = new Affine(); // degenerate transform: fall back to identity
+		}
+
+		var transform = new Affine();
+		transform.appendScale(pixelScale, pixelScale);
+		transform.appendTranslation(-bounds.getMinX(), -bounds.getMinY());
+		transform.append(inverse);
+
+		var params = new SnapshotParameters();
+		params.setFill(Color.WHITE);
+		params.setTransform(transform);
+
+		var image = new WritableImage(
+				(int) Math.ceil(bounds.getWidth() * pixelScale),
+				(int) Math.ceil(bounds.getHeight() * pixelScale));
+
+		return root.snapshot(params, image);
 	}
 }

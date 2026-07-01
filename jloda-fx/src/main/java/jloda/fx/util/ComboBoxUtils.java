@@ -43,7 +43,7 @@ public class ComboBoxUtils {
 		comboBox.setConverter(new StringConverter<>() {
 			@Override
 			public String toString(Double value) {
-				return value == null ? "" : StringUtils.removeTrailingZerosAfterDot(value);
+				return value == null ? "" : StringUtils.trim(value);
 			}
 
 			@Override

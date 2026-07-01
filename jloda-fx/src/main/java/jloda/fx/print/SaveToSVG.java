@@ -18,7 +18,7 @@
  *
  */
 
-package jloda.fx.util;
+package jloda.fx.print;
 
 import javafx.geometry.Bounds;
 import javafx.geometry.Point2D;
@@ -26,6 +26,8 @@ import javafx.scene.Node;
 import javafx.scene.SnapshotParameters;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.chart.Chart;
+import javafx.scene.control.Labeled;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
@@ -35,7 +37,10 @@ import javafx.scene.paint.Paint;
 import javafx.scene.shape.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
+import jloda.fx.control.RichTextLabel;
 import jloda.fx.thirdparty.PngEncoderFX;
+import jloda.fx.util.BasicFX;
+import jloda.fx.util.GeometryUtilsFX;
 import jloda.fx.window.MainWindowManager;
 import jloda.util.Basic;
 import jloda.util.FileUtils;
@@ -48,7 +53,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
-
 
 /**
  * save a root node and all descendants to an SVG image.
@@ -84,9 +88,9 @@ public class SaveToSVG {
 		var currentDateTime = LocalDateTime.now();
 		var formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 		var formattedDateTime = currentDateTime.format(formatter);
-		buf.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>%n<!-- Creator: %s -->%n<!-- Created: %s -->%n<!-- Software: JLODA2 https://github.com/husonlab/jloda2 -->%n".formatted(System.getProperty("user.name"), formattedDateTime));
+		buf.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>%n<!-- Creator: %s -->%n<!-- Created: %s -->%n<!-- Software: JLODA3 https://github.com/husonlab/jloda3 -->%n".formatted(System.getProperty("user.name"), formattedDateTime));
 
-		buf.append("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%.1f\" height=\"%.1f\" viewBox=\"%.1f %.1f %.1f %.1f\">\n"
+		buf.append("<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"%.1f\" height=\"%.1f\" viewBox=\"%.1f %.1f %.1f %.1f\">\n"
 				.formatted(bounds.getWidth(), bounds.getHeight(), bounds.getMinX(), bounds.getMinY(), bounds.getWidth(), bounds.getHeight()));
 			/*
 			buf.append("""
@@ -106,7 +110,7 @@ public class SaveToSVG {
 
 		for (var n : BasicFX.getAllRecursively(root, n -> true)) {
 			// System.err.println("n: " + n.getClass().getSimpleName());
-			if (SaveToPDF.isNodeVisible(n)) {
+			if (isNodeVisible(n)) {
 				buf.append(getSVG(root, n));
 			}
 		}
@@ -124,7 +128,7 @@ public class SaveToSVG {
 	 * @return the SVG string or empty string
 	 */
 	public static String getSVG(Node root, Node node) {
-		var scaleFactor = SaveToPDF.computeScaleFactor(root, node);
+		var scaleFactor = computeScaleFactor(root, node);
 
 		var formatting = createFormattingAndTransformString(root, node, scaleFactor);
 
@@ -139,7 +143,7 @@ public class SaveToSVG {
 						var location = root.screenToLocal(pane.localToScreen(0, 0));
 						var format = " fill=\"%s\"".formatted(asSvgColor(color));
 						{
-							double screenAngle = SaveToPDF.getAngleOnScreen(node);
+							double screenAngle = getAngleOnScreen(node);
 							if ((screenAngle % 360.0) != 0) {
 								format += (" transform=\"rotate(%.1f %.2f %.2f)\"".formatted(screenAngle, location.getX(), location.getY()));
 							}
@@ -191,7 +195,7 @@ public class SaveToSVG {
 				var tY = (root.sceneToLocal(curve.localToScene(curve.getEndX(), curve.getEndY())).getY());
 				buf.append(createCubicCurve(sX, sY, c1X, c1Y, c2X, c2Y, tX, tY, formatting));
 			} else if (node instanceof Path path) {
-				if (!SaveToPDF.containedInText(path))
+				if (!containedInText(path))
 					buf.append(createPath(path, root, formatting));
 			} else if (node instanceof Polygon polygon) {
 				var points = new ArrayList<Point2D>();
@@ -211,13 +215,13 @@ public class SaveToSVG {
 				buf.append(createPolyline(points, formatting));
 			} else if (node instanceof Text text) {
 				if (!text.getText().isBlank()) {
-					double screenAngle = SaveToPDF.getAngleOnScreen(text);
+					double screenAngle = getAngleOnScreen(text);
 					var localBounds = text.getBoundsInLocal();
 					var origX = localBounds.getMinX();
 					var origY = localBounds.getMinY() + 0.87f * localBounds.getHeight();
 					var rotateAnchorX = root.sceneToLocal(text.localToScene(origX, origY)).getX();
 					var rotateAnchorY = root.sceneToLocal(text.localToScene(origX, origY)).getY();
-					if (SaveToPDF.isMirrored(text)) // todo: this is untested:
+					if (isMirrored(text)) // todo: this is untested:
 						screenAngle = 360 - screenAngle;
 					var fontHeight = computeFinalHeight(root, text, text.getFont().getSize());
 					buf.append(createText((rotateAnchorX), (rotateAnchorY), screenAngle, text.getText(), text.getFont(), fontHeight, text.getFill()));
@@ -429,7 +433,7 @@ public class SaveToSVG {
 		}
 
 		if (node instanceof Circle || node instanceof Ellipse || node instanceof Rectangle || node instanceof Pane || node instanceof ImageView || node instanceof Chart) {
-			double screenAngle = SaveToPDF.getAngleOnScreen(node);
+			double screenAngle = getAngleOnScreen(node);
 			var localBounds = node.getBoundsInLocal();
 			if ((screenAngle % 360.0) != 0) {
 				var origX = localBounds.getMinX();
@@ -451,4 +455,80 @@ public class SaveToSVG {
 		var heightInScreenCoordinates = pane.localToScreen(new Point2D(0, originalHeight)).subtract(pane.localToScreen(new Point2D(0, 0))).magnitude();
 		return root.sceneToLocal(new Point2D(0, heightInScreenCoordinates)).subtract(root.sceneToLocal(new Point2D(0, 0))).magnitude();
 	}
+
+	public static boolean isNodeVisible(Node node) {
+		if (!node.isVisible() || "iceberg".equals(node.getId())) {
+			return false;
+		}
+
+		var parent = node.getParent();
+		while (parent != null) {
+			if (!parent.isVisible()) {
+				return false;
+			}
+			parent = parent.getParent();
+		}
+		if (node instanceof Shape shape) {
+			return (shape.getFill() != null && shape.getFill() != Color.TRANSPARENT) || (shape.getStroke() != null && shape.getStroke() != Color.TRANSPARENT);
+		} else
+			return true;
+	}
+
+	public static boolean containedInText(Node node) {
+		while (node != null) {
+			if (node instanceof Text || node instanceof RichTextLabel || node instanceof Labeled || node instanceof TextInputControl) {
+				return true;
+			} else
+				node = node.getParent();
+		}
+		return false;
+	}
+
+	public static double computeScaleFactor(Node root, Node node) {
+		root.applyCss();
+		node.applyCss();
+		var scaleX = root.sceneToLocal(node.localToScene(1.0, 0.0)).getX() - root.sceneToLocal(node.localToScene(0.0, 0.0)).getX();
+		var scaleY = root.sceneToLocal(node.localToScene(0.0, 1.0)).getY() - root.sceneToLocal(node.localToScene(0.0, 0.0)).getY();
+		var value = Math.min(scaleX, scaleY); // todo: could also try average here?
+		return value <= 0 ? 1.0 : value;
+	}
+
+	/**
+	 * gets the angle of a node on screen
+	 *
+	 * @param node the node
+	 * @return angle in degrees
+	 */
+	public static double getAngleOnScreen(Node node) {
+		var localOrig = new Point2D(0, 0);
+		var localX1000 = new Point2D(1000, 0);
+		var orig = node.localToScreen(localOrig);
+		if (orig != null) {
+			var x1000 = node.localToScreen(localX1000).subtract(orig);
+			if (x1000 != null) {
+				return GeometryUtilsFX.computeAngle(x1000);
+			}
+		}
+		return 0.0;
+	}
+
+	/**
+	 * does this pane appear as a mirrored image on the screen?
+	 *
+	 * @param node the pane
+	 * @return true, if mirror image, false if direct image
+	 */
+	public static boolean isMirrored(Node node) {
+		var orig = node.localToScreen(0, 0);
+		if (orig != null) {
+			var x1000 = node.localToScreen(1000, 0);
+			var y1000 = node.localToScreen(0, 1000);
+			var p1 = x1000.subtract(orig);
+			var p2 = y1000.subtract(orig);
+			var determinant = p1.getX() * p2.getY() - p1.getY() * p2.getX();
+			return (determinant < 0);
+		} else
+			return false;
+	}
+
 }

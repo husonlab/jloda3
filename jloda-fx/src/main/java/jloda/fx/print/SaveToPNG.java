@@ -18,7 +18,7 @@
  *
  */
 
-package jloda.fx.util;
+package jloda.fx.print;
 
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;

@@ -26,6 +26,7 @@ import javafx.beans.property.SimpleBooleanProperty;
 import javafx.concurrent.ScheduledService;
 import javafx.concurrent.Task;
 import javafx.scene.Node;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.Clipboard;
@@ -36,6 +37,7 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 import jloda.fx.dialog.ExportImageDialog;
 import jloda.fx.print.ContentBoundsUtil;
+import jloda.fx.print.Print;
 import jloda.fx.window.MainWindowManager;
 import jloda.util.FileUtils;
 import jloda.util.TriConsumer;
@@ -123,15 +125,30 @@ public class ClipboardUtils {
 	}
 
 	public static void putImage(Node node) {
+		putImage(node, null);
+	}
+
+	public static void putImage(Node node, ScrollPane scrollPane) {
+		ScrollPane.ScrollBarPolicy hbar = null, vbar = null;
+		if (scrollPane != null) {
+			hbar = scrollPane.getHbarPolicy();
+			vbar = scrollPane.getVbarPolicy();
+			scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+			scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		}
+
 		var dark = MainWindowManager.isUseDarkTheme();
 		if (dark)
 			MainWindowManager.setUseDarkTheme(false);
 		try {
-			var bbox = ContentBoundsUtil.computeContentBoundsLocal(node);
-			var snapshot = jloda.fx.print.TightSnapshot.snapshotBBoxTight(node, bbox, Color.WHITE, 300, 200);
-			snapshot = jloda.fx.print.ImageCropper.cropWhiteMargins(snapshot, 20, 0.02, 0.1);
-			ClipboardUtils.putImage(snapshot);
+			var image = Print.createHighResSnapshot(node, 3);
+			image = jloda.fx.print.ImageCropper.cropWhiteMargins(image, 20, 0.02, 0.1);
+			ClipboardUtils.putImage(image);
 		} finally {
+			if (scrollPane != null) {
+				scrollPane.setHbarPolicy(hbar);
+				scrollPane.setVbarPolicy(vbar);
+			}
 			MainWindowManager.setUseDarkTheme(dark);
 		}
 	}

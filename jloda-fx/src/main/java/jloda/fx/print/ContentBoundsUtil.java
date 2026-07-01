@@ -33,13 +33,6 @@ public final class ContentBoundsUtil {
 		for (Node n : allDescendants(root)) {
 			if (!n.isVisible() || n.getOpacity() <= 1e-6) continue;
 
-			// Encourage layout for text-heavy nodes
-			if (n instanceof Parent p) {
-				// Cheap, safe: helps TextFlow compute glyph layout in practice
-				p.applyCss();
-				p.layout();
-			}
-
 			Bounds b = bestBounds(n);
 			if (b == null || b.getWidth() <= 0 || b.getHeight() <= 0) continue;
 

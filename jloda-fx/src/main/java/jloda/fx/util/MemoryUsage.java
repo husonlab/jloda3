@@ -61,9 +61,9 @@ public class MemoryUsage {
 					if (currentMemoryUsage.get() > peakMemoryUsage.get())
 						peakMemoryUsage.set(currentMemoryUsage.get());
 					if (availableMemory.get() < 1024)
-						memoryUsageString.set(StringUtils.removeTrailingZerosAfterDot(String.format("%d of %d", currentMemoryUsage.get(), availableMemory.get())) + "M");
+						memoryUsageString.set(StringUtils.trim(String.format("%d of %d", currentMemoryUsage.get(), availableMemory.get())) + "M");
 					else
-						memoryUsageString.set(StringUtils.removeTrailingZerosAfterDot(String.format("%.1f of %.1f", currentMemoryUsage.get() / 1024.0, availableMemory.get() / 1024.0)) + "G");
+						memoryUsageString.set(StringUtils.trim(String.format("%.1f of %.1f", currentMemoryUsage.get() / 1024.0, availableMemory.get() / 1024.0)) + "G");
 				});
 			}
 		}, 0, 5, SECONDS);
