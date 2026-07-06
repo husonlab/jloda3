@@ -31,16 +31,15 @@
  */
 package jloda.util.interval;
 
-import java.util.Objects;
-
 /**
  * The Interval class maintains an interval with some associated data
  *
  * @param <T> The type of data being stored
- * @author Kevin Dolan
- * Modified by Daniel Huson, 2.2017
+ * <p>
+ * Extended by Daniel Huson, 2.2017, 7.2026  rewrite
+ * Original author: Kevin Dolan
  */
-public class Interval<T> implements Comparable<Interval<T>> {
+public class Interval<T> {
 	private final int start;
 	private final int end;
 	private T data;
@@ -121,10 +120,11 @@ public class Interval<T> implements Comparable<Interval<T>> {
 	/**
 	 * Return -1 if this interval's start pos is less than the other, 1 if greater
 	 * In the event of a tie, -1 if this interval's end pos is less than the other, 1 if greater, 0 if same
+	 * Important: this ignores the data associated with the interval
 	 *
 	 * @return 1 or -1
 	 */
-	public int compareTo(Interval<T> other) {
+	public int compareCoordinatesTo(Interval<T> other) {
 		if (start < other.getStart())
 			return -1;
 		else if (start > other.getStart())
@@ -133,11 +133,11 @@ public class Interval<T> implements Comparable<Interval<T>> {
 	}
 
 	/**
-	 * Returns true if start and end are equals
+	 * Returns true if start and end are hasSameCoordinates
 	 *
-	 * @return true, if start and end are equals
+	 * @return true, if start and end are hasSameCoordinates
 	 */
-	public boolean equals(Interval<T> other) {
+	public boolean hasSameCoordinates(Interval<T> other) {
 		return start == other.getStart() && end == other.end;
 	}
 
@@ -156,7 +156,9 @@ public class Interval<T> implements Comparable<Interval<T>> {
 	 * @return intersection length
 	 */
 	public int intersectionLength(int a, int b) {
-		return Math.min(end, Math.max(a, b)) - Math.max(start, Math.min(a, b));
+		var lo = Math.max(start, Math.min(a, b));
+		var hi = Math.min(end, Math.max(a, b));
+		return Math.max(0, hi - lo + 1);
 	}
 
 
@@ -170,7 +172,7 @@ public class Interval<T> implements Comparable<Interval<T>> {
 	public boolean equals(Object other) {
 		if (this == other) return true;
 		return other instanceof Interval<?> interval && start == interval.start && end == interval.end &&
-				(data == null && interval.data == null || data != null && data.equals(interval.data));
+			   (data == null && interval.data == null || data != null && data.equals(interval.data));
 	}
 
 	/**
@@ -180,6 +182,9 @@ public class Interval<T> implements Comparable<Interval<T>> {
 	 */
 	@Override
 	public int hashCode() {
-		return Objects.hash(start, end, data);
+		var result = start;
+		result = 31 * result + end;
+		result = 31 * result + (data == null ? 0 : data.hashCode());
+		return result;
 	}
 }

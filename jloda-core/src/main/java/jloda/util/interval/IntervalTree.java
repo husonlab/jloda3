@@ -39,12 +39,13 @@ import java.util.*;
  * can be queried for all data associated with a particular interval
  *
  * @param <T> the type of objects to associate
- * @author Kevin Dolan
- * Extended by Daniel Huson, 2.2017
+ * <p>
+ * Extended by Daniel Huson, 2.2017, 7.2026  rewrite
+ * Original author: Kevin Dolan
  */
 public class IntervalTree<T> implements Iterable<Interval<T>> {
 	private IntervalNode<T> head;
-	private final LinkedList<Interval<T>> intervalList;
+	private final ArrayList<Interval<T>> intervalList;
 	private boolean inSync;
 	private boolean sorted;
 
@@ -55,7 +56,7 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 	 */
 	public IntervalTree() {
 		this.head = new IntervalNode<>();
-		this.intervalList = new LinkedList<>();
+		this.intervalList = new ArrayList<>();
 		this.inSync = true;
 		this.sorted = true;
 		covered = 0;
@@ -68,7 +69,7 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 	 */
 	public IntervalTree(Collection<Interval<T>> intervalList) {
 		this.head = new IntervalNode<>(intervalList);
-		this.intervalList = new LinkedList<>(intervalList);
+		this.intervalList = new ArrayList<>(intervalList);
 		this.inSync = true;
 		this.sorted = false;
 		covered = -1;
@@ -101,9 +102,9 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 	 */
 	public ArrayList<T> get(int pos) {
 		buildTree();
-		final ArrayList<Interval<T>> intervals = head.stab(pos);
-		final ArrayList<T> result = new ArrayList<>(intervals.size());
-		for (Interval<T> interval : intervals)
+		final var intervals = head.stab(pos);
+		final var result = new ArrayList<T>(intervals.size());
+		for (var interval : intervals)
 			result.add(interval.getData());
 		return result;
 	}
@@ -114,15 +115,17 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 	 * @param minCoverageProportion amount of target of interval that must be covered
 	 * @return best interval
 	 */
-	public Interval<T> getBestInterval(Interval target, double minCoverageProportion) {
-		final double toCover = minCoverageProportion * target.length();
-		final ArrayList<Interval<T>> intervals = head.query(target);
+	public Interval<T> getBestInterval(Interval<?> target, double minCoverageProportion) {
+		buildTree();
+		final var toCover = minCoverageProportion * target.length();
+		final var intervals = head.query(target);
 		Interval<T> result = null;
-		int bestCoverage = 0;
-		for (Interval<T> interval : intervals) {
-			final int coverage = interval.intersectionLength(target.getStart(), target.getEnd());
+		var bestCoverage = 0;
+		for (var interval : intervals) {
+			final var coverage = interval.intersectionLength(target.getStart(), target.getEnd());
 			if (coverage >= toCover && (result == null || coverage > bestCoverage || coverage == bestCoverage && interval.length() > result.length())) {
 				result = interval;
+				bestCoverage = coverage;
 			}
 		}
 		return result;
@@ -250,7 +253,7 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 	 * @return true, if was contained
 	 */
 	public boolean remove(Interval<T> interval) {
-		boolean removed = intervalList.remove(interval);
+		var removed = intervalList.remove(interval);
 		if (removed) {
 			inSync = false;
 			covered = -1;
@@ -263,7 +266,7 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 	 * Will not rebuild until the next query or call to build
 	 */
 	public void remove(T data) {
-		Interval<T> interval = find(data);
+		var interval = find(data);
 		if (interval != null) {
 			remove(interval);
 		}
@@ -277,7 +280,7 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 	 */
 	public Interval<T> find(T data) {
 		sortList();
-		for (Interval<T> interval : intervalList) {
+		for (var interval : intervalList) {
 			if ((data == null && interval.getData() == null) || (interval.getData() != null && interval.getData().equals(data)))
 				return interval;
 		}
@@ -289,7 +292,7 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 	 * Will not rebuild until the next query or call to build
 	 */
 	public void removeAll(Collection<Interval<T>> intervals) {
-		boolean removed = intervalList.removeAll(intervals);
+		var removed = intervalList.removeAll(intervals);
 		if (removed) {
 			inSync = false;
 			covered = -1;
@@ -383,7 +386,7 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 	 */
 	private void sortList() {
 		if (!sorted) {
-			intervalList.sort(Comparator.naturalOrder());
+			intervalList.sort(Interval::compareCoordinatesTo);
 			sorted = true;
 		}
 	}
@@ -399,14 +402,16 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 	 * @return covered
 	 */
 	public int getCovered() {
+		if (intervalList.isEmpty())
+			return 0;
 		if (covered >= 0)
 			return covered;
 		else
 			covered = 0;
-		int start = Integer.MIN_VALUE;
-		int end = Integer.MIN_VALUE;
+		var start = Integer.MIN_VALUE;
+		var end = Integer.MIN_VALUE;
 
-		for (Interval<T> interval : getAllIntervals(true)) {
+		for (var interval : getAllIntervals(true)) {
 			if (start == Integer.MIN_VALUE) {
 				start = interval.getStart();
 			} else if (interval.getStart() > end) {
@@ -425,9 +430,20 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 	 * @return list
 	 */
 	public Interval<T>[] getIntervalsSortedByDecreasingIntersectionLength(final int a, final int b) {
-		final List<Interval<T>> intervals = getIntervals(a, b);
-		final Interval<T>[] array = (Interval[]) intervals.toArray(new Interval[0]);
-		Arrays.sort(array, (in1, in2) -> Integer.compare(in2.intersectionLength(a, b), in1.intersectionLength(a, b)));
-		return array;
+		final var intervals = getIntervals(a, b);
+		final var n = intervals.size();
+		@SuppressWarnings("unchecked") final Interval<T>[] array = intervals.toArray(new Interval[0]);
+		// compute each intersection length exactly once (avoids O(n log n) recomputation in the comparator)
+		final var length = new int[n];
+		for (var i = 0; i < n; i++)
+			length[i] = array[i].intersectionLength(a, b);
+		final var order = new Integer[n];
+		for (var i = 0; i < n; i++)
+			order[i] = i;
+		Arrays.sort(order, (i, j) -> Integer.compare(length[j], length[i]));
+		@SuppressWarnings("unchecked") final Interval<T>[] result = new Interval[n];
+		for (var i = 0; i < n; i++)
+			result[i] = array[order[i]];
+		return result;
 	}
 }

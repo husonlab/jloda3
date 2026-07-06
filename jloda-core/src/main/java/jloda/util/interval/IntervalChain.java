@@ -124,10 +124,10 @@ public class IntervalChain {
     }
 
     public String toString() {
-        final StringBuilder buf = new StringBuilder();
+        final var buf = new StringBuilder();
         buf.append("Intervals: ");
 
-        Interval interval = head;
+        var interval = head;
         while (interval != null) {
             buf.append(String.format("[%d,%d] ", interval.getA(), interval.getB()));
             interval = interval.getNext();
@@ -180,9 +180,9 @@ public class IntervalChain {
 
         int[] pairs = {11, 20, 71, 80, 31, 41, 50, 60, 36, 55, 21, 25, 68, 72, 15, 18};
 
-        final IntervalChain intervalChain = new IntervalChain();
+        final var intervalChain = new IntervalChain();
 
-        for (int i = 0; i < pairs.length; i += 2) {
+        for (var i = 0; i < pairs.length; i += 2) {
             System.err.println("Adding: " + pairs[i] + "," + pairs[i + 1]);
             intervalChain.add(pairs[i], pairs[i + 1]);
             System.err.println(intervalChain);
