@@ -16,12 +16,12 @@ module jloda_fx {
 	requires org.apache.xmlgraphics.batik.util;
 	requires org.apache.xmlgraphics.fop.core;
 	requires org.apache.xmlgraphics.commons;
-	requires xml.apis.ext;
 	requires jdk.xml.dom;
 	requires org.apache.commons.logging;
 	requires org.apache.commons.io;
 	requires org.apache.pdfbox.io;
 	requires org.apache.fontbox;
+	requires static xml.apis.ext;
 
 	exports jloda.fx.dialog;
 	exports jloda.fx.colorscale;
