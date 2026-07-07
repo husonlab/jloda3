@@ -94,8 +94,17 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 	}
 
 	/**
+	 * is empty?
+	 *
+	 * @return true, if empty
+	 */
+	public boolean isEmpty() {
+		return intervalList.isEmpty();
+	}
+
+	/**
 	 * Perform a stabbing query, returning the associated data
-	 * Will rebuild the tree if out of sync
+	 * Will first rebuild the tree if out of sync
 	 *
 	 * @param pos the pos to stab
 	 * @return the data associated with all intervals that contain pos
@@ -133,7 +142,7 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 
 	/**
 	 * Perform a stabbing query, returning the interval objects
-	 * Will rebuild the tree if out of sync
+	 * Will first rebuild the tree if out of sync
 	 *
 	 * @param pos the pos to stab
 	 * @return all intervals that contain pos
@@ -145,7 +154,7 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 
 	/**
 	 * Perform an interval query, returning the associated data
-	 * Will rebuild the tree if out of sync
+	 * Will first rebuild the tree if out of sync
 	 *
 	 * @param start the start of the interval to check
 	 * @param end   the end of the interval to check
@@ -157,7 +166,7 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 
 	/**
 	 * Perform an interval query, returning the associated data
-	 * Will rebuild the tree if out of sync
+	 * Will first rebuild the tree if out of sync
 	 *
 	 * @param target the interval to check
 	 * @return the data associated with all intervals that intersects target
@@ -173,7 +182,7 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 
 	/**
 	 * Perform an interval query, returning the interval objects
-	 * Will rebuild the tree if out of sync
+	 * Will first rebuild the tree if out of sync
 	 *
 	 * @param target the interval to check
 	 * @return all intervals that intersect target
@@ -185,7 +194,7 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 
 	/**
 	 * Perform an interval query, returning the interval objects
-	 * Will rebuild the tree if out of sync
+	 * Will first rebuild the tree if out of sync
 	 *
 	 * @param start the start of the interval to check
 	 * @param end   the end of the interval to check
@@ -197,6 +206,7 @@ public class IntervalTree<T> implements Iterable<Interval<T>> {
 
 	/**
 	 * Add an interval object to the interval tree's list.
+	 * Where possible, use addAll() instead of add(), to avoid an unbalanced datastructure
 	 * Interval is added directly, does not trigger a complete rebuild
 	 *
 	 * @param interval the interval object to add
