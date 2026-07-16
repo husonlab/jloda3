@@ -20,6 +20,7 @@
 
 package jloda.fx.util;
 
+import javafx.application.HostServices;
 import javafx.beans.property.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -36,6 +37,7 @@ import java.util.function.Function;
  */
 public class ProgramProperties extends jloda.util.ProgramProperties {
 	private static boolean desktop = true;
+	private static HostServices hostServices;
 
 	static private javafx.scene.text.Font defaultFontFX = null;
 
@@ -204,5 +206,13 @@ public class ProgramProperties extends jloda.util.ProgramProperties {
 
 	public static boolean isAndroid() {
 		return "android".equalsIgnoreCase(System.getProperty("javafx.platform"));
+	}
+
+	public static HostServices getHostServices() {
+		return hostServices;
+	}
+
+	public static void setHostServices(HostServices hostServices) {
+		ProgramProperties.hostServices = hostServices;
 	}
 }
