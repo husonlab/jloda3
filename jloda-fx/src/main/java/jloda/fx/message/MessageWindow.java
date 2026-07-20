@@ -118,6 +118,25 @@ public class MessageWindow {
         }
     }
 
+    private static void hideStage(Stage stage) {
+        if (stage == null) {
+            return;
+        }
+
+        if (!Platform.isFxApplicationThread()) {
+            Platform.runLater(() -> hideStage(stage));
+            return;
+        }
+
+        if (!stage.isShowing()) {
+            return;
+        }
+
+        Basic.restoreSystemOut();
+        Basic.restoreSystemErr();
+        stage.hide();
+    }
+
     public boolean isVisible() {
         return visible.get();
     }
