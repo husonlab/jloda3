@@ -22,6 +22,7 @@ module jloda_fx {
 	requires org.apache.pdfbox.io;
 	requires org.apache.fontbox;
 	requires static xml.apis.ext;
+	requires java.sql;
 
 	exports jloda.fx.dialog;
 	exports jloda.fx.colorscale;
@@ -67,4 +68,7 @@ module jloda_fx {
 
 	exports jloda.fx.phylo.embed;
 	exports jloda.fx.print;
+
+	// opens jloda.fx.options;
+	exports jloda.fx.options;
 }
