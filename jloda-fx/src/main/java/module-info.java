@@ -69,6 +69,6 @@ module jloda_fx {
 	exports jloda.fx.phylo.embed;
 	exports jloda.fx.print;
 
-	// opens jloda.fx.options;
+	exports jloda.fx.examples;
 	exports jloda.fx.options;
 }
