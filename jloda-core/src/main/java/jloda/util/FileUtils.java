@@ -227,7 +227,7 @@ public class FileUtils {
 
 	public static void checkFileReadableNonEmpty(String... fileNames) throws IOException {
 		for (var fileName : fileNames) {
-			if (!fileName.equals("stdin")) {
+			if (!fileName.startsWith(PREFIX_TO_INDICATE_TO_PARSE_FILENAME_STRING) && !fileName.equals("stdin")) {
 				final File file = new File(fileName);
 				if (!file.exists())
 					throw new IOException("No such file: " + fileName);
