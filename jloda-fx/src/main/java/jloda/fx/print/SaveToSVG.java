@@ -158,24 +158,24 @@ public class SaveToSVG {
 				var y2 = (root.sceneToLocal(line.localToScene(line.getEndX(), line.getEndY())).getY());
 				buf.append(createLine(x1, y1, x2, y2, formatting));
 			} else if (node instanceof Rectangle rectangle) {
-				var width = computeFinalWidth(root, rectangle, rectangle.getWidth());
-				var height = computeFinalHeight(root, rectangle, rectangle.getHeight());
-				var screenBounds = rectangle.localToScreen(rectangle.getBoundsInLocal());
-				var location = root.screenToLocal(new Point2D(screenBounds.getMinX(), screenBounds.getMinY()));
-				buf.append(createRect(location.getX(), location.getY(), width, height, formatting));
+				// save as polygon because other would require additional transforms
+				var points = new ArrayList<Point2D>();
+				points.add(root.sceneToLocal(rectangle.localToScene(rectangle.getX(), rectangle.getY())));
+				points.add(root.sceneToLocal(rectangle.localToScene(rectangle.getX() + rectangle.getWidth(), rectangle.getY())));
+				points.add(root.sceneToLocal(rectangle.localToScene(rectangle.getX() + rectangle.getWidth(), rectangle.getY() + rectangle.getHeight())));
+				points.add(root.sceneToLocal(rectangle.localToScene(rectangle.getX(), rectangle.getY() + rectangle.getHeight())));
+				buf.append(createPolygon(points, formatting));
 			} else if (node instanceof Circle circle) {
-				var bounds = root.sceneToLocal(circle.localToScene(circle.getBoundsInLocal()));
-				var r = (0.5 * bounds.getHeight());
-				var x = (bounds.getCenterX());
-				var y = (bounds.getCenterY());
-				buf.append(createCircle(x, y, r, formatting));
+				var c = root.sceneToLocal(circle.localToScene(circle.getCenterX(), circle.getCenterY()));
+				var e = root.sceneToLocal(circle.localToScene(circle.getCenterX() + circle.getRadius(), circle.getCenterY()));
+				buf.append(createCircle(c.getX(), c.getY(), c.distance(e), formatting));
 			} else if (node instanceof Ellipse ellipse) {
-				var bounds = root.sceneToLocal(ellipse.localToScene(ellipse.getBoundsInLocal()));
-				var rx = (ellipse.getRadiusX());
-				var ry = (ellipse.getRadiusY());
-				var x = (bounds.getCenterX());
-				var y = (bounds.getCenterY());
-				buf.append(createEllipse(x, y, rx, ry, formatting));
+				var center = root.sceneToLocal(ellipse.localToScene(ellipse.getCenterX(), ellipse.getCenterY()));
+				var xEdge = root.sceneToLocal(ellipse.localToScene(ellipse.getCenterX() + ellipse.getRadiusX(), ellipse.getCenterY()));
+				var yEdge = root.sceneToLocal(ellipse.localToScene(ellipse.getCenterX(), ellipse.getCenterY() + ellipse.getRadiusY()));
+				var rx = center.distance(xEdge);
+				var ry = center.distance(yEdge);
+				buf.append(createEllipse(center.getX(), center.getY(), rx, ry, formatting));
 			} else if (node instanceof QuadCurve curve) {
 				var sX = (root.sceneToLocal(curve.localToScene(curve.getStartX(), curve.getStartY())).getX());
 				var sY = (root.sceneToLocal(curve.localToScene(curve.getStartX(), curve.getStartY())).getY());
@@ -432,8 +432,8 @@ public class SaveToSVG {
 			}
 		}
 
-		if (node instanceof Circle || node instanceof Ellipse || node instanceof Rectangle || node instanceof Pane || node instanceof ImageView || node instanceof Chart) {
-			double screenAngle = getAngleOnScreen(node);
+		if (node instanceof Pane || node instanceof ImageView || node instanceof Chart) {
+			var screenAngle = getAngleOnScreen(node);
 			var localBounds = node.getBoundsInLocal();
 			if ((screenAngle % 360.0) != 0) {
 				var origX = localBounds.getMinX();
@@ -530,5 +530,4 @@ public class SaveToSVG {
 		} else
 			return false;
 	}
-
 }
