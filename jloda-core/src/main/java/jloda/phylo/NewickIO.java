@@ -295,12 +295,12 @@ public class NewickIO {
 
 		var colons = 0;
 		if (getNewickEdgeCommentSupplier() != null) {
-			while (colons < 1) {
-				buf.append(":");
-				colons++;
-			}
 			var comment = getNewickEdgeCommentSupplier().apply(e);
 			if (comment != null && !comment.trim().isEmpty()) {
+				while (colons < 1) {
+					buf.append(":");
+					colons++;
+				}
 				buf.append("[").append(comment).append("]");
 			}
 		}

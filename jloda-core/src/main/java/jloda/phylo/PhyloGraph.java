@@ -162,10 +162,9 @@ public class PhyloGraph extends Graph {
 	}
 
 	public void setWeight(Edge e, double value) {
-		if (edgeWeights == null) {
-			if (value == DEFAULT_WEIGHT)
-				return;
-		}
+		// note: do not skip storing when value == DEFAULT_WEIGHT: an explicitly set weight must be
+		// recorded (and hence written on output) regardless of insertion order; otherwise an edge
+		// explicitly set to the default weight before the weights map is allocated would be lost
 		getEdgeWeights().put(e, value);
 	}
 
