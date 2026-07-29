@@ -2297,7 +2297,7 @@ public class StringUtils {
 			else
 				buf.append(separator);
 
-			buf.append(StringUtils.removeTrailingZerosAfterDot(format, array[i]));
+			buf.append(StringUtils.trim(format, array[i]));
 		}
 		return buf.toString();
 	}

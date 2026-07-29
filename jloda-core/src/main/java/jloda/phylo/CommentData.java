@@ -336,7 +336,7 @@ public class CommentData {
 
 		@Override
 		public String toString() {
-			return StringUtils.removeTrailingZerosAfterDot("%.12f", value);
+			return StringUtils.trim("%.12f", value);
 		}
 
 		public double getValue() {
@@ -375,7 +375,7 @@ public class CommentData {
 			for (int i = 0; i < value.length; i++) {
 				if (i > 0)
 					buf.append(",");
-				buf.append(StringUtils.removeTrailingZerosAfterDot("%.12f", value[i]));
+				buf.append(StringUtils.trim("%.12f", value[i]));
 			}
 			buf.append("}");
 			return buf.toString();

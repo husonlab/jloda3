@@ -557,6 +557,6 @@ public class NumberUtils {
 	}
 
 	public static String toString(String format, double value) {
-		return StringUtils.removeTrailingZerosAfterDot(String.format(format, value));
+		return StringUtils.trim(String.format(format, value));
 	}
 }

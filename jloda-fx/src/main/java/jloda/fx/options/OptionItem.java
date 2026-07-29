@@ -183,11 +183,11 @@ public class OptionItem {
 		if (!legalValues.isEmpty())
 			return StringUtils.toString(legalValues, "|");
 		else if (hasMin && hasMax)
-			return "[" + StringUtils.removeTrailingZerosAfterDot(min) + "," + StringUtils.removeTrailingZerosAfterDot(max) + "]";
+			return "[" + StringUtils.trim(min) + "," + StringUtils.trim(max) + "]";
 		else if (hasMin)
-			return "≥ " + StringUtils.removeTrailingZerosAfterDot(min);
+			return "≥ " + StringUtils.trim(min);
 		else if (hasMax)
-			return "≤ " + StringUtils.removeTrailingZerosAfterDot(max);
+			return "≤ " + StringUtils.trim(max);
 		else
 			return "";
 	}
