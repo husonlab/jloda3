@@ -55,7 +55,7 @@ public class GraphViewPopupListener implements IPopupListener {
 	 * popup menu on node
 	 */
 	public void doNodePopup(MouseEvent me, NodeSet nodes) {
-		if (nodes.size() != 0) {
+		if (!nodes.isEmpty()) {
             /*
             if (me.isShiftDown() == false) {
                 viewer.selectAllNodes(false);
