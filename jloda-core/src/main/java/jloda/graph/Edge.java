@@ -441,6 +441,8 @@ public class Edge extends NodeEdge implements Comparable<Edge> {
             tPrev = null;
             tNext = null;
 
+            target = w; // must update target BEFORE linking into w's list, so setPrev/setNext(w, ..) below apply to this edge
+
             if (w.getFirstAdjacentEdge() == null)
                 w.setFirstAdjacentEdge(this);
             if (w.getLastAdjacentEdge() != null) {
@@ -449,7 +451,6 @@ public class Edge extends NodeEdge implements Comparable<Edge> {
             }
             w.setLastAdjacentEdge(this);
 
-            target = w;
             w.incrementInDegree();
 
         }
@@ -481,6 +482,8 @@ public class Edge extends NodeEdge implements Comparable<Edge> {
             sPrev = null;
             sNext = null;
 
+            source = w; // must update source BEFORE linking into w's list, so setPrev/setNext(w, ..) below apply to this edge
+
             if (w.getFirstAdjacentEdge() == null)
                 w.setFirstAdjacentEdge(this);
             if (w.getLastAdjacentEdge() != null) {
@@ -489,7 +492,6 @@ public class Edge extends NodeEdge implements Comparable<Edge> {
             }
             w.setLastAdjacentEdge(this);
 
-            source = w;
             w.incrementOutDegree();
 
         }
