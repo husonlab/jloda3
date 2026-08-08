@@ -1817,27 +1817,27 @@ public class Graph extends GraphBase implements INamed {
     }
 
     /**
-     * contract an edge
+     * contract an edge e=(s,t): all other edges incident to the source s are moved to the target t,
+     * then the source s (and e) are removed
      *
      * @param e to be contracted
      * @return remaining target node
-     * @todo: this appears to be broken
      */
     public Node contract(Edge e) {
         var s = e.getSource();
         var t = e.getTarget();
 
-        // all edges adjacent to s are made adjacent to t:
-
-        deleteEdge(e);
-
+        // move all edges incident to s (except e) over to t; snapshot s's adjacency BEFORE deleting
+        // anything, so the traversal never walks over an already-deleted edge (NotOwnerException):
         for (var f : IteratorUtils.asList(s.adjacentEdges())) {
+            if (f == e)
+                continue;
             if (f.getSource().equals(s))
                 f.changeSource(t);
             else if (f.getTarget().equals(s))
                 f.changeTarget(t);
         }
-        deleteNode(s);
+        deleteNode(s); // removes s and its only remaining incident edge, e
         return t;
     }
 
