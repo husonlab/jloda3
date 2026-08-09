@@ -165,20 +165,25 @@ public class Print {
 			scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 		}
 
+		// Capture the snapshot in light mode, then restore the theme *before* showing the print dialog, so
+		// that only the rendered image is forced to light mode; the app stays in its current theme while the
+		// (potentially long-lived) print dialog is open.
+		Image image;
 		var dark = MainWindowManager.isUseDarkTheme();
 		if (dark)
 			MainWindowManager.setUseDarkTheme(false);
 		try {
-			var image = createHighResSnapshot(node, 4);
+			image = createHighResSnapshot(node, 4);
 			image = ImageCropper.cropWhiteMargins(image, 20, 0.02, 0.1);
-			printSnapshot(owner, image);
 		} finally {
 			if (scrollPane != null) {
 				scrollPane.setHbarPolicy(hbar);
 				scrollPane.setVbarPolicy(vbar);
 			}
-			MainWindowManager.setUseDarkTheme(dark);
+			if (dark)
+				MainWindowManager.setUseDarkTheme(true);
 		}
+		printSnapshot(owner, image);
 	}
 
 	public static void printSnapshot(Stage owner, Image snapshot) {
