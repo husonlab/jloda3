@@ -38,6 +38,7 @@
         <module>jloda-core</module>
         <module>jloda-connect</module>
         <module>jloda-phylogeny</module>
+        <module>jloda-metagenomics</module>
         <module>jloda-fx</module>
         <module>jloda-swing</module>
     </modules>
