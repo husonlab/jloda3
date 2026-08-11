@@ -39,8 +39,13 @@ public class SetupWindowMenu {
 
 		final InvalidationListener invalidationListener = observable -> {
 			synchronized (originalWindowMenuItems) {
+				// Keep the static items in place and rebuild only the dynamic per-window tail. Replacing the
+				// whole list (setAll) on a live macOS system menu can throw IndexOutOfBoundsException in
+				// com.sun.glass.ui.Menu.insert, so we remove/add only the entries that actually change.
+				if (windowMenu.getItems().size() > originalWindowMenuItems.size())
+					windowMenu.getItems().remove(originalWindowMenuItems.size(), windowMenu.getItems().size());
 				if (window.getStage().isFocused()) {
-					var newMenuItems = new ArrayList<>(originalWindowMenuItems);
+					var newMenuItems = new ArrayList<MenuItem>();
 					var count = 0;
 					for (var otherWindow : MainWindowManager.getInstance().getMainWindows()) {
 						if (otherWindow.getStage() != null) {
@@ -65,9 +70,7 @@ public class SetupWindowMenu {
 							}
 						}
 					}
-					windowMenu.getItems().setAll(newMenuItems);
-				} else {
-					windowMenu.getItems().setAll(originalWindowMenuItems);
+					windowMenu.getItems().addAll(newMenuItems);
 				}
 			}
 		};
