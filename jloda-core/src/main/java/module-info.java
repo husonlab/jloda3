@@ -5,6 +5,7 @@ module jloda_core {
 	exports jloda.graph.io;
 	exports jloda.graph.algorithms;
 	exports jloda.graph.fmm;
+	exports jloda.graph.layout;
 
 	exports jloda.phylo;
 	exports jloda.util;
@@ -25,4 +26,7 @@ module jloda_core {
 
 	exports Jama;
 	exports Jama.util;
+
+	// pluggable graph-layout providers (e.g. a native OGDF FM3 layout); the jloda Java default is the fallback
+	uses jloda.graph.layout.GraphLayoutService;
 }
