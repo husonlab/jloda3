@@ -22,6 +22,7 @@ package jloda.megan.classification.db;
 import jloda.megan.classification.Classification;
 import jloda.megan.classification.ClassificationManager;
 import jloda.megan.classification.LoadClassifications;
+import jloda.util.CanceledException;
 import jloda.util.FileUtils;
 import jloda.util.ProgramProperties;
 
@@ -289,6 +290,9 @@ public class ClassificationsDatabaseManager {
 	 * @return the catalog
 	 * @throws IOException if no catalog URL is configured, or it cannot be fetched or parsed
 	 */
+	public static ClassificationsManifest fetchManifest() throws IOException {
+		return ClassificationsManifest.fetch(getManifestUrl());
+	}
 
 	/**
 	 * downloads the given catalog entry into the MEGAN data directory (verifying its checksum), without changing
@@ -298,6 +302,9 @@ public class ClassificationsDatabaseManager {
 	 * @param progress progress handler, or null
 	 * @return the downloaded file
 	 */
+	public static File downloadToDataDir(ClassificationsManifest.Entry entry, ClassificationsDatabaseDownloader.ProgressHandler progress) throws IOException, CanceledException {
+		return ClassificationsDatabaseDownloader.download(entry, getDataDirectory(), progress);
+	}
 
 	/**
 	 * makes the classification database at the given file the active one: records it in the

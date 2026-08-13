@@ -1,6 +1,7 @@
 module jloda_megan {
 	requires jloda_core;
 	requires java.sql;
+	requires java.net.http;
 	requires org.xerial.sqlitejdbc;
 
 	// meganized-DAA reading (step 1-2)
