@@ -19,9 +19,9 @@
  */
 package jloda.megan.classification.db;
 
+import jloda.util.progress.ProgressListener;
 import jloda.megan.classification.data.ClassificationFullTree;
 import jloda.megan.classification.data.Name2IdMap;
-import jloda.util.progress.ProgressListener;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -33,7 +33,7 @@ import java.util.Set;
  * <p>
  * This is the abstraction that decouples MEGAN's classifications from any particular storage:
  * {@link ClassificationsDatabaseFromResources} serves the classifications bundled in the
- * {@code megan8/resources/files} branch of the jar, whereas {@link megan8.classification.LoadClassifications}
+ * {@code megan8/resources/files} branch of the jar, whereas {@link jloda.megan.classification.LoadClassifications}
  * serves them from an SQLite classification database (e.g. megan-classification-r1.db).
  * <p>
  * The name of a classifications database (its {@link #getName()}) is what gets recorded in meganized

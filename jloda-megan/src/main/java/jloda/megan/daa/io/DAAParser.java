@@ -20,12 +20,12 @@
 
 package jloda.megan.daa.io;
 
-import jloda.megan.io.FileInputStreamAdapter;
-import jloda.megan.io.FileRandomAccessReadOnlyAdapter;
 import jloda.seq.BlastMode;
 import jloda.util.*;
 import jloda.util.interval.Interval;
 import jloda.util.interval.IntervalTree;
+import jloda.megan.io.FileInputStreamAdapter;
+import jloda.megan.io.FileRandomAccessReadOnlyAdapter;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -131,7 +131,7 @@ public class DAAParser {
 	 * @throws IOException if anything goes wrong
 	 */
 	public static void checkDaaFileMeganizedUsingCurrentMeganVersion(String fileName) throws IOException {
-		var allowMoveToMeganSeven = jloda.util.ProgramProperties.get("allow-move-to-megan-seven", false);
+		var allowMoveToMeganSeven = ProgramProperties.get("allow-move-to-megan-seven", false);
 		var moveToMeganSeven = false;
 		try (InputReaderLittleEndian ins = new InputReaderLittleEndian(new FileInputStreamAdapter(fileName))) {
 			long magicNumber = ins.readLong();
@@ -188,6 +188,89 @@ public class DAAParser {
 		return BlastMode.Unknown;
 	}
 
+	/**
+	 * get all alignments in SAM format
+	 */
+	public void getAllAlignmentsSAMFormat(int maxMatchesPerRead, BlockingQueue<Pair<byte[], byte[]>> outputQueue, boolean parseLongReads) throws IOException {
+		final ByteInputBuffer inputBuffer = new ByteInputBuffer();
+		final ByteOutputBuffer outputBuffer = new ByteOutputBuffer(100000);
+
+		final float minProportionCoverToDominate;
+		final float topProportionScoreToDominate;
+		if (parseLongReads) {
+			// restored from megan8 PostProcessMatches (defaults 90/90), read headlessly
+			minProportionCoverToDominate = Math.min(1f, (float) ProgramProperties.get("MinPercentCoverToStronglyDominate", 90f) / 100.0f);
+			topProportionScoreToDominate = Math.min(1f, (float) ProgramProperties.get("TopPercentScoreToStronglyDominate", 90f) / 100.0f);
+		} else {
+			minProportionCoverToDominate = 0;
+			topProportionScoreToDominate = 0;
+		}
+
+		try (InputReaderLittleEndian ins = new InputReaderLittleEndian(new FileInputStreamAdapter(header.getFileName()));
+			 final InputReaderLittleEndian refIns = new InputReaderLittleEndian(new FileRandomAccessReadOnlyAdapter(header.getFileName()))) {
+			ins.seek(header.getLocationOfBlockInFile(header.getAlignmentsBlockIndex()));
+			final DAAQueryRecord queryRecord = new DAAQueryRecord(this);
+			final DAAMatchRecord matchRecord = new DAAMatchRecord(queryRecord);
+
+			for (int a = 0; a < header.getQueryRecords(); a++) {
+				inputBuffer.rewind();
+				queryRecord.setLocation(ins.getPosition());
+				ins.readSizePrefixedBytes(inputBuffer);
+				queryRecord.parseBuffer(inputBuffer);
+
+				if (!parseLongReads) {
+					int numberOfMatches = 0;
+					while (inputBuffer.getPosition() < inputBuffer.size()) {
+						if (++numberOfMatches > maxMatchesPerRead)
+							break;
+						matchRecord.parseBuffer(inputBuffer, refIns);
+						SAMUtilities.createSAM(this, matchRecord, outputBuffer, alignmentAlphabet);
+					}
+				} else // parse long reads
+				{
+					intervalTree.clear();
+					intervalCountMap.clear();
+					var intervals = new ArrayList<Interval<DAAMatchRecord>>();
+					try {
+						while (inputBuffer.getPosition() < inputBuffer.size()) {
+							final DAAMatchRecord aMatchRecord = new DAAMatchRecord(queryRecord);
+							aMatchRecord.parseBuffer(inputBuffer, refIns);
+							intervals.add(new Interval<>(aMatchRecord.getQueryBegin(), aMatchRecord.getQueryEnd(), aMatchRecord));
+						}
+					} finally {
+						intervalTree.setAll(intervals);
+					}
+					list.clear();
+					for (var interval : intervalTree) {
+						var covered = false;
+						for (var other : intervalTree.getIntervals(interval)) {
+							if (other.overlap(interval) >= minProportionCoverToDominate * interval.length() && topProportionScoreToDominate * other.getData().getScore() > interval.getData().getScore()) {
+								covered = true;
+								break;
+							}
+						}
+						if (!covered)
+							list.add(interval.getData());
+					}
+					for (DAAMatchRecord aMatchRecord : list) {
+						SAMUtilities.createSAM(this, aMatchRecord, outputBuffer, alignmentAlphabet);
+					}
+				}
+
+				if (outputBuffer.size() > 0) {
+					outputQueue.put(new Pair<>(queryRecord.getQueryFastA(sourceAlphabet), outputBuffer.copyBytes()));
+					outputBuffer.rewind();
+				}
+			}
+
+			outputQueue.put(SENTINEL_SAM_ALIGNMENTS);
+
+			// System.err.println(String.format("Total reads:   %,15d", header.getQueryRecords()));
+			// System.err.println(String.format("Alignments:    %,15d", alignmentCount));
+		} catch (InterruptedException e) {
+			Basic.caught(e);
+		}
+	}
 
 	/**
 	 * get all queries with matches

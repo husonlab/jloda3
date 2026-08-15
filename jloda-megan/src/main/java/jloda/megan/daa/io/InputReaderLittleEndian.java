@@ -21,10 +21,10 @@
 package jloda.megan.daa.io;
 
 
+import jloda.util.ByteInputBuffer;
 import jloda.megan.io.ByteByteInt;
 import jloda.megan.io.IInput;
 import jloda.megan.io.IInputReader;
-import jloda.util.ByteInputBuffer;
 
 import java.io.Closeable;
 import java.io.IOException;

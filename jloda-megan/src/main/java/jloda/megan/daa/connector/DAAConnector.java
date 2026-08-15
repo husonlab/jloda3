@@ -19,14 +19,15 @@
  */
 package jloda.megan.daa.connector;
 
-import jloda.megan.daa.io.*;
-import jloda.megan.data.*;
-import jloda.megan.io.InputStreamAdapter;
 import jloda.util.CanceledException;
 import jloda.util.ListOfLongs;
 import jloda.util.Single;
 import jloda.util.StringUtils;
 import jloda.util.progress.ProgressListener;
+import jloda.megan.daa.io.*;
+import jloda.megan.data.*;
+import jloda.megan.data.*;
+import jloda.megan.io.InputStreamAdapter;
 
 import java.io.File;
 import java.io.IOException;

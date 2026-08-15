@@ -19,13 +19,13 @@
  */
 package jloda.megan.daa.connector;
 
+import jloda.util.StringUtils;
 import jloda.megan.daa.io.DAAMatchRecord;
 import jloda.megan.daa.io.DAAQueryRecord;
 import jloda.megan.daa.io.Translator;
 import jloda.megan.data.IMatchBlock;
 import jloda.megan.data.IReadBlock;
 import jloda.megan.util.ReadMagnitudeParser;
-import jloda.util.StringUtils;
 
 /**
  * ReadBlock for DAA

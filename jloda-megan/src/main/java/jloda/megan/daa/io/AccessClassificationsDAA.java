@@ -20,10 +20,10 @@
 
 package jloda.megan.daa.io;
 
+import jloda.util.ListOfLongs;
 import jloda.megan.daa.connector.ClassificationBlockDAA;
 import jloda.megan.data.IClassificationBlock;
 import jloda.megan.io.FileRandomAccessReadOnlyAdapter;
-import jloda.util.ListOfLongs;
 
 import java.io.IOException;
 import java.util.Collection;

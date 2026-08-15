@@ -19,9 +19,12 @@
  */
 package jloda.megan.daa.connector;
 
+import jloda.util.Basic;
+import jloda.util.ByteOutputBuffer;
+import jloda.util.StringUtils;
 import jloda.megan.daa.io.*;
 import jloda.megan.data.IMatchBlock;
-import jloda.util.StringUtils;
+import jloda.megan.parsers.sam.SAMMatch;
 
 import java.io.StringWriter;
 import java.util.HashMap;
@@ -194,9 +197,16 @@ public class MatchBlockDAA implements IMatchBlock {
 	 * get the text
 	 */
 	public String getText() {
-		// SAM/alignment-text rendering is not needed for classification reading; use getTextBlastTab() for a
-		// tab-separated summary. (Original SAMMatch-based rendering stays in megan8.)
-		return getTextBlastTab();
+		try { // todo: do this directly and more efficently
+			ByteOutputBuffer buffer = new ByteOutputBuffer();
+			SAMUtilities.createSAM(daaParser, matchRecord, buffer, daaParser.getAlignmentAlphabet());
+			SAMMatch match = new SAMMatch(daaParser.getBlastMode());
+			match.parse(buffer.getBytes(), buffer.size());
+			return match.getBlastAlignmentText();
+		} catch (Exception e) {
+			Basic.caught(e);
+			return "";
+		}
 	}
 
 	public String getTextBlastTab() {

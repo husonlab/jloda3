@@ -21,11 +21,11 @@
 package jloda.megan.daa.io;
 
 
+import jloda.util.ByteInputBuffer;
+import jloda.util.StringUtils;
 import jloda.megan.io.FileInputStreamAdapter;
 import jloda.megan.io.FileOutputStreamAdapter;
 import jloda.megan.io.IOutput;
-import jloda.util.ByteInputBuffer;
-import jloda.util.StringUtils;
 
 import java.io.Closeable;
 import java.io.File;

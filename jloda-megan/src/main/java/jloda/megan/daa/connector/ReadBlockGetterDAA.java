@@ -19,14 +19,14 @@
  */
 package jloda.megan.daa.connector;
 
+import jloda.util.Basic;
+import jloda.util.ByteInputBuffer;
+import jloda.util.Pair;
 import jloda.megan.daa.io.*;
 import jloda.megan.data.IReadBlock;
 import jloda.megan.data.IReadBlockGetter;
 import jloda.megan.io.FileInputStreamAdapter;
 import jloda.megan.io.FileRandomAccessReadOnlyAdapter;
-import jloda.util.Basic;
-import jloda.util.ByteInputBuffer;
-import jloda.util.Pair;
 
 import java.io.IOException;
 

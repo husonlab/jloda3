@@ -20,11 +20,12 @@
 
 package jloda.megan.daa.io;
 
+import jloda.util.Basic;
+import jloda.util.StringUtils;
+import jloda.megan.classification.Classification;
 import jloda.megan.io.FileInputStreamAdapter;
 import jloda.megan.io.FileRandomAccessReadOnlyAdapter;
 import jloda.megan.io.FileRandomAccessReadWriteAdapter;
-import jloda.util.Basic;
-import jloda.util.StringUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -268,7 +269,7 @@ public class DAAHeader {
 				if (getBlockType(b) == BlockType.megan_ref_annotations) {
 					ins.seek(getLocationOfBlockInFile(b));
 					refAnnotationNames[numberOfRefAnnotations] = ins.readNullTerminatedBytes();
-					if (refAnnotationNames[numberOfRefAnnotations].equals("Taxonomy"))
+					if (refAnnotationNames[numberOfRefAnnotations].equals(Classification.Taxonomy))
 						refAnnotationIndexForTaxonomy = numberOfRefAnnotations;
 					int[] annotations = refAnnotations[numberOfRefAnnotations] = new int[getNumberOfReferences()];
 					for (int i = 0; i < getNumberOfReferences(); i++) {

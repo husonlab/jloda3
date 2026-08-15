@@ -21,8 +21,8 @@
 package jloda.megan.daa.io;
 
 
-import jloda.megan.io.IOutput;
 import jloda.util.Basic;
+import jloda.megan.io.IOutput;
 
 import java.io.OutputStream;
 
