@@ -52,6 +52,10 @@ public class ResourceManagerFX {
 
 	static {
 		classLoadersAndRoots.add(new Pair<>(ResourceManagerFX.class, "jloda/resources"));
+		// The resources themselves (icons, images) are packaged in jloda-core, not in jloda-fx. A class can
+		// only load resources from its own module, so on the module path the root above cannot see them;
+		// anchor a second root on a jloda-core class.
+		classLoadersAndRoots.add(new Pair<>(Basic.class, "jloda/resources"));
 	}
 
 	/**
