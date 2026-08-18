@@ -28,6 +28,8 @@ import javafx.concurrent.Worker;
 import jloda.fx.util.AService;
 import jloda.util.Basic;
 import jloda.util.StringUtils;
+import jloda.util.progress.ProgressListener;
+import jloda.util.progress.ProgressSilent;
 
 import java.util.stream.Collectors;
 
@@ -125,11 +127,46 @@ public class AlgorithmNode extends WorkflowNode {
 		try {
 			if (service.getProgressListener() != null)
 				service.getProgressListener().setTasks("Running", getName());
-			service.restart();
+			if (!AService.isToolkitRunning())
+				runInline();
+			else
+				service.restart();
 		} catch (Exception ex) {
 			Basic.caught(ex);
 			throw ex;
 		}
+	}
+
+	/**
+	 * runs the algorithm on the calling thread, driving by hand the transitions that the service state
+	 * listener drives when a toolkit is present: clear the outputs, invalidate, compute, validate
+	 * <p>
+	 * Used when there is no JavaFX toolkit, because a Service can only be started from the FX application
+	 * thread. Note that this is synchronous and therefore recursive: setValid(true) validates the child data
+	 * nodes, which restarts the algorithm nodes below them, so when this returns the whole subtree beneath
+	 * the node has been computed. That is the property a headless run wants; it is also why a workflow with a
+	 * pathologically long chain would use a correspondingly deep stack.
+	 */
+	private void runInline() {
+		getChildren().stream().filter(d -> d instanceof DataNode).map(d -> (DataNode) d).map(DataNode::getDataBlock).forEach(DataBlock::clear);
+		setValid(false);
+		try {
+			service.runInline(getHeadlessProgressListener());
+			setValid(true);
+		} catch (Exception ex) {
+			Basic.caught(ex);
+			setValid(false);
+		}
+	}
+
+	/**
+	 * the progress listener to use when running without a toolkit
+	 *
+	 * @return progress listener; silent unless the owning workflow supplies one
+	 */
+	private ProgressListener getHeadlessProgressListener() {
+		var progress = getOwner().getHeadlessProgressListener();
+		return (progress != null ? progress : new ProgressSilent());
 	}
 
 	@Override

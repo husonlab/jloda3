@@ -29,6 +29,7 @@ import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Worker;
 import jloda.util.IteratorUtils;
+import jloda.util.progress.ProgressListener;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -55,6 +56,10 @@ public class Workflow extends WorkerBase implements Worker<Boolean> {
 	private final ListChangeListener<WorkflowNode> parentsChangedListener;
 
 	private final BooleanProperty connected = new SimpleBooleanProperty(true);
+
+	// used by every algorithm node when running without a JavaFX toolkit (AService.isToolkitRunning() false),
+	// where there is no service and hence no service-supplied progress listener. Null means silent.
+	private ProgressListener headlessProgressListener;
 
 	public Workflow() {
 		this("Workflow");
@@ -295,6 +300,19 @@ public class Workflow extends WorkerBase implements Worker<Boolean> {
 
 	protected void setValid(boolean valid) {
 		this.valid.set(valid);
+	}
+
+	/**
+	 * the progress listener that algorithm nodes report to when running without a JavaFX toolkit
+	 *
+	 * @return progress listener, or null for silent running
+	 */
+	public ProgressListener getHeadlessProgressListener() {
+		return headlessProgressListener;
+	}
+
+	public void setHeadlessProgressListener(ProgressListener headlessProgressListener) {
+		this.headlessProgressListener = headlessProgressListener;
 	}
 
 	public String toReportString() {

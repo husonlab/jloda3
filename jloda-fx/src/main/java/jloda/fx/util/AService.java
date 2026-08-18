@@ -27,6 +27,7 @@ import jloda.fx.control.ProgressPane;
 import jloda.fx.window.NotificationManager;
 import jloda.util.ProgramExecutorService;
 import jloda.util.progress.ProgressListener;
+import jloda.util.progress.ProgressSilent;
 
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
@@ -41,7 +42,16 @@ public class AService<T> extends Service<T> {
 	private TaskWithProgressListener<T> task;
 	private Callable<T> callable;
 	private Pane progressParentPane;
-	private final ProgressPane progressPane;
+
+	// Created on demand, never in the constructor: ProgressPane is a JavaFX Control, and loading Control
+	// initialises the platform stylesheet, which throws "Toolkit not initialized" when no toolkit is running.
+	// A service that never displays its progress - a command-line tool, a headless workflow run, a language
+	// binding - must not be forced to start a toolkit just to compute. Only getProgressPane() may touch it.
+	private ProgressPane progressPane;
+	private boolean progressBarShowStopButton = true;
+
+	private static boolean toolkitRunning = false;
+	private ProgressListener inlineProgressListener;
 
 	public AService() {
 		this(null, null);
@@ -61,24 +71,36 @@ public class AService<T> extends Service<T> {
 		setCallable(callable);
 		setProgressParentPane(progressParentPane);
 
-		progressPane = new ProgressPane(this);
-		progressPane.setVisible(true);
-
 		this.runningProperty().addListener((c, o, n) -> {
 			if (getProgressParentPane() != null) {
-				RunAfterAWhile.apply(progressPane, () ->
+				var pane = getProgressPane();
+				RunAfterAWhile.apply(pane, () ->
 						Platform.runLater(() -> {
 							if (n) {
-								if (!getProgressParentPane().getChildren().contains(progressPane))
-									getProgressParentPane().getChildren().add(progressPane);
+								if (!getProgressParentPane().getChildren().contains(pane))
+									getProgressParentPane().getChildren().add(pane);
 							} else {
-								getProgressParentPane().getChildren().remove(progressPane);
+								getProgressParentPane().getChildren().remove(pane);
 							}
 						}));
 			}
 		});
 		setOnFailed(e -> NotificationManager.showError("Failed: "  // + Basic.getShortName(AService.this.getException().getClass())
 													   + (AService.this.getException().getMessage() != null ? AService.this.getException().getMessage() : "")));
+	}
+
+	/**
+	 * the progress pane, created on first use
+	 *
+	 * @return progress pane; requires a running JavaFX toolkit, so call this only when the progress is to be shown
+	 */
+	private ProgressPane getProgressPane() {
+		if (progressPane == null) {
+			progressPane = new ProgressPane(this);
+			progressPane.setVisible(true);
+			progressPane.showStopButtonProperty().set(progressBarShowStopButton);
+		}
+		return progressPane;
 	}
 
 	@Override
@@ -93,7 +115,50 @@ public class AService<T> extends Service<T> {
 	}
 
 	public ProgressListener getProgressListener() {
+		if (inlineProgressListener != null) // set only while runInline() is executing
+			return inlineProgressListener;
 		return (task != null ? task.getProgressListener() : null);
+	}
+
+	/**
+	 * is the JavaFX toolkit running?
+	 * <p>
+	 * A javafx.concurrent.Service can only be started from the FX application thread, and there is no such
+	 * thread until a toolkit has been started. Code that must work both in the application and headless - a
+	 * command-line tool, a workflow run, a language binding - asks this and calls runInline() when it is false.
+	 * Probing by calling Platform.runLater is the only reliable test: Platform.isFxApplicationThread() goes
+	 * through Toolkit.getToolkit(), which is precisely what is not available.
+	 *
+	 * @return true if a toolkit is running
+	 */
+	public static boolean isToolkitRunning() {
+		if (!toolkitRunning) { // once true it stays true; a toolkit cannot be shut down and restarted
+			try {
+				Platform.runLater(() -> {
+				});
+				toolkitRunning = true;
+			} catch (IllegalStateException ignored) {
+			}
+		}
+		return toolkitRunning;
+	}
+
+	/**
+	 * runs the callable on the calling thread, bypassing the JavaFX service machinery
+	 * <p>
+	 * This is the headless path, for use when isToolkitRunning() is false. It is synchronous: when this
+	 * returns, the computation has finished. getProgressListener() reports the given listener while it runs.
+	 *
+	 * @param progress progress listener to report, or null for a silent one
+	 * @return the value computed by the callable, or null if there is none
+	 */
+	public T runInline(ProgressListener progress) throws Exception {
+		inlineProgressListener = (progress != null ? progress : new ProgressSilent());
+		try {
+			return (callable != null ? callable.call() : null);
+		} finally {
+			inlineProgressListener = null;
+		}
 	}
 
 	public void setCallable(Callable<T> callable) {
@@ -109,7 +174,7 @@ public class AService<T> extends Service<T> {
 	}
 
 	public void setProgressParentPane(Pane progressParentPane) {
-		if (this.progressParentPane != null)
+		if (this.progressParentPane != null && progressPane != null) // do not create the pane just to remove it
 			this.progressParentPane.getChildren().remove(progressPane);
 		this.progressParentPane = progressParentPane;
 		//   if(progressParentPane!=null)
@@ -132,6 +197,8 @@ public class AService<T> extends Service<T> {
 	}
 
 	public void setProgressBarShowStopButton(boolean show) {
-		progressPane.showStopButtonProperty().set(show);
+		progressBarShowStopButton = show; // remembered so it survives being set before the pane exists
+		if (progressPane != null)
+			progressPane.showStopButtonProperty().set(show);
 	}
 }
