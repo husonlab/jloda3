@@ -33,6 +33,7 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.Pane;
@@ -640,8 +641,42 @@ public class SplittableTabPane extends Pane {
                     selectionModel.select(tabPane.getSelectionModel().getSelectedItem());
             }
         });
+
+        // Clicking anywhere in a tab's content makes that tab the selected one. This has to be an event
+        // filter rather than a handler: filters run in the capturing phase, on the way down to the target,
+        // so this fires even when the content consumes the press. Content does consume it - a graph view
+        // consumes the press on every shape it draws, so that dragging a shape does not also start a
+        // rubber-band selection - which is why clicking a node used not to bring its pane forward while
+        // clicking an edge, which has no press handler, did.
+        tabPane.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+            var tab = tabPane.getSelectionModel().getSelectedItem();
+            if (tab == null)
+                return;
+            if (tab != selectionModel.getSelectedItem())
+                selectionModel.select(tab); // its listener makes this the focused tab pane as well
+            else if (!isFocusWithin(tabPane))
+                setFocusedTabPane(tabPane);
+            // We deliberately do not take the keyboard focus when it already sits inside this pane: a text
+            // field being edited here has to keep it, or it would see a focus-lost and commit while the
+            // user is still typing. Whatever the user actually clicked takes the focus on the way back up.
+        });
+
         setupDrop(tabPane);
         return tabPane;
+    }
+
+    /**
+     * does the keyboard focus currently sit on the given node, or on anything inside it?
+     */
+    private static boolean isFocusWithin(Node node) {
+        var scene = node.getScene();
+        if (scene == null)
+            return false;
+        for (var owner = scene.getFocusOwner(); owner != null; owner = owner.getParent()) {
+            if (owner == node)
+                return true;
+        }
+        return false;
     }
 
     private void setupDrag(Tab tab) {
