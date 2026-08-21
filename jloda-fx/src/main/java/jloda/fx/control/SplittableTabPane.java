@@ -663,29 +663,29 @@ public class SplittableTabPane extends Pane {
             // user is still typing. Whatever the user actually clicked takes the focus on the way back up.
         });
 
-        // Zooming a pane brings it forward too. A scroll only counts if the content actually acted on it -
-        // a zoomable pane consumes the event exactly when it zooms - because a stray touchpad scroll across
-        // a pane that does nothing with it must not silently change which tab the menus apply to. Whether
-        // it was consumed is known only once dispatch has finished, hence the runLater.
-        tabPane.addEventFilter(ScrollEvent.SCROLL, e -> {
-            var tab = tabPane.getSelectionModel().getSelectedItem();
-            if (tab != null && tab != selectionModel.getSelectedItem())
-                Platform.runLater(() -> {
-                    if (e.isConsumed() && tabPane.getSelectionModel().getSelectedItem() == tab)
-                        selectionModel.select(tab);
-                });
-        });
-
-        // A pinch needs no such test: it cannot be made by accident, and the views are not consistent about
-        // consuming it.
-        tabPane.addEventFilter(ZoomEvent.ZOOM, e -> {
-            var tab = tabPane.getSelectionModel().getSelectedItem();
-            if (tab != null && tab != selectionModel.getSelectedItem())
-                selectionModel.select(tab);
-        });
+        // Zooming or scrolling a pane brings it forward too, on the same reasoning as the press above.
+        // This deliberately does not try to work out whether the content did anything with the scroll: an
+        // earlier version only counted a scroll the content had consumed, which is what a zoomable pane does
+        // exactly when it zooms, but that depends on subtle details of how the platform dispatches gesture
+        // events and did not work outside a synthetic test. Reacting to every scroll over the pane is
+        // coarser - a touchpad brushed on the way past will bring a pane forward without zooming it - but it
+        // is predictable, and it does not silently do nothing.
+        tabPane.addEventFilter(ScrollEvent.SCROLL, e -> selectOnGesture(tabPane));
+        tabPane.addEventFilter(ZoomEvent.ZOOM, e -> selectOnGesture(tabPane));
 
         setupDrop(tabPane);
         return tabPane;
+    }
+
+    /**
+     * makes the given tab pane's tab the selected one, in response to a scroll or zoom gesture over it. Does
+     * not touch the keyboard focus unless the selection actually changes, so a gesture cannot pull the focus
+     * out of a text field being edited in the same pane.
+     */
+    private void selectOnGesture(TabPane tabPane) {
+        var tab = tabPane.getSelectionModel().getSelectedItem();
+        if (tab != null && tab != selectionModel.getSelectedItem())
+            selectionModel.select(tab);
     }
 
     /**
