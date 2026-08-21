@@ -174,7 +174,7 @@ public class Print {
 			MainWindowManager.setUseDarkTheme(false);
 		try {
 			image = createHighResSnapshot(node, 4);
-			image = ImageCropper.cropWhiteMargins(image, 20, 0.02, 0.1);
+			image = ImageCropper.cropMargins(image, 20, 0.02, 0.1);
 		} finally {
 			if (scrollPane != null) {
 				scrollPane.setHbarPolicy(hbar);

@@ -142,7 +142,7 @@ public class ClipboardUtils {
 			MainWindowManager.setUseDarkTheme(false);
 		try {
 			var image = Print.createHighResSnapshot(node, 3);
-			image = jloda.fx.print.ImageCropper.cropWhiteMargins(image, 20, 0.02, 0.1);
+			image = jloda.fx.print.ImageCropper.cropMargins(image, 20, 0.02, 0.1);
 			ClipboardUtils.putImage(image);
 		} finally {
 			if (scrollPane != null) {
@@ -167,7 +167,7 @@ public class ClipboardUtils {
 				MainWindowManager.ensureDarkTheme(stage, false);
 			var bbox = ContentBoundsUtil.computeContentBoundsLocal(node);
 			var snapshot = jloda.fx.print.TightSnapshot.snapshotBBoxTight(node, bbox, Color.WHITE, 300, 200);
-			snapshot = jloda.fx.print.ImageCropper.cropWhiteMargins(snapshot, 20, 0.02, 0.1);
+			snapshot = jloda.fx.print.ImageCropper.cropMargins(snapshot, 20, 0.02, 0.1);
 			ExportImageDialog.saveNodeAsImage(new ImageView(snapshot), "png", pngFile);
 			if (FileUtils.fileExistsAndIsNonEmpty(pngFile)) {
 				if (additionalFileConsumer != null) {

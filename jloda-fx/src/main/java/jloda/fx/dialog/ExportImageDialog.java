@@ -161,7 +161,7 @@ public class ExportImageDialog {
 		try {
 			image = createHighResSnapshot(root, EXPORT_PIXEL_SCALE);
 			if (autoCrop)
-				image = jloda.fx.print.ImageCropper.cropWhiteMargins(image, 20, 0.02, 0.1);
+				image = jloda.fx.print.ImageCropper.cropMargins(image, 20, 0.02, 0.1);
 		} finally {
 			if (scrollPane != null) {
 				scrollPane.setHbarPolicy(hbar);
