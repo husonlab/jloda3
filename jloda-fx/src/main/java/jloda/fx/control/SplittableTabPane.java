@@ -34,6 +34,8 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.input.ScrollEvent;
+import javafx.scene.input.ZoomEvent;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.Pane;
@@ -659,6 +661,27 @@ public class SplittableTabPane extends Pane {
             // We deliberately do not take the keyboard focus when it already sits inside this pane: a text
             // field being edited here has to keep it, or it would see a focus-lost and commit while the
             // user is still typing. Whatever the user actually clicked takes the focus on the way back up.
+        });
+
+        // Zooming a pane brings it forward too. A scroll only counts if the content actually acted on it -
+        // a zoomable pane consumes the event exactly when it zooms - because a stray touchpad scroll across
+        // a pane that does nothing with it must not silently change which tab the menus apply to. Whether
+        // it was consumed is known only once dispatch has finished, hence the runLater.
+        tabPane.addEventFilter(ScrollEvent.SCROLL, e -> {
+            var tab = tabPane.getSelectionModel().getSelectedItem();
+            if (tab != null && tab != selectionModel.getSelectedItem())
+                Platform.runLater(() -> {
+                    if (e.isConsumed() && tabPane.getSelectionModel().getSelectedItem() == tab)
+                        selectionModel.select(tab);
+                });
+        });
+
+        // A pinch needs no such test: it cannot be made by accident, and the views are not consistent about
+        // consuming it.
+        tabPane.addEventFilter(ZoomEvent.ZOOM, e -> {
+            var tab = tabPane.getSelectionModel().getSelectedItem();
+            if (tab != null && tab != selectionModel.getSelectedItem())
+                selectionModel.select(tab);
         });
 
         setupDrop(tabPane);
