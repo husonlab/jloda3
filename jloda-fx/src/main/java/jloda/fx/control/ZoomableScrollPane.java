@@ -56,6 +56,16 @@ public class ZoomableScrollPane extends ScrollPane {
 
 	public static boolean zoomByScroll = true;
 
+	/**
+	 * whether a scroll or zoom gesture over one pane of a SplittableTabPane brings that pane forward, making
+	 * its tab the selected one. Set false to switch that off.
+	 * <p>
+	 * The behaviour is implemented in SplittableTabPane, not here; the switch sits next to zoomByScroll so
+	 * that a program wanting different gesture behaviour finds both in one place. Read on each gesture, so it
+	 * can be changed at any time, not only before the panes are built.
+	 */
+	public static boolean selectPaneOnScrollOrZoom = true;
+
 	private final ObjectProperty<Runnable> updateScaleMethod;
 
 	/**

@@ -669,7 +669,8 @@ public class SplittableTabPane extends Pane {
         // exactly when it zooms, but that depends on subtle details of how the platform dispatches gesture
         // events and did not work outside a synthetic test. Reacting to every scroll over the pane is
         // coarser - a touchpad brushed on the way past will bring a pane forward without zooming it - but it
-        // is predictable, and it does not silently do nothing.
+        // is predictable, and it does not silently do nothing. ZoomableScrollPane.selectPaneOnScrollOrZoom
+        // turns the whole thing off for a program that does not want it.
         tabPane.addEventFilter(ScrollEvent.SCROLL, e -> selectOnGesture(tabPane));
         tabPane.addEventFilter(ZoomEvent.ZOOM, e -> selectOnGesture(tabPane));
 
@@ -683,6 +684,8 @@ public class SplittableTabPane extends Pane {
      * out of a text field being edited in the same pane.
      */
     private void selectOnGesture(TabPane tabPane) {
+        if (!ZoomableScrollPane.selectPaneOnScrollOrZoom)
+            return;
         var tab = tabPane.getSelectionModel().getSelectedItem();
         if (tab != null && tab != selectionModel.getSelectedItem())
             selectionModel.select(tab);
