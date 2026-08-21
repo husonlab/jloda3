@@ -19,6 +19,7 @@
 
 package jloda.fx.icons;
 
+import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.scene.Node;
@@ -88,7 +89,16 @@ public final class StylesheetUtil {
 			return;
 		}
 
-		scene.getStylesheets().add(0, url);
+		// Add the stylesheet on the next pulse, not here. Mutating scene.getStylesheets() in the middle of
+		// building a control makes JavaFX redo CSS while the control tree is still being assembled, and
+		// modena's looked-up colours (-fx-base, -fx-text-base-color, ...) are then briefly unresolvable. That
+		// is what floods the console with "Could not resolve '-fx-text-base-color'" and with
+		// "String cannot be cast to Color" for '-fx-background-color' in modena's own .tool-bar rule.
+		// Index 0 is kept, so that the application's own stylesheets still take precedence over this one.
+		Platform.runLater(() -> {
+			if (!containsStylesheet(scene, url))
+				scene.getStylesheets().add(0, url);
+		});
 	}
 
 	private static boolean containsStylesheet(Scene scene, String url) {
