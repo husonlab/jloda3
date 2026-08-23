@@ -182,6 +182,62 @@ public class TaxonomicLevels {
 	}
 
 	/**
+	 * replaces the rank id -&gt; name mappings with those from a classification database, keeping the hardcoded
+	 * defaults for any ids the database does not provide (the major-rank set is left unchanged). Rank names shown to
+	 * the user are thus taken from the current classification database rather than being hard-wired.
+	 * <p>
+	 * The previous (hardcoded) name of an overridden rank is retained as an alias in the name-&gt;id map, so that
+	 * code resolving a rank by its canonical MEGAN name ({@link #getGenusId()}, {@link #getRankForOneLetterCode},
+	 * rank-collapse/-select commands, ...) keeps working even when the database uses a different display name for
+	 * the same rank id.
+	 * <p>
+	 * Two cases are not treated as an override: rank id 0, which is MEGAN's 'no rank' sentinel rather than a
+	 * level; and a name that differs from the hardcoded one only in spelling (the released databases write the raw
+	 * NCBI {@code genus}, {@code species group}), where the canonical MEGAN name is kept and the database's
+	 * spelling is added as a further alias.
+	 */
+	public static void setFromDatabase(Map<Integer, String> dbRankNames) {
+		if (dbRankNames == null || dbRankNames.isEmpty())
+			return;
+		final var instance = getInstance();
+		for (var entry : dbRankNames.entrySet()) {
+			final var id = entry.getKey();
+			final var name = entry.getValue();
+			if (id == null || name == null || name.isBlank())
+				continue;
+			if (id == 0)
+				continue; // 0 is MEGAN's 'no rank' sentinel, deliberately not one of the selectable levels
+			final var previous = instance.id2name.get(id);
+			if (name.equals(previous))
+				continue;
+			if (previous != null) {
+				if (isSpellingVariant(name, previous)) {
+					instance.name2id.put(name, id); // the database's spelling resolves, but the display name stays canonical
+					continue;
+				}
+				final var idx = instance.names.indexOf(previous);
+				if (idx >= 0)
+					instance.names.set(idx, name);
+				// keep 'previous' as an alias in name2id (do not remove it), so name-based lookups still resolve
+			} else {
+				instance.names.add(name);
+			}
+			instance.id2name.put(id, name);
+			instance.name2id.put(name, id);
+		}
+	}
+
+	/**
+	 * do two names denote the same rank, differing only in spelling (upper/lower case, and '_' versus ' ')? A
+	 * database that writes {@code genus} or {@code species group} is spelling MEGAN's rank differently, not
+	 * renaming it, and the canonical name is kept: rank names are compared with {@code equals} elsewhere
+	 * (e.g. {@code megan8.util.ExportStamp}), so a mere change of case would break those comparisons.
+	 */
+	private static boolean isSpellingVariant(String a, String b) {
+		return a.replace('_', ' ').equalsIgnoreCase(b.replace('_', ' '));
+	}
+
+	/**
 	 * get all names
 	 *
 	 * @return names

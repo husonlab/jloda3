@@ -21,6 +21,9 @@ package jloda.megan.classification;
 
 import jloda.graph.Node;
 import jloda.megan.algorithms.LCAAddressing;
+import jloda.megan.classification.Classification;
+import jloda.megan.classification.ClassificationManager;
+import jloda.megan.classification.IdMapper;
 import jloda.megan.classification.data.ClassificationFullTree;
 import jloda.megan.classification.data.Name2IdMap;
 
