@@ -19,15 +19,18 @@
  */
 package jloda.megan.classification.db;
 
+import jloda.megan.classification.db.IClassificationsDatabase;
+import jloda.util.ProgramProperties;
+import jloda.util.CanceledException;
+import jloda.util.FileUtils;
 import jloda.megan.classification.Classification;
 import jloda.megan.classification.ClassificationManager;
 import jloda.megan.classification.LoadClassifications;
-import jloda.util.CanceledException;
-import jloda.util.FileUtils;
-import jloda.util.ProgramProperties;
+import jloda.megan.classification.TaxonomicLevels;
 
 import java.io.File;
 import java.io.IOException;
+import java.sql.DriverManager;
 import java.sql.SQLException;
 
 /**
@@ -42,14 +45,19 @@ import java.sql.SQLException;
  */
 public class ClassificationsDatabaseManager {
 	/**
-	 * opens the temporary "unnamed" classifications database that serves the classifications bundled in the jar.
-	 * This is used until real classification databases are available.
-	 *
-	 * @return the bundled ("unnamed") classifications database
+	 * the properties this class reads. MEGAN's keys, kept verbatim so existing settings still apply; MEGAN's
+	 * MeganProperties now points at these rather than repeating the literals.
 	 */
-	public static IClassificationsDatabase openBundled() {
-		throw new UnsupportedOperationException("bundled classifications database is not available in jloda-metagenomics; open an explicit classification database file");
-	}
+	public static final String CLASSIFICATIONS_DATABASE_FILE = "ClassificationsDatabaseFile";
+	public static final String MEGAN_DATA_DIRECTORY = "MeganDataDirectory";
+	public static final String CLASSIFICATIONS_DATABASE_MANIFEST_URL = "ClassificationsDatabaseManifestURL";
+
+	/**
+	 * run whenever the set of registered classifications changes, so that an application can refresh whatever
+	 * it built from that set. MEGAN rebuilds its global "open viewer" commands, which are otherwise made once
+	 * at startup and would go stale when the classification database is switched.
+	 */
+	public static Runnable afterClassificationsRegistered = null;
 
 	/**
 	 * opens the classification database at the given file, verifying that it is a MEGAN classification database
@@ -70,11 +78,12 @@ public class ClassificationsDatabaseManager {
 
 	/**
 	 * gets the classifications database to use: the one configured via the {@code ClassificationsDatabaseFile}
-	 * property if it exists and is a valid MEGAN classification database, otherwise the bundled ("unnamed") one
+	 * property if it exists and is a valid MEGAN classification database, otherwise the newest default database
+	 * found on disk, or null if none is available
 	 *
-	 * @return the classifications database to use
+	 * @return the classifications database to use, or null if none is available
 	 */
-	public static IClassificationsDatabase openConfiguredOrBundled() {
+	public static IClassificationsDatabase openConfiguredOrDefault() {
 		final var file = getClassificationsDatabaseFile();
 		if (file != null && !file.isBlank()) {
 			final var dbFile = new File(file);
@@ -82,13 +91,63 @@ public class ClassificationsDatabaseManager {
 				try {
 					return open(dbFile);
 				} catch (IOException e) {
-					System.err.println("Warning: " + e.getMessage() + "; using bundled classifications");
+					System.err.println("Warning: " + e.getMessage() + "; looking for a default classification database");
 				}
 			} else {
-				System.err.println("Warning: configured classification database not found: " + file + "; using bundled classifications");
+				System.err.println("Warning: configured classification database not found: " + file + "; looking for a default classification database");
 			}
 		}
-		return openBundled();
+		final var defaultDb = findDefaultDatabase();
+		if (defaultDb != null) {
+			try {
+				return open(defaultDb);
+			} catch (IOException e) {
+				System.err.println("Warning: " + e.getMessage() + "; no classification database available");
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * finds the default classification database to use when none is explicitly configured: the newest
+	 * megan8-classification-r<N>.db in the MEGAN data directory, else the current working directory (where an
+	 * installer-shipped or downloaded database is placed). Returns null if none is found.
+	 */
+	public static File findDefaultDatabase() {
+		for (var dir : new File[]{getDataDirectory(), new File(System.getProperty("user.dir"))}) {
+			final var best = newestClassificationDatabase(dir);
+			if (best != null)
+				return best;
+		}
+		return null;
+	}
+
+	private static File newestClassificationDatabase(File dir) {
+		final var files = dir.listFiles((d, name) -> name.startsWith("megan8-classification-r") && name.endsWith(".db"));
+		if (files == null)
+			return null;
+		File best = null;
+		int bestRelease = -1;
+		for (var file : files) {
+			final var release = releaseNumber(file.getName());
+			if (file.canRead() && release > bestRelease) {
+				bestRelease = release;
+				best = file;
+			}
+		}
+		return best;
+	}
+
+	private static int releaseNumber(String fileName) {
+		final var base = FileUtils.replaceFileSuffix(fileName, "");
+		final var idx = base.lastIndexOf("-r");
+		if (idx < 0)
+			return -1;
+		try {
+			return Integer.parseInt(base.substring(idx + 2));
+		} catch (NumberFormatException e) {
+			return -1;
+		}
 	}
 
 	/**
@@ -100,7 +159,7 @@ public class ClassificationsDatabaseManager {
 
 	/**
 	 * gets the base name of the currently active classifications database, or {@link IClassificationsDatabase#UNNAMED}
-	 * if none is set (i.e. the classifications bundled in the jar are in use). This is the value stamped into
+	 * if none is set (i.e. no classification database is configured). This is the value stamped into
 	 * meganized files.
 	 *
 	 * @return current classifications database name
@@ -139,6 +198,8 @@ public class ClassificationsDatabaseManager {
 	public static void loadAndRegister(IClassificationsDatabase db) {
 		registerFromDatabase(db);
 
+		if (afterClassificationsRegistered != null)
+			afterClassificationsRegistered.run();
 
 		// the NCBI taxonomy backs the always-present MainViewer, so ensure it is loaded
 		if (db.hasClassification(Classification.Taxonomy))
@@ -155,6 +216,7 @@ public class ClassificationsDatabaseManager {
 	public static void registerFromDatabase(IClassificationsDatabase db) {
 		ClassificationManager.clear();
 		setCurrent(db);
+		TaxonomicLevels.setFromDatabase(db.getRankNames());
 
 		for (var cName : db.getClassificationNames()) {
 			if (cName.equals(Classification.Taxonomy)) {
@@ -171,7 +233,7 @@ public class ClassificationsDatabaseManager {
 	/**
 	 * reports which classification database is in use and which version of each classification it provides, so
 	 * that a run's log says what produced its numbers. Every way of choosing a database comes through
-	 * {@code registerFromDatabase}, so this covers the GUI at startup, the tools' {@code -cdb}, the classifications
+	 * {@link #registerFromDatabase}, so this covers the GUI at startup, the tools' {@code -cdb}, the classifications
 	 * embedded in a combined mapping database, and the readers' auto-detection from a file's stamp.
 	 *
 	 * @param db the database just registered
@@ -212,15 +274,74 @@ public class ClassificationsDatabaseManager {
 	/**
 	 * opens the classification database at the given path and registers its classifications, making it the current
 	 * database (so trees are loaded from it and meganized files are stamped with its name). A blank path is a no-op
-	 * (the bundled "unnamed" classifications remain in use). This is the entry point for the command-line tools'
+	 * (no classification database is applied). This is the entry point for the command-line tools'
 	 * {@code -cdb}/{@code --classificationDB} option.
 	 *
-	 * @param dbFile path to the classification database, or blank/null to keep the bundled classifications
+	 * @param dbFile path to the classification database, or blank/null for a no-op
 	 * @throws IOException if the file cannot be read or is not a valid MEGAN classification database
 	 */
 	public static void applyClassificationDB(String dbFile) throws IOException {
 		if (dbFile != null && !dbFile.isBlank())
 			registerFromDatabase(open(new File(dbFile)));
+	}
+
+	/**
+	 * opens and registers the classification database for a tool that has neither a meganized file nor a mapping
+	 * database to take it from: the one named by {@code -cdb} if given, otherwise the configured or newest default
+	 * database found on disk.
+	 *
+	 * @param dbFile path to the classification database from {@code -cdb}, or blank/null
+	 * @return true, if a database was registered; false, if none was named and none could be found
+	 * @throws IOException if the named file cannot be read or is not a valid MEGAN classification database
+	 */
+	public static boolean applyClassificationDBOrDefault(String dbFile) throws IOException {
+		if (dbFile != null && !dbFile.isBlank()) {
+			applyClassificationDB(dbFile);
+			return true;
+		}
+		final var db = openConfiguredOrDefault();
+		if (db == null)
+			return false;
+		registerFromDatabase(db);
+		return true;
+	}
+
+	/**
+	 * chooses and registers the classification database for MEGANIZING: an explicit {@code -cdb} wins; otherwise, if
+	 * the mapping database is a combined file that embeds the classifications, those are used; otherwise it is an
+	 * error, because meganization needs the classification trees.
+	 *
+	 * @param cdbFile   explicit classification database path from {@code -cdb}, or blank/null
+	 * @param mapDbFile the mapping database path (a combined file may embed the classifications), or blank/null
+	 * @throws IOException if no classification database is available
+	 */
+	public static void applyForMeganizing(String cdbFile, String mapDbFile) throws IOException {
+		if (cdbFile != null && !cdbFile.isBlank()) {
+			applyClassificationDB(cdbFile);                    // an explicit -cdb wins
+		} else if (mappingDatabaseEmbedsClassifications(mapDbFile)) {
+			applyClassificationDB(mapDbFile);                  // combined file: classifications embedded in the mapping database
+		} else {
+			throw new IOException("No classification database: supply --classificationDB (-cdb), or use a mapping database that embeds the classifications");
+		}
+	}
+
+	/**
+	 * does the given mapping database embed the classification tables (i.e. is it a combined mapping+classification
+	 * file)? Checks for a {@code classifications} table; returns false if the file is missing or on any error.
+	 *
+	 * @param mapDbFile the mapping database path, or blank/null
+	 * @return true if the mapping database also contains the classifications
+	 */
+	public static boolean mappingDatabaseEmbedsClassifications(String mapDbFile) {
+		if (mapDbFile == null || mapDbFile.isBlank() || !new File(mapDbFile).canRead())
+			return false;
+		try (var connection = DriverManager.getConnection("jdbc:sqlite:" + mapDbFile);
+			 var statement = connection.createStatement();
+			 var rs = statement.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='classifications';")) {
+			return rs.next();
+		} catch (SQLException e) {
+			return false;
+		}
 	}
 
 	/**
@@ -230,7 +351,7 @@ public class ClassificationsDatabaseManager {
 	 *     <li>if {@code cdbOverride} is set, that database is used (an explicit -cdb wins);</li>
 	 *     <li>otherwise, if the file names a classification database, it is located by base name in the MEGAN data
 	 *     directory (or at the configured classification database file) and used;</li>
-	 *     <li>otherwise the current / bundled classifications are kept.</li>
+	 *     <li>otherwise the current classifications are kept.</li>
 	 * </ul>
 	 * In every case, a compatibility warning is printed to stderr if the database finally in use does not match the
 	 * one recorded in the file.
@@ -246,6 +367,12 @@ public class ClassificationsDatabaseManager {
 			if (resolved != null)
 				registerIfDifferent(resolved);
 			// else: keep current; the compatibility check below reports the mismatch and suggests -cdb
+		}
+
+		if (getCurrent() == null) {
+			final var defaultDb = findDefaultDatabase();
+			if (defaultDb != null)
+				registerIfDifferent(defaultDb);
 		}
 
 		final var result = ClassificationsCompatibility.check(fileStamp, getCurrent());
@@ -284,10 +411,6 @@ public class ClassificationsDatabaseManager {
 		return null;
 	}
 
-	/**
-	 * removes the stale open-viewer commands from the global command list and adds one for each currently
-	 * supported classification
-	 */
 
 	/**
 	 * gets the dedicated directory into which downloaded classification (and map) databases are placed.
@@ -296,19 +419,19 @@ public class ClassificationsDatabaseManager {
 	 * @return data directory
 	 */
 	public static File getDataDirectory() {
-		final var path = ProgramProperties.get("MeganDataDirectory",
+		final var path = ProgramProperties.get(MEGAN_DATA_DIRECTORY,
 				System.getProperty("user.home") + File.separator + ".megan");
 		return new File(path);
 	}
 
 	/**
-	 * gets the path of the active classification database file, or empty if the bundled ("unnamed")
-	 * classifications should be used
+	 * gets the path of the active classification database file, or empty if no classification database is
+	 * configured (the "unnamed" default is in use)
 	 *
 	 * @return classification database file path, or empty string
 	 */
 	public static String getClassificationsDatabaseFile() {
-		return ProgramProperties.get("ClassificationsDatabaseFile", "");
+		return ProgramProperties.get(CLASSIFICATIONS_DATABASE_FILE, "");
 	}
 
 	/**
@@ -316,7 +439,7 @@ public class ClassificationsDatabaseManager {
 	 * {@code ClassificationsDatabaseManifestURL} property, falling back to {@link #DEFAULT_MANIFEST_URL}
 	 */
 	public static String getManifestUrl() {
-		return ProgramProperties.get("ClassificationsDatabaseManifestURL", DEFAULT_MANIFEST_URL);
+		return ProgramProperties.get(CLASSIFICATIONS_DATABASE_MANIFEST_URL, DEFAULT_MANIFEST_URL);
 	}
 
 	// Production catalog (once the databases are hosted), a GitHub-releases manifest like the installer updater uses:
@@ -359,12 +482,12 @@ public class ClassificationsDatabaseManager {
 	 */
 	public static void useDatabaseFile(File dbFile) throws IOException {
 		final var db = open(dbFile); // validates it is a MEGC database
-		ProgramProperties.put("ClassificationsDatabaseFile", dbFile.getPath());
+		ProgramProperties.put(CLASSIFICATIONS_DATABASE_FILE, dbFile.getPath());
 		loadAndRegister(db);
 	}
 
 	/**
-	 * has a real classification database (i.e. not the bundled one) been configured, and does its file exist?
+	 * has a real classification database (i.e. not the "unnamed" default) been configured, and does its file exist?
 	 */
 	public static boolean hasConfiguredDatabase() {
 		final var file = getClassificationsDatabaseFile();

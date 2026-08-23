@@ -66,7 +66,7 @@ public class ClassificationsCompatibility {
 	 * compares the classification database recorded in a meganized file against the one currently in use
 	 *
 	 * @param fileDatabase the base name recorded in the file (from {@code DataTable.getClassificationsDatabase()}), may be null
-	 * @param currentDb    the classification database currently in use, may be null (treated as the bundled "unnamed" one)
+	 * @param currentDb    the classification database currently in use, may be null (treated as the "unnamed" database)
 	 * @return the comparison result
 	 */
 	public static Result check(String fileDatabase, IClassificationsDatabase currentDb) {
