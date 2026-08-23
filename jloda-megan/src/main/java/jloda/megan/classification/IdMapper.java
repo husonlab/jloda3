@@ -19,22 +19,21 @@
  */
 package jloda.megan.classification;
 
+import jloda.megan.classification.data.Accession2IdMapFactory;
+import jloda.megan.classification.data.IString2IntegerMap;
+import jloda.megan.classification.data.IString2IntegerMapFactory;
+import jloda.megan.classification.data.String2IntegerMap;
+import jloda.util.ProgramProperties;
+import jloda.util.Basic;
+import jloda.util.progress.ProgressListener;
 import jloda.megan.classification.data.ClassificationFullTree;
 import jloda.megan.classification.data.Name2IdMap;
-import jloda.util.ProgramProperties;
 
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.HashSet;
-import java.util.Set;
+import java.io.IOException;
+import java.util.*;
 
 /**
  * tracks mapping files for a named type of classification
- * <p>
- * Read-side only: this copy (in jloda-metagenomics) keeps the classification's tree, name map, disabled
- * ids and active/loaded-map bookkeeping needed to read a meganized DAA. The accession/synonym mapping
- * machinery (loadMappingFile, createIdParser, getAccessionMap, ... which pull megan8.accessiondb) stays
- * in megan8, since a meganized DAA already carries per-read class ids.
  * <p>
  * Daniel Huson, 4.2015
  */
@@ -49,6 +48,27 @@ public class IdMapper {
 	static public final String UNCLASSIFIED_LABEL = "Unclassified";
 	static public final int CONTAMINANTS_ID = -6; // -5 used by KEGG
 	static public final String CONTAMINANTS_LABEL = "Contaminants";
+
+	/**
+	 * property naming the classifications that are taxonomic, and so are parsed with an LCA rather than by
+	 * first hit. MEGAN's key and default, kept verbatim so a user's existing setting still applies; the value
+	 * is read from the shared {@link ProgramProperties}, which MEGAN populates before loading anything.
+	 */
+	public static final String TAXONOMIC_CLASSIFICATIONS = "AdditionalTaxonomyViewers";
+	public static final String[] TAXONOMIC_CLASSIFICATIONS_DEFAULT = {"Taxonomy", "GTDB"};
+
+	public static IString2IntegerMapFactory accessionMapFactory = new Accession2IdMapFactory();
+
+	/**
+	 * opens a MEGAN mapping database ({@code megan-map*.db}) for one classification. The reader for those
+	 * lives in MEGAN, not here, so MEGAN installs this at startup; a program that installs nothing simply
+	 * cannot use {@link MapType#MeganMapDB}, which is the honest outcome rather than a link error.
+	 */
+	public interface MeganMapDBFactory {
+		IString2IntegerMap open(String mappingDBFile, String cName) throws IOException;
+	}
+
+	public static MeganMapDBFactory meganMapDBFactory = null;
 
 	public enum MapType {Accession, Synonyms, MeganMapDB}
 
@@ -67,6 +87,11 @@ public class IdMapper {
 
 	private final Set<Integer> disabledIds = new HashSet<>();
 
+	private IString2IntegerMap accessionMap = null;
+	private String2IntegerMap synonymsMap = null;
+
+	private final IdParser.Algorithm algorithm;
+
 	/**
 	 * constructor
 	 */
@@ -74,6 +99,8 @@ public class IdMapper {
 		this.cName = name;
 		this.fullTree = fullTree;
 		this.name2IdMap = name2IdMap;
+
+		algorithm = (Arrays.asList(ProgramProperties.get(TAXONOMIC_CLASSIFICATIONS, TAXONOMIC_CLASSIFICATIONS_DEFAULT)).contains(name) ? IdParser.Algorithm.LCA : IdParser.Algorithm.First_Hit);
 	}
 
 	/**
@@ -88,6 +115,59 @@ public class IdMapper {
 			return new String[]{shortTag};
 		else
 			return new String[]{shortTag, longTag};
+	}
+
+	/**
+	 * load the named file of the given map type
+	 */
+	public void loadMappingFile(String fileName, MapType mapType, boolean reload, ProgressListener progress) throws IOException {
+		switch (mapType) {
+			case Accession -> {
+				if (accessionMap == null || reload) {
+					if (accessionMap != null) {
+						closeAccessionMap();
+					}
+
+					this.accessionMap = accessionMapFactory.create(name2IdMap, fileName, progress);
+					loadedMaps.add(mapType);
+					activeMaps.add(mapType);
+					map2Filename.put(mapType, fileName);
+
+				}
+			}
+			case Synonyms -> {
+				if (synonymsMap == null || reload) {
+					if (synonymsMap != null) {
+						synonymsMap.close();
+					}
+					final String2IntegerMap synonymsMap = new String2IntegerMap();
+
+					synonymsMap.loadFile(name2IdMap, fileName, progress);
+					this.synonymsMap = synonymsMap;
+					loadedMaps.add(mapType);
+					activeMaps.add(mapType);
+					map2Filename.put(mapType, fileName);
+
+				}
+			}
+			case MeganMapDB -> {
+				if (accessionMap == null || reload) {
+					if (accessionMap != null) {
+						closeAccessionMap();
+					}
+					if (meganMapDBFactory == null)
+						throw new IOException("Mapping databases are not available in this program: no MeganMapDBFactory installed");
+					try {
+						this.accessionMap = meganMapDBFactory.open(fileName, cName);
+						loadedMaps.add(mapType);
+						activeMaps.add(mapType);
+						map2Filename.put(mapType, fileName);
+					} catch (Exception e) {
+						throw new IOException(e);
+					}
+				}
+			}
+		}
 	}
 
 	/**
@@ -118,8 +198,65 @@ public class IdMapper {
 		return useTextParsing;
 	}
 
+	/**
+	 * creates a new id parser for this mapper
+	 */
+	public IdParser createIdParser() {
+		// one parser per thread, so a map that cannot be shared across threads - a SQLite mapping database -
+		// hands out its own instance and gets its own mapper to hold it. Maps that are safe to share return
+		// themselves from duplicate(), and the parser then works off this mapper directly.
+		var mapper = this;
+		if (accessionMap != null) {
+			try {
+				final var ownCopy = accessionMap.duplicate();
+				if (ownCopy != accessionMap) {
+					mapper = new IdMapper(cName, fullTree, name2IdMap);
+					mapper.setUseTextParsing(isUseTextParsing());
+					mapper.adoptAccessionMap(ownCopy, MapType.MeganMapDB, map2Filename.get(MapType.MeganMapDB));
+				}
+			} catch (IOException e) {
+				Basic.caught(e);
+			}
+		}
+		final IdParser idParser = new IdParser(mapper);
+		idParser.setAlgorithm(algorithm);
+		return idParser;
+	}
+
+	/**
+	 * takes over an already-open accession map, recording it as loaded and active under the given type. Used
+	 * by {@link #createIdParser()}, which has the map in hand and must not re-open it.
+	 */
+	private void adoptAccessionMap(IString2IntegerMap map, MapType mapType, String fileName) {
+		this.accessionMap = map;
+		loadedMaps.add(mapType);
+		activeMaps.add(mapType);
+		if (fileName != null)
+			map2Filename.put(mapType, fileName);
+	}
+
+	/**
+	 * get a id from an accession
+	 *
+	 * @return KO id or null
+	 */
+	public Integer getIdFromAccession(String accession) throws IOException {
+		if (isLoaded(MapType.Accession) || isLoaded(MapType.MeganMapDB)) {
+			return getAccessionMap().get(accession);
+		}
+		return null;
+	}
+
 	public String getMappingFile(MapType mapType) {
 		return map2Filename.get(mapType);
+	}
+
+	public IString2IntegerMap getAccessionMap() {
+		return accessionMap;
+	}
+
+	public String2IntegerMap getSynonymsMap() {
+		return synonymsMap;
 	}
 
 	public boolean hasActiveAndLoaded() {
@@ -143,6 +280,17 @@ public class IdMapper {
 
 	public Set<Integer> getDisabledIds() {
 		return disabledIds;
+	}
+
+	private void closeAccessionMap() {
+		if (accessionMap != null) {
+			try {
+				accessionMap.close();
+			} catch (IOException e) {
+				Basic.caught(e);
+			}
+		}
+		accessionMap = null;
 	}
 
 	public boolean isDisabled(int id) {

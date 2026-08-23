@@ -41,4 +41,17 @@ public interface IString2IntegerMap extends Closeable {
 	 * @return size
 	 */
 	int size();
+
+	/**
+	 * an instance that another thread may use, or this one if it is already safe to share.
+	 * <p>
+	 * In-memory and file-backed maps share fine and so return themselves, which is the default. A map backed
+	 * by a SQLite connection must hand out its own: MEGAN runs one id parser per thread, and they would
+	 * otherwise contend on a single connection.
+	 *
+	 * @return an instance for the caller's own use
+	 */
+	default IString2IntegerMap duplicate() throws IOException {
+		return this;
+	}
 }
