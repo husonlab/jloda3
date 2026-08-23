@@ -22,6 +22,7 @@ package jloda.megan.classification;
 import jloda.megan.classification.data.ClassificationFullTree;
 import jloda.megan.classification.data.Name2IdMap;
 import jloda.megan.classification.db.IClassificationsDatabase;
+import jloda.megan.util.Notifications;
 import jloda.util.Basic;
 import jloda.util.StringUtils;
 import jloda.util.progress.ProgressListener;
@@ -75,7 +76,7 @@ public class Classification {
 			}
 		} catch (Exception e) {
 			Basic.caught(e);
-			System.err.println("Failed to load classification '" + cName + "' from database '" + db.getName() + "': " + e.getMessage());
+			Notifications.showError("Failed to load classification '" + cName + "' from database '" + db.getName() + "': " + e.getMessage());
 		} finally {
 			progress.setCancelable(true);
 		}
