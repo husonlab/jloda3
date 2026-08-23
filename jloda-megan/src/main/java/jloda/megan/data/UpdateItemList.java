@@ -159,7 +159,9 @@ public class UpdateItemList extends LinkedList<UpdateItem> {
 	}
 
 	/**
-	 * append the src class to the target class
+	 * append the src class to the target class. The target chain is left UNSORTED: the caller must call
+	 * {@link #sortChain} once per target after all merges, rather than paying a re-sort of the whole (growing)
+	 * target on every merge — that re-sort was ~30% of binning CPU on a short-read run.
 	 */
 	public void appendClass(int classificationId, int srcClassId, int tarClassId) {
 		float newSize = getWeight(classificationId, srcClassId) + getWeight(classificationId, tarClassId);
@@ -194,19 +196,21 @@ public class UpdateItemList extends LinkedList<UpdateItem> {
 
 			setWeight(classificationId, tarClassId, newSize);
 			removeClass(classificationId, srcClassId);
-
-			sortChain(classificationId, tarClassId);
+			// the merged chain is deliberately left unsorted; the caller sorts each target once (see sortChain)
 		}
 	}
 
 	/**
-	 * after appending a class to an existing class, sorts all UpdateItems so that they appear in the order in
-	 * which the reads occur in the file, for a given classId.
-	 * This is useful for when we extract all reads for a given classId, as then we go through the file sequentially
+	 * sorts the chain of a class by read uid, so that its reads appear in the order in which they occur in the
+	 * file (needed for sequential extraction). Call once per target after {@link #appendClass} has merged into
+	 * it: appendClass no longer sorts, because re-sorting the whole growing target on every merge was ~30% of
+	 * binning CPU on a short-read run.
 	 */
-	private void sortChain(int classificationId, int classId) {
-		// sort all UpdateItems by readUid:
-		final ArrayList<UpdateItem> sorted = new ArrayList<>(100000);
+	public void sortChain(int classificationId, int classId) {
+		// sort all UpdateItems by readUid. Size the list to the chain and let it grow: this runs once per
+		// min-support merge (tens of thousands of times on a short-read run), and a fixed 100000-capacity list
+		// allocated ~800 KB every call — tens of GB of transient garbage, ~27% of the run's allocation by JFR.
+		final ArrayList<UpdateItem> sorted = new ArrayList<>();
 
 		UpdateItem item = getFirst(classificationId, classId);
 		while (item != null) {
