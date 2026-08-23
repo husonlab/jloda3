@@ -145,10 +145,6 @@ public class Name2IdMap implements IName2IdMap {
 	}
 
 	/**
-	 * load from file
-	 */
-
-	/**
 	 * load the id-to-name mapping (together with ranks and tooltips) from a reader.
 	 * The caller is responsible for closing the reader.
 	 *

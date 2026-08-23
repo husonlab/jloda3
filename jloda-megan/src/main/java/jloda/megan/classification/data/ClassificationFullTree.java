@@ -57,6 +57,15 @@ public class ClassificationFullTree extends PhyloTree {
 	/**
 	 * constructor
 	 */
+	/**
+	 * run once the taxonomy has finished loading, for whatever the application wants to do to it that this
+	 * module should not decide. MEGAN uses it to seed the disabled-taxa set from its {@code DisabledTaxa}
+	 * property — a policy of that program, and one its default switches on for thirteen taxa, so it changes
+	 * binning; a program that installs nothing (ALORA) disables nothing, which is the neutral behaviour this
+	 * module should have on its own.
+	 */
+	public static Runnable afterLoadingTaxonomy = null;
+
 	public ClassificationFullTree(String cName, Name2IdMap name2IdMap) {
 		this.name2IdMap = name2IdMap;
 		this.setName(cName);
@@ -72,10 +81,6 @@ public class ClassificationFullTree extends PhyloTree {
 		id2Address.clear();
 		address2Id.clear();
 	}
-
-	/**
-	 * load the tree from a file
-	 */
 
 	/**
 	 * load the tree from a reader. The caller is responsible for closing the reader.
@@ -164,6 +169,8 @@ public class ClassificationFullTree extends PhyloTree {
 			if (taxId > 0)
 				name2IdMap.setRank(taxId, 127);
 
+			if (afterLoadingTaxonomy != null)
+				afterLoadingTaxonomy.run();
 		}
 
 		LCAAddressing.computeAddresses(this, id2Address, address2Id);
