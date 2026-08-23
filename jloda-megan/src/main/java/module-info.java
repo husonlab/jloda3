@@ -13,6 +13,7 @@ module jloda_megan {
 	// classification database access: taxonomy/GTDB trees, names, ranks (step 3)
 	exports jloda.megan.classification;
 	exports jloda.megan.classification.data;
+	exports jloda.megan.classification.util;
 	exports jloda.megan.classification.db;
 
 	// shared with megan8, which no longer keeps its own copies of these
