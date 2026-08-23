@@ -14,4 +14,11 @@ module jloda_megan {
 	exports jloda.megan.classification;
 	exports jloda.megan.classification.data;
 	exports jloda.megan.classification.db;
+
+	// shared with megan8, which no longer keeps its own copies of these
+	exports jloda.megan.algorithms;
+	exports jloda.megan.io.experimental;
+	exports jloda.megan.parsers.sam;
+	exports jloda.megan.rma3;
+	exports jloda.megan.util;
 }
