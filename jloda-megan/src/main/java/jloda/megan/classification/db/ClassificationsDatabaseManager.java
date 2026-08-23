@@ -164,6 +164,49 @@ public class ClassificationsDatabaseManager {
 				ClassificationManager.getAllSupportedClassificationsExcludingNCBITaxonomy().add(cName);
 			}
 		}
+
+		report(db);
+	}
+
+	/**
+	 * reports which classification database is in use and which version of each classification it provides, so
+	 * that a run's log says what produced its numbers. Every way of choosing a database comes through
+	 * {@code registerFromDatabase}, so this covers the GUI at startup, the tools' {@code -cdb}, the classifications
+	 * embedded in a combined mapping database, and the readers' auto-detection from a file's stamp.
+	 *
+	 * @param db the database just registered
+	 */
+	private static void report(IClassificationsDatabase db) {
+		final var release = db.getDbRelease();
+		System.err.printf("Classification database: %s%s%n", db.getName(),
+				(release != null && !release.isBlank()) ? " (release " + release + ")" : "");
+
+		final var buf = new StringBuilder();
+		for (var cName : db.getClassificationNames()) {
+			if (!buf.isEmpty())
+				buf.append(", ");
+			buf.append(cName);
+			final var version = versionOf(db, cName);
+			if (!version.isBlank())
+				buf.append(" (").append(version).append(")");
+		}
+		if (!buf.isEmpty())
+			System.err.println("Classifications: " + buf);
+	}
+
+	/**
+	 * the source and version a database records for a classification, e.g. "GTDB v232", or "" if it records none
+	 */
+	private static String versionOf(IClassificationsDatabase db, String cName) {
+		try {
+			final var info = db.getClassificationInfo(cName);
+			if (info == null)
+				return "";
+			return "%s %s".formatted(info.source() != null ? info.source() : "",
+					info.sourceVersion() != null ? info.sourceVersion() : "").trim();
+		} catch (IOException e) {
+			return "";
+		}
 	}
 
 	/**

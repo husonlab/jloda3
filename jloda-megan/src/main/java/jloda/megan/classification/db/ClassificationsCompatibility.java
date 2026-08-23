@@ -19,6 +19,8 @@
  */
 package jloda.megan.classification.db;
 
+import java.util.Set;
+
 /**
  * compares the classification database a meganized file was created with (as recorded in its data table) against
  * the classification database currently in use, and reports whether they are compatible.
@@ -76,7 +78,7 @@ public class ClassificationsCompatibility {
 		if (fileDatabase.equals(currentName))
 			return new Result(Status.MATCH, fileDatabase, currentName, null);
 
-		if (currentDb != null && currentDb.getCompatibleWith().contains(fileDatabase))
+		if (currentDb != null && declaresCompatibility(currentDb.getCompatibleWith(), fileDatabase))
 			return new Result(Status.DECLARED_COMPATIBLE, fileDatabase, currentName,
 					"This file was meganized with classification database '" + fileDatabase
 					+ "'; the current database '" + currentName + "' is compatible with it.");
@@ -86,5 +88,22 @@ public class ClassificationsCompatibility {
 				+ "', but the current database is '" + currentName + "'.\n"
 				+ "Taxon and function names or ids may not resolve consistently.\n"
 				+ "Consider switching to classification database '" + fileDatabase + "' before working with this file.");
+	}
+
+	/**
+	 * does the current database declare compatibility with the given earlier database? An entry of the
+	 * {@code compatible_with} column is either the full base name of that database
+	 * ("megan8-classification-r1") or, as the released databases write it, just its release token ("r1").
+	 *
+	 * @param compatibleWith the entries declared by the current database
+	 * @param fileDatabase   the base name recorded in the file
+	 * @return true, if one of the entries names the file's database
+	 */
+	private static boolean declaresCompatibility(Set<String> compatibleWith, String fileDatabase) {
+		for (var entry : compatibleWith) {
+			if (entry.equals(fileDatabase) || fileDatabase.endsWith("-" + entry))
+				return true;
+		}
+		return false;
 	}
 }

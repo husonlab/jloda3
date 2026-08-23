@@ -58,6 +58,10 @@ public class LoadClassifications implements IClassificationsDatabase {
 	// SQLite application_id marking a MEGAN classification database: the four bytes 'MEGC'
 	public static final int MEGC_APPLICATION_ID = 0x4D454743;
 
+	// ... and 'MEGM', marking a MEGAN mapping database. A combined file carries the mappings and the
+	// classifications together and is marked as the mapping database it primarily is, so both are read here.
+	public static final int MEGM_APPLICATION_ID = 0x4D45474D;
+
 	// a valid tree-table name: letters, digits and underscores only (guards the necessary string concatenation below)
 	private static final Pattern SAFE_IDENTIFIER = Pattern.compile("\\w+");
 
@@ -66,6 +70,7 @@ public class LoadClassifications implements IClassificationsDatabase {
 	private final Map<Integer, String> rankNames = new HashMap<>(); // merged across classifications (fallback)
 	private final Map<String, Map<Integer, String>> classificationRankNames = new HashMap<>(); // per MEGAN classification name
 	private final Set<String> compatibleWith = new HashSet<>(); // earlier database base names whose ids still resolve here
+	private final Map<String, String> dbInfo = new HashMap<>(); // the db_info table: db_release, db_type, created, ...
 	private final Map<String, ClassificationMeta> name2meta = new LinkedHashMap<>(); // keyed by MEGAN classification name
 
 	/**
@@ -77,6 +82,7 @@ public class LoadClassifications implements IClassificationsDatabase {
 		connection = connect(dbFile, true);
 		verifyApplicationId(connection);
 		name = FileUtils.replaceFileSuffix(FileUtils.getFileNameWithoutPath(dbFile), "");
+		loadDbInfo(connection);
 		loadRanks(connection);
 		for (var meta : loadClassificationMetadata(connection)) {
 			name2meta.put(meta.megaName(), meta);
@@ -149,36 +155,52 @@ public class LoadClassifications implements IClassificationsDatabase {
 	// --- database reading ---
 
 	/**
-	 * verifies that the database is a MEGAN classification database, by checking its application_id
+	 * verifies that the database holds MEGAN classifications, by checking its application_id: either a
+	 * classification database ('MEGC') or a mapping database that carries them ('MEGM')
 	 */
 	private static void verifyApplicationId(Connection connection) throws SQLException {
 		try (var statement = connection.createStatement();
 			 var rs = statement.executeQuery("PRAGMA application_id;")) {
 			if (rs.next()) {
 				final var applicationId = rs.getInt(1);
-				if (applicationId != MEGC_APPLICATION_ID)
-					throw new SQLException("Not a MEGAN classification database (application_id=0x%08X, expected 0x%08X 'MEGC')"
-							.formatted(applicationId, MEGC_APPLICATION_ID));
+				if (applicationId != MEGC_APPLICATION_ID && applicationId != MEGM_APPLICATION_ID)
+					throw new SQLException("Does not hold MEGAN classifications (application_id=0x%08X, expected 0x%08X 'MEGC' or 0x%08X 'MEGM')"
+							.formatted(applicationId, MEGC_APPLICATION_ID, MEGM_APPLICATION_ID));
 			}
 		}
 	}
 
 	/**
-	 * reads the ranks table (rank id -&gt; rank name). As of schema v1 the ranks are per classification (columns
-	 * {@code classifications, id, name}); an older flat {@code id, name} table is still handled. Rank names are kept
-	 * both per classification and in a merged map.
+	 * reads the ranks table (rank id -&gt; rank name). The ranks are per classification; the released schema names
+	 * the key column {@code classification}, an earlier draft named it {@code classifications}, and a still older
+	 * flat {@code id, name} table is also handled. Rank names are kept both per classification and in a merged map.
 	 */
+	/**
+	 * reads the {@code db_info(key,value)} table, which describes the database as a whole ({@code db_release},
+	 * {@code db_type}, {@code created}, {@code megan_min_version}). Absent in a database that predates it.
+	 */
+	private void loadDbInfo(Connection connection) {
+		try (var statement = connection.createStatement();
+			 var rs = statement.executeQuery("SELECT key, value FROM db_info")) {
+			while (rs.next())
+				dbInfo.put(rs.getString("key"), rs.getString("value"));
+		} catch (SQLException ignored) {
+			// a database without a db_info table simply describes itself by its file name
+		}
+	}
+
 	private void loadRanks(Connection connection) throws SQLException {
 		try (var statement = connection.createStatement();
 			 var rs = statement.executeQuery("SELECT * FROM ranks")) {
 			final var columns = columnNames(rs.getMetaData());
-			final var hasClassification = columns.contains("classifications");
+			final var classificationColumn = columns.contains("classification") ? "classification"
+					: (columns.contains("classifications") ? "classifications" : null);
 			while (rs.next()) {
 				final var id = rs.getInt("id");
 				final var rankName = rs.getString("name");
 				rankNames.put(id, rankName);
-				if (hasClassification) {
-					final var cName = megaName(rs.getString("classifications"));
+				if (classificationColumn != null) {
+					final var cName = megaName(rs.getString(classificationColumn));
 					classificationRankNames.computeIfAbsent(cName, k -> new HashMap<>()).put(id, rankName);
 				}
 			}
@@ -349,6 +371,19 @@ public class LoadClassifications implements IClassificationsDatabase {
 	@Override
 	public Set<String> getCompatibleWith() {
 		return compatibleWith;
+	}
+
+	@Override
+	public String getDbRelease() {
+		return dbInfo.get("db_release");
+	}
+
+	/**
+	 * gets a value from the {@code db_info} table (e.g. {@code db_type}, {@code created},
+	 * {@code megan_min_version}), or null
+	 */
+	public String getDbInfo(String key) {
+		return dbInfo.get(key);
 	}
 
 	/**

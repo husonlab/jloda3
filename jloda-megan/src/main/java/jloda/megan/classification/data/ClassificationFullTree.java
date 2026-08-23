@@ -167,6 +167,97 @@ public class ClassificationFullTree extends PhyloTree {
 		}
 
 		LCAAddressing.computeAddresses(this, id2Address, address2Id);
+
+		// deliberately after the addresses have been computed: LCA addresses are assigned by walking the children
+		// in adjacency order, so reordering first would change every address. Doing it last leaves the addresses,
+		// and therefore all binning, exactly as they were -- this only affects the order things are drawn and listed.
+		sortChildren();
+	}
+
+	/**
+	 * orders every node's children alphabetically by name, with MEGAN's four ancillary nodes last and in the order
+	 * No hits, Not assigned, Low complexity, Contaminants.
+	 * <p>
+	 * Without this, children come out in whatever order the source produced them: for a classification database
+	 * that is ascending node id, because the tree tables are keyed by {@code node_id INTEGER PRIMARY KEY} and are
+	 * read in rowid order, which puts the negative ancillary ids first and leaves the rest in id order rather than
+	 * by name.
+	 * <p>
+	 * The in-edge keeps its position at the head of the adjacency list, so only the children move.
+	 */
+	public void sortChildren() {
+		final var order = new ArrayList<Edge>();
+		final var children = new ArrayList<SortableChild>();
+
+		for (var v : nodes()) {
+			if (v.getOutDegree() < 2)
+				continue; // nothing to order
+
+			// the sort key is computed once per child rather than inside the comparator: a name lookup per
+			// comparison would cost O(n log n) lookups on a node with 47 000 children, of which the NCBI taxonomy
+			// has several
+			children.clear();
+			for (var e : v.outEdges()) {
+				final var id = classId(e.getTarget());
+				children.add(new SortableChild(e, ancillaryRank(id), childSortKey(e.getTarget(), id), id));
+			}
+			children.sort(null);
+
+			order.clear();
+			for (var e : v.inEdges())
+				order.add(e);
+			for (var child : children)
+				order.add(child.edge());
+			v.rearrangeAdjacentEdges(order);
+		}
+	}
+
+	/**
+	 * one child of a node, with its sort key worked out in advance
+	 */
+	private record SortableChild(Edge edge, int ancillaryRank, String name, int id) implements Comparable<SortableChild> {
+		@Override
+		public int compareTo(SortableChild that) {
+			if (ancillaryRank != that.ancillaryRank)
+				return Integer.compare(ancillaryRank, that.ancillaryRank);
+			var result = String.CASE_INSENSITIVE_ORDER.compare(name, that.name);
+			if (result == 0)
+				result = name.compareTo(that.name);
+			return result != 0 ? result : Integer.compare(id, that.id);
+		}
+	}
+
+	/**
+	 * where an ancillary node sorts among a node's children: 0 for an ordinary child, so that the four ancillary
+	 * nodes come last, in the order No hits, Not assigned, Low complexity, Contaminants
+	 */
+	private static int ancillaryRank(int id) {
+		return switch (id) {
+			case IdMapper.NOHITS_ID -> 1;
+			case IdMapper.UNASSIGNED_ID -> 2;
+			case IdMapper.LOW_COMPLEXITY_ID -> 3;
+			case IdMapper.CONTAMINANTS_ID -> 4;
+			default -> 0;
+		};
+	}
+
+	/**
+	 * the classification id of a node, which is its info and NOT {@code getId(v)} &mdash; that is jloda's internal
+	 * graph id. {@link Integer#MIN_VALUE} for a node that carries none.
+	 */
+	private static int classId(Node v) {
+		return v.getInfo() instanceof Integer id ? id : Integer.MIN_VALUE;
+	}
+
+	/**
+	 * the name a child is sorted under: its name from the id mapping, else its label, else its id
+	 */
+	private String childSortKey(Node v, int id) {
+		final var name = (id != Integer.MIN_VALUE ? name2IdMap.get(id) : null);
+		if (name != null && !name.isBlank())
+			return name;
+		final var label = getLabel(v);
+		return label != null ? label : String.valueOf(id);
 	}
 
 

@@ -139,6 +139,17 @@ public interface IClassificationsDatabase extends Closeable {
 	}
 
 	/**
+	 * the release tag this classification database was built as, from {@code db_info.db_release} (e.g. "r1"), or
+	 * null if it records none. A mapping database built against this one records the same tag, so that the pair
+	 * can be recognised as matched; see {@code docs/classification-db-versioning.md}.
+	 *
+	 * @return release tag or null
+	 */
+	default String getDbRelease() {
+		return null;
+	}
+
+	/**
 	 * closes any resources (e.g. a database connection) held by this source. The default is a no-op.
 	 */
 	@Override
