@@ -41,8 +41,6 @@ public class ClassificationManager {
 	private static final ArrayList<String> defaultClassificationsList = new ArrayList<>();
 	private static final ArrayList<String> defaultClassificationsListExcludingNCBITaxonomy = new ArrayList<>();
 
-	private static final Map<String, String> additionalClassificationName2TreeFile = new HashMap<>();
-	private static final Map<String, String> additionalClassificationName2MapFile = new HashMap<>();
 
 	private static String meganMapDBFile;
 	private static boolean useFastAccessionMappingMode;
@@ -79,8 +77,7 @@ public class ClassificationManager {
 						if (classificationsDatabase != null && classificationsDatabase.hasClassification(name)) {
 							classification = loadFromDatabase(name, classificationsDatabase, new ProgressSilent());
 						} else {
-							// no classification database provides this classification: file-based .tre/.map
-							// loading is not supported in jloda-metagenomics, so return an empty classification
+							System.err.println("Warning: classification '" + name + "' is not available in the current classification database");
 							classification = new Classification(name);
 						}
 					} else {
@@ -93,11 +90,6 @@ public class ClassificationManager {
 		return classification;
 	}
 
-	/**
-	 * loads the named files and setups up the given classification (if not already present)
-	 *
-	 * @return classification
-	 */
 
 	/**
 	 * loads the named classification from the given classifications database (if not already present)
@@ -126,8 +118,6 @@ public class ClassificationManager {
 			name2classification.clear();
 			allSupportedClassifications.clear();
 			allSupportedClassificationsExcludingNCBITaxonomy.clear();
-			additionalClassificationName2TreeFile.clear();
-			additionalClassificationName2MapFile.clear();
 		}
 	}
 
@@ -227,6 +217,8 @@ public class ClassificationManager {
 	public static void setMeganMapDBFile(String meganMapDBFile) throws IOException {
 		if (meganMapDBFile != null && !FileUtils.fileExistsAndIsNonEmpty(meganMapDBFile))
 			throw new IOException("File not found or not readable: " + meganMapDBFile);
+		if (!IdMapper.meganMapDBFileFilter.test(meganMapDBFile))
+			throw new IOException("Mapping file " + FileUtils.getFileNameWithoutPath(meganMapDBFile) + " is intended for use with MEGAN Ultimate Edition, it is not compatible with MEGAN Community Edition");
 
 		ClassificationManager.meganMapDBFile = meganMapDBFile;
 		if (meganMapDBFile != null)
@@ -243,13 +235,5 @@ public class ClassificationManager {
 
 	public static void setUseFastAccessionMappingMode(boolean useFastAccessionMappingMode) {
 		ClassificationManager.useFastAccessionMappingMode = useFastAccessionMappingMode;
-	}
-
-	public static Map<String, String> getAdditionalClassificationName2TreeFile() {
-		return additionalClassificationName2TreeFile;
-	}
-
-	public static Map<String, String> getAdditionalClassificationName2MapFile() {
-		return additionalClassificationName2MapFile;
 	}
 }

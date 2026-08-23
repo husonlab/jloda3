@@ -21,11 +21,12 @@
 package jloda.megan.classification;
 
 import jloda.graph.Node;
+import jloda.megan.classification.Classification;
+import jloda.util.FileUtils;
+import jloda.util.progress.ProgressListener;
 import jloda.megan.classification.data.ClassificationFullTree;
 import jloda.megan.classification.data.Name2IdMap;
 import jloda.megan.classification.db.IClassificationsDatabase;
-import jloda.util.FileUtils;
-import jloda.util.progress.ProgressListener;
 import org.sqlite.SQLiteConfig;
 
 import java.io.IOException;
@@ -123,7 +124,7 @@ public class LoadClassifications implements IClassificationsDatabase {
 		final var meta = name2meta.get(cName);
 		if (meta == null)
 			return null;
-		return new IClassificationsDatabase.ClassificationInfo(meta.megaName(), meta.type(), meta.source(), meta.sourceVersion(), meta.doi(), meta.nodeCount(), meta.isDag());
+		return new IClassificationsDatabase.ClassificationInfo(meta.megaName(), meta.type(), meta.source(), meta.sourceVersion(), meta.fingerprint(), meta.compatibleWith(), meta.doi(), meta.nodeCount(), meta.isDag());
 	}
 
 	@Override
@@ -171,11 +172,6 @@ public class LoadClassifications implements IClassificationsDatabase {
 	}
 
 	/**
-	 * reads the ranks table (rank id -&gt; rank name). The ranks are per classification; the released schema names
-	 * the key column {@code classification}, an earlier draft named it {@code classifications}, and a still older
-	 * flat {@code id, name} table is also handled. Rank names are kept both per classification and in a merged map.
-	 */
-	/**
 	 * reads the {@code db_info(key,value)} table, which describes the database as a whole ({@code db_release},
 	 * {@code db_type}, {@code created}, {@code megan_min_version}). Absent in a database that predates it.
 	 */
@@ -189,6 +185,11 @@ public class LoadClassifications implements IClassificationsDatabase {
 		}
 	}
 
+	/**
+	 * reads the ranks table (rank id -&gt; rank name). The ranks are per classification; the released schema names
+	 * the key column {@code classification}, an earlier draft named it {@code classifications}, and a still older
+	 * flat {@code id, name} table is also handled. Rank names are kept both per classification and in a merged map.
+	 */
 	private void loadRanks(Connection connection) throws SQLException {
 		try (var statement = connection.createStatement();
 			 var rs = statement.executeQuery("SELECT * FROM ranks")) {
@@ -228,6 +229,7 @@ public class LoadClassifications implements IClassificationsDatabase {
 				final var isDag = columns.contains("is_dag") && rs.getInt("is_dag") != 0;
 				final var source = str(rs, columns, "source");
 				final var sourceVersion = str(rs, columns, "source_version");
+				final var fingerprint = str(rs, columns, "fingerprint");
 				final var doi = str(rs, columns, "doi");
 				final var compatible = str(rs, columns, "compatible_with");
 				if (compatible != null) {
@@ -236,7 +238,7 @@ public class LoadClassifications implements IClassificationsDatabase {
 							compatibleWith.add(token.trim());
 				}
 				list.add(new ClassificationMeta(megaName(dbName), dbName, (displayName != null && !displayName.isBlank()) ? displayName : dbName,
-						type, treeTable, rootId, nodeCount, isDag, source, sourceVersion, doi));
+						type, treeTable, rootId, nodeCount, isDag, source, sourceVersion, doi, fingerprint, compatible));
 			}
 		}
 		return list;
@@ -419,7 +421,7 @@ public class LoadClassifications implements IClassificationsDatabase {
 	 */
 	private record ClassificationMeta(String megaName, String name, String displayName, String type, String treeTable,
 									  Integer rootId, int nodeCount, boolean isDag, String source, String sourceVersion,
-									  String doi) {
+									  String doi, String fingerprint, String compatibleWith) {
 	}
 
 	/**

@@ -68,6 +68,7 @@ public class Classification {
 		progress.setCancelable(false);
 
 		try {
+			VersionInfo.put(cName + " tree", db.getInfo(cName));
 			db.loadClassification(cName, fullTree, name2IdMap, progress);
 
 			if (cName.equals(Classification.Taxonomy)) {

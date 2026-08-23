@@ -26,19 +26,19 @@ import jloda.megan.classification.data.Name2IdMap;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Map;
 import java.util.Set;
 
 /**
  * a source of classifications (trees and id-mappings).
  * <p>
  * This is the abstraction that decouples MEGAN's classifications from any particular storage:
- * {@link ClassificationsDatabaseFromResources} serves the classifications bundled in the
- * {@code megan8/resources/files} branch of the jar, whereas {@link jloda.megan.classification.LoadClassifications}
- * serves them from an SQLite classification database (e.g. megan-classification-r1.db).
+ * {@link jloda.megan.classification.LoadClassifications} serves them from an SQLite classification database
+ * (e.g. megan8-classification-r1.db).
  * <p>
  * The name of a classifications database (its {@link #getName()}) is what gets recorded in meganized
- * DAA/RMA6/.megan files so that compatibility can later be checked. The bundled jar-resources source
- * uses the reserved name {@link #UNNAMED}.
+ * DAA/RMA6/.megan files so that compatibility can later be checked. A source with no name uses the
+ * reserved name {@link #UNNAMED}.
  * <p>
  * Rather than exposing storage-specific data (file streams work for Newick trees but cannot represent the GO
  * and EGGNOG DAGs), an implementation is asked to populate MEGAN's own structures directly via
@@ -78,6 +78,24 @@ public interface IClassificationsDatabase extends Closeable {
 	boolean hasClassification(String cName);
 
 	/**
+	 * the release tag this classification database was built as, from {@code db_info.db_release} (e.g. "r1"), or
+	 * null if it records none. A mapping database built against this one records the same tag, so that the pair
+	 * can be recognised as matched; see {@code docs/classification-db-versioning.md}.
+	 *
+	 * @return release tag or null
+	 */
+	default String getDbRelease() {
+		return null;
+	}
+
+	/**
+	 * gets the rank id -&gt; rank name map (merged across classifications), or empty if the database has no ranks
+	 */
+	default Map<Integer, String> getRankNames() {
+		return Map.of();
+	}
+
+	/**
 	 * populates the given full tree and id-mapping for the named classification. Implementations are responsible
 	 * for adding MEGAN's ancillary nodes (no-hits, unassigned, ...) and computing LCA addresses, as
 	 * {@link ClassificationFullTree#loadFromReader} and {@link ClassificationFullTree#finishLoadingFromDatabase}
@@ -108,11 +126,13 @@ public interface IClassificationsDatabase extends Closeable {
 	 * @param type          "taxonomy" or "function" (or null if unknown)
 	 * @param source        upstream source name (e.g. NCBI, GTDB), or null
 	 * @param sourceVersion source version / snapshot date, or null
+	 * @param fingerprint   content fingerprint of the classification, used for exact mapping-database matching, or null
+	 * @param compatibleWith comma-separated earlier releases this classification is backward-compatible with, or null
 	 * @param doi           citation / DOI, or null
 	 * @param nodeCount     number of nodes recorded for the classification, or -1 if unknown
 	 * @param isDag         whether the classification is a DAG (a leaf may sit under several parents)
 	 */
-	record ClassificationInfo(String name, String type, String source, String sourceVersion, String doi, int nodeCount, boolean isDag) {
+	record ClassificationInfo(String name, String type, String source, String sourceVersion, String fingerprint, String compatibleWith, String doi, int nodeCount, boolean isDag) {
 	}
 
 	/**
@@ -136,17 +156,6 @@ public interface IClassificationsDatabase extends Closeable {
 	 */
 	default Set<String> getCompatibleWith() {
 		return Set.of();
-	}
-
-	/**
-	 * the release tag this classification database was built as, from {@code db_info.db_release} (e.g. "r1"), or
-	 * null if it records none. A mapping database built against this one records the same tag, so that the pair
-	 * can be recognised as matched; see {@code docs/classification-db-versioning.md}.
-	 *
-	 * @return release tag or null
-	 */
-	default String getDbRelease() {
-		return null;
 	}
 
 	/**

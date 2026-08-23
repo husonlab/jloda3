@@ -19,6 +19,7 @@
  */
 package jloda.megan.classification;
 
+import java.util.function.Predicate;
 import jloda.megan.classification.data.Accession2IdMapFactory;
 import jloda.megan.classification.data.IString2IntegerMap;
 import jloda.megan.classification.data.IString2IntegerMapFactory;
@@ -69,6 +70,13 @@ public class IdMapper {
 	}
 
 	public static MeganMapDBFactory meganMapDBFactory = null;
+
+	/**
+	 * whether a mapping-database file is one this program may open. MEGAN Community Edition installs a filter
+	 * that rejects Ultimate Edition databases; the default accepts everything, since only MEGAN makes that
+	 * distinction.
+	 */
+	public static Predicate<String> meganMapDBFileFilter = fileName -> true;
 
 	public enum MapType {Accession, Synonyms, MeganMapDB}
 
