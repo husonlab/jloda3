@@ -52,7 +52,7 @@ public class ClassificationManager {
 		defaultClassificationsListExcludingNCBITaxonomy.add("EGGNOG");
 		defaultClassificationsListExcludingNCBITaxonomy.add("SEED");
 		defaultClassificationsListExcludingNCBITaxonomy.add("GO");
-		defaultClassificationsListExcludingNCBITaxonomy.add("KEGG");
+		defaultClassificationsListExcludingNCBITaxonomy.add("EC");
 		allSupportedClassificationsExcludingNCBITaxonomy.addAll(defaultClassificationsListExcludingNCBITaxonomy);
 
 		defaultClassificationsList.addAll(defaultClassificationsListExcludingNCBITaxonomy);
