@@ -442,13 +442,14 @@ public class ClassificationsDatabaseManager {
 		return ProgramProperties.get(CLASSIFICATIONS_DATABASE_MANIFEST_URL, DEFAULT_MANIFEST_URL);
 	}
 
-	// Production catalog (once the databases are hosted), a GitHub-releases manifest like the installer updater uses:
-	// public static final String DEFAULT_MANIFEST_URL = "https://github.com/husonlab/megan8/releases/latest/download/megan-classification-manifest.json";
+	// Production catalog: a GitHub-releases manifest, like the installer updater uses.
 	//
-	// Local testing: serve a directory containing manifest.json and the .db files, e.g.
+	// For local testing, serve a directory containing manifest.json and the .db files, e.g.
 	//     cd ~/megan-catalog && python3 -m http.server 8000
-	// (the property ClassificationsDatabaseManifestURL overrides this at runtime)
-	public static final String DEFAULT_MANIFEST_URL = "http://localhost:8000/manifest.json";
+	// and point MEGAN at it by setting the property, rather than by editing this line:
+	//     ClassificationsDatabaseManifestURL=http://localhost:8000/manifest.json
+	// (the property overrides this default at runtime)
+	public static final String DEFAULT_MANIFEST_URL = "https://github.com/husonlab/megan8/releases/latest/download/megan-classification-manifest.json";
 
 	/**
 	 * fetches the online catalog of classification databases available for download

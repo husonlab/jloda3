@@ -57,8 +57,6 @@ public class ArgsOptions {
 
     private boolean optionFound = false;
 
-    private boolean doLaTeX = false;
-    private String latexDescription = "";
 
     /**
      * constructor
@@ -97,14 +95,6 @@ public class ArgsOptions {
             setVerbose(getOption("-v", "--verbose", "verbose", false) && !doHelp);
         } catch (UsageException ignored) {
         }
-        try {
-            doLaTeX = (args.length > 0 && args[0].equalsIgnoreCase("latex")) || getOption("!latex", "!--latex", "Generate LaTeX section", false, false);
-            if (doLaTeX) {
-                doHelp = true;
-            }
-        } catch (UsageException ignored) {
-        }
-
         if (verbose)
             System.err.println(programName + " - " + getDescription() + "\nOptions:");
     }
@@ -209,11 +199,6 @@ public class ArgsOptions {
     public void done() throws UsageException {
         if (!alreadyHasOtherComment)
             comment(OTHER);
-
-        if (doLaTeX) {
-            System.out.println(getLatexSection());
-            System.exit(0);
-        }
 
         if (verbose) {
             System.err.println("\t--verbose: true");
@@ -787,19 +772,4 @@ public class ArgsOptions {
         }
     }
 
-    public void setLatexDescription(String latexDescription) {
-        this.latexDescription = latexDescription;
-    }
-
-    public String getLatexSection() {
-        var title = StringUtils.fromCamelCase(Basic.getMainClassName()).replace("A Add", "AAdd")
-                .replaceAll("\\s*3\\s*", "3").replaceAll("\\s*2\\s*", " to ");
-        var toolName = title.toLowerCase().replaceAll(" to ", "2").replaceAll(" ", "-");
-        return "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n"
-               + "\\section{%s}%n%n".formatted(title) +
-               "The \\verb^%s^ commandline program. \\index{%s program}%n%n".formatted(toolName, toolName) +
-               latexDescription + "\n\n{\\footnotesize\n\\begin{Verbatim}[breaklines=true]\n" +
-               StringUtils.getTextBefore("AUTHOR(s)", getUsage().replaceAll("Default value: /.*/", "Default value: "))
-               + "\\end{Verbatim}\n}\n\n";
-    }
 }
