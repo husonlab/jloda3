@@ -90,7 +90,7 @@ public class AMultipleSelectionModel<T> extends MultipleSelectionModel<T> {
                             set.add(AMultipleSelectionModel.this.items[i]);
                         }
                         if (!getListenersSuspended()) {
-                            unmodifiableSelectedIndices.removeAll(c.getAddedSubList());
+							unmodifiableSelectedIndices.removeAll(c.getRemoved()); // this said getAddedSubList(), which is empty here
                             unmodifiableSelectedItems.removeAll(set);
                         }
                         selectedItems.removeAll(set);

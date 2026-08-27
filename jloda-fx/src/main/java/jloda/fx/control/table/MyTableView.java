@@ -32,17 +32,18 @@ import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.input.*;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
+import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.util.converter.DefaultStringConverter;
 import jloda.fx.control.AMultipleSelectionModel;
+import jloda.fx.util.BasicFX;
 import jloda.fx.window.MainWindowManager;
-import jloda.util.BitSetUtils;
 import jloda.util.NumberUtils;
 import jloda.util.StringUtils;
 import jloda.util.Triplet;
@@ -88,11 +89,44 @@ public class MyTableView extends Pane {
     private int updatePauseLevel = 0; // if level larger than 0 then updating is paused
     private final LongProperty update = new SimpleLongProperty(0);
 
+    private static final String SELECTED_STYLE_CLASS = "selected";
+
+    // the table's cell selection is the one source of truth; everything below is derived from it
+    private final ObservableList<String> selectedRowNames = FXCollections.observableArrayList();
+    private final ObservableList<String> unmodifiableSelectedRowNames = FXCollections.unmodifiableObservableList(selectedRowNames);
+    private final LongProperty selectionUpdate = new SimpleLongProperty(0);
+    private int selectionPauseLevel = 0; // while larger than 0, selection changes are collected rather than applied
+    private boolean selectionUpdatePending = false;
+    private int rowSelectionAnchor = -1; // for shift-click in the row header
+    private String sortedColName = null; // which column the rows are in the order of, to mark its heading again after a reload
+    private TableColumn.SortType sortedType = TableColumn.SortType.ASCENDING;
+
+    private static final int MAX_UNDO = 20;
+    private final Deque<TableState> undoStack = new ArrayDeque<>();
+    private final Deque<TableState> redoStack = new ArrayDeque<>();
+    private final BooleanProperty canUndo = new SimpleBooleanProperty(false);
+    private final BooleanProperty canRedo = new SimpleBooleanProperty(false);
+    private TableState currentState; // the table as it stood after the last change, i.e. what an undo goes back to
+    private boolean applyingHistory = false;
+    private boolean resetHistoryOnNextUpdate = false;
+
+    private static final double MIN_ROW_HEADER_WIDTH = 60;
+    private static final double MAX_ROW_HEADER_WIDTH = 400;
+    private static final double MIN_COL_WIDTH = 60;
+    private static final double MAX_COL_WIDTH = 300;
+    private static final int MAX_ROWS_MEASURED_PER_COL = 200; // enough to size a column, cheap on a big table
+    private static final double DEFAULT_COLUMN_HEADER_HEIGHT = 26; // only until the table has a skin to measure
+
+    private final SplitPane splitPane;
+    private final DoubleProperty rowHeaderWidth = new SimpleDoubleProperty(200);
+    private boolean settingRowHeaderWidth = false; // true while we are the ones moving the divider
+    private boolean rowHeaderWidthSetByUser = false; // once the divider has been dragged, leave it where it is
+
     private final Image dragImage;
 
     public MyTableView() {
         rowHeaderView = new ListView<>();
-        rowHeaderView.setMinWidth(200);
+        rowHeaderView.setMinWidth(0); // the divider decides the width, so let the user make it as narrow as they like
         rowHeaderView.setPrefWidth(200);
         rowHeaderView.setSelectionModel(new AMultipleSelectionModel<>());
         rowHeaderView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
@@ -116,11 +150,35 @@ public class MyTableView extends Pane {
             rowGraphicMap.addListener((InvalidationListener) (e) -> cell.setGraphic(rowGraphicMap.get(cell.getText())));
             cell.textProperty().addListener((c, o, n) -> cell.setGraphic(rowGraphicMap.get(n)));
 
+            // a name too long for the header is clipped, so show it in full on hover
+            final Tooltip tooltip = new Tooltip();
+            tooltip.textProperty().bind(cell.itemProperty());
+            cell.itemProperty().addListener((c, o, n) -> cell.setTooltip(n == null ? null : tooltip));
+
+            // clicking a row header selects the row itself: the header shows the table's selection, it does not hold one of its own
+            cell.setOnMouseClicked((e) -> {
+                if (e.getButton() == MouseButton.PRIMARY && !cell.isEmpty()) {
+                    final int index = cell.getIndex();
+                    if (e.isShiftDown() && rowSelectionAnchor >= 0) {
+                        selectRowRange(rowSelectionAnchor, index);
+                    } else if (e.isShortcutDown()) {
+                        selectRow(index, !isRowSelected(index));
+                        rowSelectionAnchor = index;
+                    } else {
+                        inOneSelectionStep(() -> {
+                            tableView.getSelectionModel().clearSelection();
+                            selectRow(index, true);
+                        });
+                        rowSelectionAnchor = index;
+                    }
+                    tableView.requestFocus();
+                    e.consume();
+                }
+            });
+
             final MenuItem selectMenuItem = new MenuItem("Select All Values");
             selectMenuItem.setOnAction((e) -> {
-                for (String rowName : rowHeaderView.getSelectionModel().getSelectedItems()) {
-                    selectRow(rowName, true);
-                }
+                selectRows(new ArrayList<>(getSelectedRows()), true);
                 tableView.requestFocus();
             });
 
@@ -223,32 +281,56 @@ public class MyTableView extends Pane {
             return cell;
         });
 
-        final HBox hbox = new HBox();
-
         VBox.setVgrow(rowHeaderView, Priority.ALWAYS);
-        final ToolBar pane = new ToolBar();
-        pane.setMinHeight(26);
-        pane.setMaxHeight(26);
-        pane.prefWidthProperty().bind(rowHeaderView.widthProperty());
-        pane.setOnMouseClicked((e) -> tableView.getSelectionModel().clearSelection());
-        final VBox leftVBox = new VBox(pane, rowHeaderView);
+        final ToolBar cornerSpacer = new ToolBar(); // sits above the row header, level with the column headers
+        cornerSpacer.setMinHeight(DEFAULT_COLUMN_HEADER_HEIGHT);
+        cornerSpacer.setPrefHeight(DEFAULT_COLUMN_HEADER_HEIGHT);
+        cornerSpacer.setMaxHeight(DEFAULT_COLUMN_HEADER_HEIGHT);
+        cornerSpacer.setOnMouseClicked((e) -> tableView.getSelectionModel().clearSelection());
+        final VBox leftVBox = new VBox(cornerSpacer, rowHeaderView);
+        leftVBox.setMinWidth(0);
 
-        HBox.setHgrow(leftVBox, Priority.SOMETIMES);
-        HBox.setHgrow(tableView, Priority.ALWAYS);
-        hbox.getChildren().setAll(leftVBox, tableView);
-
-        hbox.prefWidthProperty().bind(widthProperty());
-        hbox.prefHeightProperty().bind(heightProperty());
-
-        this.getChildren().add(hbox);
-
-        tableView.skinProperty().addListener((c, o, n) -> {
-            ScrollBar mainTableVerticalScrollBar = (ScrollBar) tableView.lookup(".scroll-bar:vertical");
-            ScrollBar rowHeaderScrollBar = (ScrollBar) rowHeaderView.lookup(".scroll-bar");
-            if (mainTableVerticalScrollBar != null && rowHeaderScrollBar != null) {
-                rowHeaderScrollBar.valueProperty().bindBidirectional(mainTableVerticalScrollBar.valueProperty());
-            }
+        splitPane = new SplitPane(leftVBox, tableView);
+        SplitPane.setResizableWithParent(leftVBox, false); // resizing the window widens the table, not the row header
+        splitPane.prefWidthProperty().bind(widthProperty());
+        splitPane.prefHeightProperty().bind(heightProperty());
+        splitPane.widthProperty().addListener((c, o, n) -> {
+            if (o.doubleValue() <= 0 && n.doubleValue() > 0)
+                applyRowHeaderWidth(); // the first time we know how wide we are
         });
+        // only an actual drag counts as the user choosing a width: the divider also moves while the pane lays itself out
+        whenLaidOut(60, () -> {
+            final Node divider = splitPane.lookup(".split-pane-divider");
+            if (divider == null)
+                return false;
+            divider.addEventFilter(MouseEvent.MOUSE_RELEASED, (e) -> {
+                if (!settingRowHeaderWidth) {
+                    rowHeaderWidthSetByUser = true;
+                    rowHeaderWidth.set(splitPane.getDividerPositions()[0] * splitPane.getWidth());
+                }
+            });
+            return true;
+        });
+        this.getChildren().add(splitPane);
+
+        tableView.skinProperty().addListener((c, o, n) -> whenLaidOut(60, () -> {
+            final ScrollBar mainTableVerticalScrollBar = (ScrollBar) tableView.lookup(".scroll-bar:vertical");
+            final ScrollBar rowHeaderScrollBar = (ScrollBar) rowHeaderView.lookup(".scroll-bar");
+            final Node columnHeader = tableView.lookup(".column-header-background");
+            final Node tableRow = tableView.lookup(".table-row-cell");
+            if (mainTableVerticalScrollBar == null || rowHeaderScrollBar == null
+                || !(columnHeader instanceof Region columnHeaderRegion) || !(tableRow instanceof Region tableRowRegion))
+                return false;
+            rowHeaderScrollBar.valueProperty().bindBidirectional(mainTableVerticalScrollBar.valueProperty());
+
+            // both of these were guesses that only held for the default font, and the row header slid out of
+            // register with the table as soon as it was not: take the numbers from the table itself
+            cornerSpacer.minHeightProperty().bind(columnHeaderRegion.heightProperty());
+            cornerSpacer.prefHeightProperty().bind(columnHeaderRegion.heightProperty());
+            cornerSpacer.maxHeightProperty().bind(columnHeaderRegion.heightProperty());
+            rowHeaderView.fixedCellSizeProperty().bind(tableRowRegion.heightProperty());
+            return true;
+        }));
 
         tableView.getItems().addListener((InvalidationListener) e -> {
             pausePostingUpdates();
@@ -266,47 +348,122 @@ public class MyTableView extends Pane {
         tableView.getColumns().addListener((InvalidationListener) e -> postUpdate());
 
         tableView.getSelectionModel().getSelectedCells().addListener((InvalidationListener) (e) -> {
-            final BitSet selectedRows = new BitSet();
-            final BitSet selectedCols = new BitSet();
-
-            for (TableColumn<MyTableRow, ?> column : tableView.getColumns()) {
-                column.getStyleClass().remove("selected");
-            }
-
-            for (var pos : tableView.getSelectionModel().getSelectedCells()) {
-                selectedRows.set(pos.getRow());
-                selectedCols.set(pos.getColumn());
-                if (pos.getColumn() < tableView.getColumns().size()) {
-                    TableColumn<MyTableRow, ?> column = getCol(pos.getColumn());
-                    column.getStyleClass().add("selected");
-                }
-            }
-            countSelectedRows.set(selectedRows.cardinality());
-            countSelectedCols.set(selectedCols.cardinality());
-
-            rowHeaderView.getSelectionModel().clearSelection();
-            for (int index : BitSetUtils.members(selectedRows)) {
-                Platform.runLater(() -> rowHeaderView.getSelectionModel().select(getRowName(index)));
-            }
-
+            if (selectionPauseLevel > 0)
+                selectionUpdatePending = true;
+            else
+                applySelection();
         });
 
         dragImage = createRectangleImage();
 
 
+        // typing over a cell starts editing it, with what was typed - which was collected and then dropped
         tableView.setOnKeyPressed((KeyEvent t) -> {
-            if (!t.isControlDown() && (t.getCode().isLetterKey() || t.getCode().isDigitKey())) {
-                lastKey = t.getText();
-                var tp = tableView.getFocusModel().getFocusedCell();
-                tableView.edit(tp.getRow(), tp.getTableColumn());
-                lastKey = null;
+            if (!t.isControlDown() && !t.isShortcutDown() && !t.isAltDown()
+                && (t.getCode().isLetterKey() || t.getCode().isDigitKey())) {
+                final var focused = tableView.getFocusModel().getFocusedCell();
+                if (focused != null && focused.getTableColumn() != null) {
+                    final String typed = t.getText();
+                    tableView.edit(focused.getRow(), focused.getTableColumn());
+                    Platform.runLater(() -> {
+                        if (tableView.lookup(".text-field-table-cell .text-field") instanceof TextField editor) {
+                            editor.setText(typed);
+                            editor.positionCaret(typed.length());
+                        }
+                    });
+                }
             }
         });
 
     }
 
-    String lastKey;
 
+    /**
+     * runs something that needs the skin's own nodes, retrying until they exist or the attempts run out
+     */
+    private void whenLaidOut(int attemptsLeft, java.util.function.BooleanSupplier action) {
+        if (!action.getAsBoolean() && attemptsLeft > 0)
+            Platform.runLater(() -> whenLaidOut(attemptsLeft - 1, action));
+    }
+
+    /**
+     * the width of the row header, in pixels
+     */
+    public double getRowHeaderWidth() {
+        return rowHeaderWidth.get();
+    }
+
+    public DoubleProperty rowHeaderWidthProperty() {
+        return rowHeaderWidth;
+    }
+
+    public void setRowHeaderWidth(double width) {
+        rowHeaderWidth.set(Math.max(MIN_ROW_HEADER_WIDTH, Math.min(MAX_ROW_HEADER_WIDTH, width)));
+        applyRowHeaderWidth();
+    }
+
+    /**
+     * lets the row header go back to fitting its contents, undoing a drag of the divider
+     */
+    public void resetRowHeaderWidth() {
+        rowHeaderWidthSetByUser = false;
+        fitRowHeaderWidth();
+    }
+
+    private void applyRowHeaderWidth() {
+        final double total = splitPane.getWidth();
+        if (total > 0) {
+            settingRowHeaderWidth = true;
+            try {
+                splitPane.setDividerPosition(0, Math.max(0.02, Math.min(0.9, rowHeaderWidth.get() / total)));
+            } finally {
+                settingRowHeaderWidth = false;
+            }
+        }
+    }
+
+    /**
+     * widens or narrows the row header to fit the row names it holds
+     */
+    public void fitRowHeaderWidth() {
+        if (rowHeaderWidthSetByUser)
+            return; // they have put the divider where they want it
+        final Font font = getRowHeaderFont();
+        double required = 0;
+        for (String rowName : rowHeaderView.getItems()) {
+            if (rowName != null)
+                required = Math.max(required, BasicFX.getTextDimension(rowName, font).getWidth());
+        }
+        setRowHeaderWidth(required + 56); // room for the row graphic, the cell padding and the scroll bar
+    }
+
+    /**
+     * sizes each column to the widest of its heading and its values
+     * <p>
+     * On a long table only the first rows are measured - past a couple of hundred, later rows almost never
+     * widen the column, and measuring them all is not worth the pass.
+     */
+    public void fitColumnWidths() {
+        final Font font = getRowHeaderFont();
+        for (var column : tableView.getColumns()) {
+            // the heading also has to fit the sort arrow, and it turns bold when the column is selected
+            double required = BasicFX.getTextDimension(column.getText(), font).getWidth() + 34;
+            final int rowsToMeasure = Math.min(tableView.getItems().size(), MAX_ROWS_MEASURED_PER_COL);
+            for (int row = 0; row < rowsToMeasure; row++) {
+                final String value = tableView.getItems().get(row).getValue(column.getText());
+                if (value != null)
+                    required = Math.max(required, BasicFX.getTextDimension(value, font).getWidth() + 16);
+            }
+            column.setPrefWidth(Math.max(MIN_COL_WIDTH, Math.min(MAX_COL_WIDTH, required)));
+        }
+    }
+
+    private Font getRowHeaderFont() {
+        if (rowHeaderView.lookup(".list-cell") instanceof Labeled labeled && labeled.getFont() != null)
+            return labeled.getFont();
+        else
+            return Font.getDefault();
+    }
 
     public void pausePostingUpdates() {
         updatePauseLevel++;
@@ -321,8 +478,225 @@ public class MyTableView extends Pane {
     }
 
     private void postUpdate() {
-        if (updatePauseLevel == 0)
+        if (updatePauseLevel == 0) {
+            recordHistory();
             update.set(update.get() + 1);
+        }
+    }
+
+    /**
+     * the table's contents, enough to put it back the way it was
+     */
+    public record TableState(ArrayList<String> rowNames, ArrayList<String> colNames, String[][] values) {
+    }
+
+    private TableState snapshotState() {
+        final var rowNames = getRowNames();
+        final var colNames = getColNames();
+        final var values = new String[rowNames.size()][colNames.size()];
+        for (int row = 0; row < rowNames.size(); row++) {
+            final MyTableRow tableRow = tableView.getItems().get(row);
+            for (int col = 0; col < colNames.size(); col++)
+                values[row][col] = tableRow.getValue(colNames.get(col));
+        }
+        return new TableState(rowNames, colNames, values);
+    }
+
+    /**
+     * remembers what the table looked like before the change that has just been made
+     * <p>
+     * A change that leaves the table exactly as it was records nothing. That matters because writing an edit
+     * through to a document typically makes the document notify its viewers, which loads the table again -
+     * an echo of the edit, not a second change, and the history has to survive it.
+     */
+    private void recordHistory() {
+        final TableState newState = snapshotState();
+        if (resetHistoryOnNextUpdate) {
+            resetHistoryOnNextUpdate = false;
+            undoStack.clear();
+            redoStack.clear();
+        } else if (!applyingHistory && currentState != null && !sameState(currentState, newState)) {
+            undoStack.push(currentState);
+            while (undoStack.size() > MAX_UNDO)
+                undoStack.removeLast();
+            redoStack.clear();
+        }
+        currentState = newState;
+        canUndo.set(!undoStack.isEmpty());
+        canRedo.set(!redoStack.isEmpty());
+    }
+
+    private static boolean sameState(TableState a, TableState b) {
+        return a.rowNames().equals(b.rowNames()) && a.colNames().equals(b.colNames())
+               && Arrays.deepEquals(a.values(), b.values());
+    }
+
+    public boolean isCanUndo() {
+        return canUndo.get();
+    }
+
+    public ReadOnlyBooleanProperty canUndoProperty() {
+        return canUndo;
+    }
+
+    public boolean isCanRedo() {
+        return canRedo.get();
+    }
+
+    public ReadOnlyBooleanProperty canRedoProperty() {
+        return canRedo;
+    }
+
+    /**
+     * forgets the history, for when the table is reloaded rather than edited
+     */
+    public void clearHistory() {
+        undoStack.clear();
+        redoStack.clear();
+        canUndo.set(false);
+        canRedo.set(false);
+        currentState = snapshotState();
+    }
+
+    public void undo() {
+        if (!undoStack.isEmpty()) {
+            if (currentState != null)
+                redoStack.push(currentState);
+            applyState(undoStack.pop());
+        }
+    }
+
+    public void redo() {
+        if (!redoStack.isEmpty()) {
+            if (currentState != null)
+                undoStack.push(currentState);
+            applyState(redoStack.pop());
+        }
+    }
+
+    private void applyState(TableState state) {
+        applyingHistory = true;
+        pausePostingUpdates();
+        try {
+            final var selection = captureSelection();
+            tableView.getSelectionModel().clearSelection();
+            tableView.getItems().clear();
+            tableView.getColumns().clear();
+            for (String colName : state.colNames())
+                tableView.getColumns().add(createTableCol(colName));
+            for (String rowName : state.rowNames())
+                tableView.getItems().add(new MyTableRow(rowName));
+            for (int row = 0; row < state.rowNames().size(); row++) {
+                final MyTableRow tableRow = tableView.getItems().get(row);
+                for (int col = 0; col < state.colNames().size(); col++)
+                    tableRow.setValue(state.colNames().get(col), state.values()[row][col]);
+            }
+            restoreSelection(selection);
+        } finally {
+            try {
+                resumePostingUpdates(); // ticks the update, so the caller writes the restored table back
+            } finally {
+                applyingHistory = false;
+                currentState = state;
+                canUndo.set(!undoStack.isEmpty());
+                canRedo.set(!redoStack.isEmpty());
+            }
+        }
+        Platform.runLater(this::fitColumnWidths);
+    }
+
+    /**
+     * collect selection changes rather than reacting to each one
+     * <p>
+     * Selecting a row or a column touches one cell at a time, so without this every one of those cells
+     * would trigger a full recomputation of the selection state, which is quadratic in the size of the table.
+     */
+    private void pauseSelectionUpdates() {
+        selectionPauseLevel++;
+    }
+
+    private void resumeSelectionUpdates() {
+        if (selectionPauseLevel > 0) {
+            selectionPauseLevel--;
+            if (selectionPauseLevel == 0 && selectionUpdatePending)
+                applySelection();
+        }
+    }
+
+    /**
+     * runs a bulk selection change, reacting to it once rather than once per cell
+     */
+    private void inOneSelectionStep(Runnable runnable) {
+        pauseSelectionUpdates();
+        try {
+            runnable.run();
+        } finally {
+            resumeSelectionUpdates();
+        }
+    }
+
+    /**
+     * recomputes everything derived from the table's cell selection: the counts, the names of the selected
+     * rows, the highlighting of the selected column headers and the selection shown in the row header
+     */
+    private void applySelection() {
+        selectionUpdatePending = false;
+
+        final BitSet selectedRows = new BitSet();
+        final BitSet selectedCols = new BitSet();
+        for (var pos : tableView.getSelectionModel().getSelectedCells()) {
+            if (pos.getRow() >= 0)
+                selectedRows.set(pos.getRow());
+            if (pos.getColumn() >= 0)
+                selectedCols.set(pos.getColumn());
+        }
+
+        // once per column, never once per cell: adding the style class per cell left hundreds of copies of it
+        // on the column, each one re-running CSS, and one remove() per event was never enough to clear them
+        for (int col = 0; col < tableView.getColumns().size(); col++) {
+            final var styleClass = tableView.getColumns().get(col).getStyleClass();
+            final boolean shouldBeSelected = selectedCols.get(col);
+            if (shouldBeSelected != styleClass.contains(SELECTED_STYLE_CLASS)) {
+                if (shouldBeSelected)
+                    styleClass.add(SELECTED_STYLE_CLASS);
+                else
+                    styleClass.removeAll(List.of(SELECTED_STYLE_CLASS)); // removeAll(), to also drop any older duplicates
+            }
+        }
+
+        final ArrayList<String> rowNames = new ArrayList<>(selectedRows.cardinality());
+        for (int row = selectedRows.nextSetBit(0); row != -1; row = selectedRows.nextSetBit(row + 1)) {
+            if (row < tableView.getItems().size())
+                rowNames.add(getRowName(row));
+        }
+        if (!rowNames.equals(selectedRowNames))
+            selectedRowNames.setAll(rowNames);
+
+        countSelectedRows.set(selectedRows.cardinality());
+        countSelectedCols.set(selectedCols.cardinality());
+
+        syncRowHeaderSelection(selectedRows);
+
+        selectionUpdate.set(selectionUpdate.get() + 1);
+    }
+
+    /**
+     * brings the row header's own selection into line with the table's, changing only what differs
+     */
+    private void syncRowHeaderSelection(BitSet selectedRows) {
+        final var model = (AMultipleSelectionModel<String>) rowHeaderView.getSelectionModel();
+        final var items = rowHeaderView.getItems();
+        final ArrayList<String> toSelect = new ArrayList<>();
+        final ArrayList<String> toClear = new ArrayList<>();
+        for (int row = 0; row < items.size(); row++) {
+            final boolean shouldBeSelected = selectedRows.get(row);
+            if (shouldBeSelected != model.isSelected(row))
+                (shouldBeSelected ? toSelect : toClear).add(items.get(row));
+        }
+        if (!toClear.isEmpty())
+            model.clearSelection(toClear);
+        if (!toSelect.isEmpty())
+            model.selectItems(toSelect);
     }
 
     public void renameRow(String oldName, String newName) {
@@ -370,7 +744,7 @@ public class MyTableView extends Pane {
     private TableColumn<MyTableRow, String> createTableCol(String colName) {
         final TableColumn<MyTableRow, String> tableColumn = new TableColumn<>(colName);
 
-        tableColumn.setSortable(false);
+        tableColumn.setSortable(false); // sorting is on the heading's context menu; a click must not reorder the table
 
         tableColumn.setCellValueFactory(p -> p.getValue().valueProperty(tableColumn.getText()));
 
@@ -407,10 +781,13 @@ public class MyTableView extends Pane {
         final MenuItem selectMenuItem = new MenuItem("Select All Values");
         selectMenuItem.setOnAction((e) -> selectCol(tableColumn, true));
 
-        final MenuItem sortMenuItem = new MenuItem("Sort By Column");
-        sortMenuItem.setOnAction((e) -> sortByCol(tableColumn.getText(), tableColumn.getSortType() == TableColumn.SortType.DESCENDING ? TableColumn.SortType.ASCENDING : TableColumn.SortType.DESCENDING));
+        final MenuItem sortAscendingMenuItem = new MenuItem("Sort Ascending");
+        sortAscendingMenuItem.setOnAction((e) -> sortByCol(tableColumn.getText(), TableColumn.SortType.ASCENDING));
 
-        contextMenu.getItems().addAll(selectMenuItem, sortMenuItem, new SeparatorMenuItem());
+        final MenuItem sortDescendingMenuItem = new MenuItem("Sort Descending");
+        sortDescendingMenuItem.setOnAction((e) -> sortByCol(tableColumn.getText(), TableColumn.SortType.DESCENDING));
+
+        contextMenu.getItems().addAll(selectMenuItem, sortAscendingMenuItem, sortDescendingMenuItem, new SeparatorMenuItem());
 
         final MenuItem addColumnMenuItem = new MenuItem("Add Column...");
         addColumnMenuItem.setOnAction((e) -> {
@@ -457,9 +834,6 @@ public class MyTableView extends Pane {
                 if (!(contextMenu.getItems().get(contextMenu.getItems().size() - 1) instanceof SeparatorMenuItem))
                     contextMenu.getItems().add(new SeparatorMenuItem());
                 contextMenu.getItems().addAll(getAdditionColHeaderMenuItems().apply(tableColumn.getText()));
-            }
-            for (MenuItem item : contextMenu.getItems()) {
-                item.setStyle("-fx-text-fill: black");
             }
         });
 
@@ -508,19 +882,76 @@ public class MyTableView extends Pane {
         }
     }
 
+    /**
+     * sorts the rows by one column, and marks that column's heading with the direction
+     */
     public void sortByCol(String colName, TableColumn.SortType sortType) {
+        final TableColumn<MyTableRow, ?> tableColumn = getCol(colName);
+        if (tableColumn != null) {
+            tableColumn.setSortType(sortType);
+            applySort(colName, sortType);
+            sortedColName = colName;
+            sortedType = sortType;
+            showSortIndicator();
+        }
+    }
+
+    /**
+     * marks the sorted column's heading, since a heading that cannot be clicked draws no arrow of its own
+     */
+    private void showSortIndicator() {
+        for (var column : tableView.getColumns()) {
+            if (column.getText().equals(sortedColName)) {
+                final Label indicator = new Label(sortedType == TableColumn.SortType.ASCENDING ? "\u25b2" : "\u25bc");
+                indicator.getStyleClass().add("sort-indicator");
+                column.setGraphic(indicator);
+            } else
+                column.setGraphic(null);
+        }
+    }
+
+    /**
+     * reorders the rows, keeping whatever was selected selected
+     */
+    private void applySort(String colName, TableColumn.SortType sortType) {
         pausePostingUpdates();
         try {
-            final TableColumn<MyTableRow, ?> tableColumn = getCol(colName);
-            tableView.getSelectionModel().clearSelection();
+            final var selection = captureSelection();
             final ArrayList<MyTableRow> list = new ArrayList<>(tableView.getItems());
-            list.sort(new ColumnComparator(colName, tableColumn.getSortType(), list));
-            tableColumn.setSortType(sortType);
+            list.sort(new ColumnComparator(colName, sortType, list));
             tableView.getItems().setAll(list);
+            restoreSelection(selection);
             tableView.requestFocus();
-            tableView.getSelectionModel().select(0, tableColumn);
         } finally {
             resumePostingUpdates();
+        }
+    }
+
+    private record CellRef(String rowName, int col) {
+    }
+
+    private List<CellRef> captureSelection() {
+        final var list = new ArrayList<CellRef>();
+        for (var pos : tableView.getSelectionModel().getSelectedCells()) {
+            if (pos.getRow() >= 0 && pos.getRow() < tableView.getItems().size() && pos.getColumn() >= 0)
+                list.add(new CellRef(getRowName(pos.getRow()), pos.getColumn()));
+        }
+        return list;
+    }
+
+    private void restoreSelection(List<CellRef> cells) {
+        if (!cells.isEmpty()) {
+            final Map<String, Integer> rowIndex = new HashMap<>();
+            for (int row = 0; row < tableView.getItems().size(); row++)
+                rowIndex.put(getRowName(row), row);
+            inOneSelectionStep(() -> {
+                tableView.getSelectionModel().clearSelection();
+                for (var cell : cells) {
+                    final Integer row = rowIndex.get(cell.rowName());
+                    if (row != null && cell.col() < getColCount())
+                        selectCell(row, cell.col(), true);
+                }
+            });
         }
     }
 
@@ -572,19 +1003,26 @@ public class MyTableView extends Pane {
 
     public void selectByValue(String colName, String value) {
         final int col = getColIndex(colName);
-        for (int row = 0; row < getRowCount(); row++) {
-            if (value.equals(getValue(row, col))) {
-                selectCell(row, col, true);
-            }
+        if (col >= 0) {
+            inOneSelectionStep(() -> {
+                for (int row = 0; row < getRowCount(); row++) {
+                    if (value.equals(getValue(row, col)))
+                        selectCell(row, col, true);
+                }
+            });
         }
     }
 
     public void selectCol(TableColumn<MyTableRow, ?> column, boolean select) {
-        for (int row = 0; row < tableView.getItems().size(); row++) {
-            if (select)
-                tableView.getSelectionModel().select(row, column);
-            else
-                tableView.getSelectionModel().clearSelection(row, column);
+        if (column != null && !tableView.getItems().isEmpty()) {
+            inOneSelectionStep(() -> {
+                if (select)
+                    tableView.getSelectionModel().selectRange(0, column, tableView.getItems().size() - 1, column);
+                else {
+                    for (int row = 0; row < tableView.getItems().size(); row++)
+                        tableView.getSelectionModel().clearSelection(row, column);
+                }
+            });
         }
     }
 
@@ -592,39 +1030,57 @@ public class MyTableView extends Pane {
         selectCol(getCol(colName), select);
     }
 
+    public void selectCols(Collection<String> colNames, boolean select) {
+        inOneSelectionStep(() -> {
+            for (String colName : colNames)
+                selectCol(colName, select);
+        });
+    }
+
     public void selectRow(String rowName, boolean select) {
         selectRow(getRowIndex(rowName), select);
     }
 
-
+    /**
+     * the row header shows the table's selection, so selecting a row header means selecting the row
+     */
     public void selectRowHeader(String rowName, boolean select) {
-        final int index = getRowIndex(rowName);
-        if (index >= 0 && index < rowHeaderView.getItems().size()) {
-            if (select)
-                rowHeaderView.getSelectionModel().select(index);
-            else
-                rowHeaderView.getSelectionModel().clearSelection(index);
-        }
+        selectRow(rowName, select);
     }
 
     public void selectRowHeaders(Collection<String> rowNames, boolean select) {
-        for (String row : rowNames) {
-            selectRowHeader(row, select);
-        }
+        selectRows(rowNames, select);
     }
 
     public void selectRow(int row, boolean select) {
-        for (TableColumn<MyTableRow, ?> column : tableView.getColumns())
-            if (select)
-                tableView.getSelectionModel().select(row, column);
-            else
-                tableView.getSelectionModel().clearSelection(row, column);
+        if (row >= 0 && row < tableView.getItems().size() && !tableView.getColumns().isEmpty()) {
+            inOneSelectionStep(() -> {
+                if (select)
+                    tableView.getSelectionModel().selectRange(row, getCol(0), row, getCol(getColCount() - 1));
+                else {
+                    for (TableColumn<MyTableRow, ?> column : tableView.getColumns())
+                        tableView.getSelectionModel().clearSelection(row, column);
+                }
+            });
+        }
     }
 
     public void selectRows(Collection<String> rowNames, boolean select) {
-        for (String row : rowNames) {
-            selectRow(row, select);
-        }
+        inOneSelectionStep(() -> {
+            for (String row : rowNames)
+                selectRow(row, select);
+        });
+    }
+
+    /**
+     * selects all rows from one index to another, inclusive, replacing the current selection
+     */
+    public void selectRowRange(int fromRow, int toRow) {
+        inOneSelectionStep(() -> {
+            tableView.getSelectionModel().clearSelection();
+            for (int row = Math.min(fromRow, toRow); row <= Math.max(fromRow, toRow); row++)
+                selectRow(row, true);
+        });
     }
 
     public void selectCell(int rowId, int colId, boolean select) {
@@ -636,6 +1092,10 @@ public class MyTableView extends Pane {
 
     public boolean isSelected(int rowId, int colId) {
         return tableView.getSelectionModel().isSelected(rowId, tableView.getColumns().get(colId));
+    }
+
+    public boolean isRowSelected(int row) {
+        return row >= 0 && row < tableView.getItems().size() && selectedRowNames.contains(getRowName(row));
     }
 
     public String getASelectedCol() {
@@ -654,14 +1114,28 @@ public class MyTableView extends Pane {
     }
 
     public void selectAll(boolean select) {
-        if (select)
-            tableView.getSelectionModel().selectAll();
-        else
-            tableView.getSelectionModel().clearSelection();
+        inOneSelectionStep(() -> {
+            if (select)
+                tableView.getSelectionModel().selectAll();
+            else
+                tableView.getSelectionModel().clearSelection();
+        });
     }
 
+    /**
+     * the names of the selected rows, in table order
+     *
+     * @return an unmodifiable list, updated in step with the table's cell selection
+     */
     public ObservableList<String> getSelectedRows() {
-        return new ReadOnlyListWrapper<>(rowHeaderView.getSelectionModel().getSelectedItems());
+        return unmodifiableSelectedRowNames;
+    }
+
+    /**
+     * ticks once per selection change, however many cells that change touched
+     */
+    public ReadOnlyLongProperty selectionUpdateProperty() {
+        return selectionUpdate;
     }
 
     public ArrayList<Integer> getSelectedRowIndices() {
@@ -836,6 +1310,12 @@ public class MyTableView extends Pane {
         return additionRowHeaderMenuItems;
     }
 
+    /**
+     * items to append to a row header's context menu, built afresh for each showing
+     * <p>
+     * The items must not belong to another menu: adding a {@link MenuItem} to a context menu removes it
+     * from the one it was in.
+     */
     public void setAdditionRowHeaderMenuItems(Function<Collection<String>, Collection<MenuItem>> additionRowHeaderMenuItems) {
         this.additionRowHeaderMenuItems = additionRowHeaderMenuItems;
     }
@@ -844,6 +1324,12 @@ public class MyTableView extends Pane {
         return additionColHeaderMenuItems;
     }
 
+    /**
+     * items to append to a column heading's context menu, built afresh for each showing
+     * <p>
+     * The items must not belong to another menu: adding a {@link MenuItem} to a context menu removes it
+     * from the one it was in.
+     */
     public void setAdditionColHeaderMenuItems(Function<String, Collection<MenuItem>> additionColHeaderMenuItems) {
         this.additionColHeaderMenuItems = additionColHeaderMenuItems;
     }
@@ -1078,6 +1564,8 @@ public class MyTableView extends Pane {
     public void clear() {
         pausePostingUpdates();
         try {
+            resetHistoryOnNextUpdate = true;
+            sortedColName = null;
             tableView.getItems().clear();
             tableView.getColumns().clear();
         } finally {
@@ -1099,6 +1587,11 @@ public class MyTableView extends Pane {
         } finally {
             resumePostingUpdates();
         }
+        showSortIndicator(); // the columns are new objects, but the rows are still in the order we left them in
+        Platform.runLater(() -> {
+            fitRowHeaderWidth();
+            fitColumnWidths();
+        });
     }
 
     public String toString() {
@@ -1165,29 +1658,52 @@ public class MyTableView extends Pane {
         return sorted;
     }
 
+    /**
+     * orders rows by one column
+     * <p>
+     * A missing value must not turn a numerical column into a textual one - in a metadata table most columns
+     * have some - so missing values are left out of that decision and sorted to the end either way round.
+     */
     private class ColumnComparator implements Comparator<MyTableRow> {
         private final String colName;
-        private final TableColumn.SortType sortType;
-        private boolean sortAsNumbers;
+        private final int direction;
+        private final boolean sortAsNumbers;
 
         public ColumnComparator(String colName, TableColumn.SortType sortType, Collection<MyTableRow> rows) {
             this.colName = colName;
-            this.sortType = sortType;
-            sortAsNumbers = true;
+            this.direction = (sortType == TableColumn.SortType.ASCENDING ? 1 : -1);
+
+            boolean allPresentAreNumbers = true;
+            boolean anyPresent = false;
             for (MyTableRow row : rows) {
-                if (!NumberUtils.isDouble(row.getValue(colName))) {
-                    sortAsNumbers = false;
-                    break;
+                final String value = row.getValue(colName);
+                if (!isMissing(value)) {
+                    anyPresent = true;
+                    if (!NumberUtils.isDouble(value)) {
+                        allPresentAreNumbers = false;
+                        break;
+                    }
                 }
             }
+            sortAsNumbers = anyPresent && allPresentAreNumbers;
+        }
+
+        private boolean isMissing(String value) {
+            return value == null || value.isBlank() || value.equals(getDefaultNewCellValue());
         }
 
         @Override
         public int compare(MyTableRow a, MyTableRow b) {
-            if (sortAsNumbers)
-                return (sortType == TableColumn.SortType.ASCENDING ? 1 : -1) * Double.compare(NumberUtils.parseDouble(a.getValue(colName)), NumberUtils.parseDouble(b.getValue(colName)));
+            final String valueA = a.getValue(colName);
+            final String valueB = b.getValue(colName);
+            if (isMissing(valueA))
+                return isMissing(valueB) ? 0 : 1;
+            else if (isMissing(valueB))
+                return -1;
+            else if (sortAsNumbers)
+                return direction * Double.compare(NumberUtils.parseDouble(valueA), NumberUtils.parseDouble(valueB));
             else
-                return (sortType == TableColumn.SortType.ASCENDING ? 1 : -1) * a.getValue(colName).compareTo(b.getValue(colName));
+                return direction * valueA.compareTo(valueB);
         }
     }
 

@@ -18,8 +18,9 @@
  *
  */
 
+/* -fx-background rather than white, so the control follows whatever theme is in force */
 .table-row-cell:empty {
-    -fx-background-color: white;
+    -fx-background-color: -fx-background;
 }
 
 .table-row-cell:empty .table-cell {
@@ -27,7 +28,7 @@
 }
 
 .list-cell:empty {
-    -fx-background-color: white;
+    -fx-background-color: -fx-background;
 }
 
 .list-cell:empty .list-cell {
@@ -39,12 +40,25 @@
     -fx-background-insets: 0, 0 1 1 0, 1 2 2 1;
 }
 
-.list-cell:selected {
-    -fx-text-fill: -fx-accent;
+.list-cell:filled:selected {
+    -fx-background-color: -fx-box-border, -fx-inner-border, -fx-selection-bar;
+    -fx-background-insets: 0, 0 1 1 0, 1 2 2 1;
+    -fx-text-fill: -fx-text-background-color;
     -fx-font-weight: bold;
 }
 
 .table-view .column-header.selected .label {
     -fx-text-fill: -fx-accent;
     -fx-font-weight: bold;
+}
+
+/* the sort indicator is a graphic on the column, so put it after the attribute name rather than before it */
+.table-view .column-header .label {
+    -fx-content-display: right;
+    -fx-graphic-text-gap: 4px;
+}
+
+.sort-indicator {
+    -fx-font-size: 80%;
+    -fx-opacity: 0.7;
 }
