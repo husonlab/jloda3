@@ -24,6 +24,11 @@
 
 .scroll-pane {
     -fx-background: white;
+    /* single white background layer with no inset: removes modena's 1px grey viewport frame, which
+       otherwise shows around the content and defeats tight image cropping on Copy Image / export */
+    -fx-background-color: white;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
 }
 
 .rich-text-label {

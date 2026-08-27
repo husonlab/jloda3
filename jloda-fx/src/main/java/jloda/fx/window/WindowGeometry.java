@@ -22,6 +22,8 @@ package jloda.fx.window;
 
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 import jloda.util.NumberUtils;
@@ -149,7 +151,25 @@ public class WindowGeometry {
 	}
 
 	public static void listenToStage(Stage stage) {
-		if (stage.isShowing() && isPlausible(stage.getX(), stage.getY())) {
+		if (stage.isShowing()) {
+			addStageListeners(stage);
+		} else {
+			// the stage may not be showing yet (e.g. this is called before Stage.show(), as when opening a
+			// second window); attach the listeners once it is shown, so that its size changes are remembered too
+			stage.showingProperty().addListener(new ChangeListener<>() {
+				@Override
+				public void changed(ObservableValue<? extends Boolean> observable, Boolean wasShowing, Boolean isShowing) {
+					if (isShowing) {
+						observable.removeListener(this);
+						addStageListeners(stage);
+					}
+				}
+			});
+		}
+	}
+
+	private static void addStageListeners(Stage stage) {
+		if (isPlausible(stage.getX(), stage.getY())) {
 			stage.xProperty().addListener(e -> update(stage.getX(), null, null, null));
 			stage.yProperty().addListener(e -> update(null, stage.getY(), null, null));
 			stage.widthProperty().addListener(e -> update(null, null, stage.getWidth(), null));
