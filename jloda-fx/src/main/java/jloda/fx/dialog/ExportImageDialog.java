@@ -35,6 +35,7 @@ import javafx.stage.Stage;
 import jloda.fx.print.SaveToPDF;
 import jloda.fx.print.SaveToPNG;
 import jloda.fx.print.SaveToSVG;
+import jloda.fx.util.FileChooserManager;
 import jloda.fx.util.ProgramProperties;
 import jloda.fx.window.MainWindowManager;
 import jloda.fx.window.NotificationManager;
@@ -87,11 +88,8 @@ public class ExportImageDialog {
 		fileChooser.setTitle("Export Image");
 
 		var previousFormat = ProgramProperties.get("SaveImageFormat", "png");
-		var previousDir = new File(ProgramProperties.get("SaveImageDir", ""));
-		if (previousDir.isDirectory()) {
-			fileChooser.setInitialDirectory(previousDir);
-		} else
-			fileChooser.setInitialDirectory((new File(file).getParentFile()));
+		// fall back to the source file's folder; a folder remembered under "SaveImageDir" takes precedence
+		fileChooser.setInitialDirectory(new File(file).getParentFile());
 		fileChooser.setInitialFileName(FileUtils.getFileNameWithoutPathOrSuffix(file) + "." + previousFormat);
 
 		var supported = new String[]{"png", "pdf", "svg"};
@@ -99,14 +97,13 @@ public class ExportImageDialog {
 		fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(String.format("Image Files (%s)", StringUtils.toString(supported, ", ")), formats));
 
 		try {
-			var selectedFile = fileChooser.showSaveDialog(stage);
+			var selectedFile = FileChooserManager.showSaveDialog(stage, fileChooser, "SaveImageDir");
 			if (selectedFile != null) {
 				var suffix = FileUtils.getFileSuffix(selectedFile.getName()).replaceAll("^.", "");
 				var format = Arrays.stream(supported).filter(s -> s.equalsIgnoreCase(suffix)).findAny().orElse(null);
 				if (format != null) {
 					saveNodeAsImage(mainNode, format, selectedFile);
 					ProgramProperties.put("SaveImageFormat", format);
-					ProgramProperties.put("SaveImageDir", selectedFile.getParent());
 				} else
 					throw new IOException("Unknown image format: " + suffix);
 			}

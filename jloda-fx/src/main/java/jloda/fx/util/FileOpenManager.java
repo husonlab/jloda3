@@ -46,11 +46,7 @@ public class FileOpenManager {
 	public static EventHandler<ActionEvent> createOpenFileEventHandler(Stage stage) {
 		return event ->
 		{
-			File previousDir = new File(ProgramProperties.get(getPropertiesKeyword(), ""));
-
 			final FileChooser fileChooser = new FileChooser();
-			if (previousDir.isDirectory())
-				fileChooser.setInitialDirectory(previousDir);
 			if (ProgramProperties.getProgramVersion() != null)
 				fileChooser.setTitle("Open File - " + ProgramProperties.getProgramVersion());
 			else
@@ -58,10 +54,9 @@ public class FileOpenManager {
 
 			if (getExtensions() != null)
 				fileChooser.getExtensionFilters().addAll(getExtensions());
-			final File selectedFile = fileChooser.showOpenDialog(stage);
+			final File selectedFile = FileChooserManager.showOpenDialog(stage, fileChooser, getPropertiesKeyword());
 
 			if (selectedFile != null && getFileOpener() != null) {
-				ProgramProperties.put(getPropertiesKeyword(), selectedFile.getParent());
 				getFileOpener().accept(selectedFile.getPath());
 				RecentFilesManager.getInstance().insertRecentFile(selectedFile.getPath());
 			}
