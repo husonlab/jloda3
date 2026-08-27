@@ -44,6 +44,58 @@ public class TaxonomicLevels {
 
 	private final BitSet majorRanks = new BitSet();
 
+	/**
+	 * the ranks that make up an exported lineage, in order, with the one-letter code each is written as.
+	 * <p>
+	 * This is deliberately NOT {@link #majorRanks}, which is the list of ranks a user can <em>choose</em>
+	 * (collapse at rank, select by rank, project to rank) and where Kingdom is a useful choice. As a level in a
+	 * path Kingdom is not: NCBI carries it on only 22 nodes, and since it was extended to the prokaryotes
+	 * (Bacillati, Thermoproteati, ...) it inserts a level between Domain and Phylum that most users do not expect;
+	 * GTDB has no Kingdom at all, so including it also makes NCBI and GTDB paths differ in depth. The 2007 comment
+	 * on {@code majorRanks.set(1)} said as much.
+	 * <p>
+	 * Domain is written {@code k}, not {@code d}: that is the Greengenes/QIIME convention that
+	 * {@code megan8.util.ExportStamp} has always used, and downstream tools parse it.
+	 */
+	private static final int[] PATH_RANK_IDS = {127, 2, 3, 4, 5, 98, 100};
+	private static final char[] PATH_RANK_LETTERS = {'k', 'p', 'c', 'o', 'f', 'g', 's'};
+
+	/**
+	 * is this one of the ranks that make up an exported lineage? Kingdom is not; see {@link #PATH_RANK_IDS}.
+	 */
+	public static boolean isPathRank(int rank) {
+		for (var id : PATH_RANK_IDS) {
+			if (id == rank)
+				return true;
+		}
+		return false;
+	}
+
+	/**
+	 * the one-letter code a path rank is written as ('k' for Domain), or 0 if the rank is not a path rank
+	 */
+	public static char getPathLetter(int rank) {
+		for (var i = 0; i < PATH_RANK_IDS.length; i++) {
+			if (PATH_RANK_IDS[i] == rank)
+				return PATH_RANK_LETTERS[i];
+		}
+		return 0;
+	}
+
+	/**
+	 * the path ranks in order, from Domain down to Species
+	 */
+	public static int[] getPathRanks() {
+		return PATH_RANK_IDS.clone();
+	}
+
+	/**
+	 * the one-letter codes of the path ranks, in the same order, uppercased &mdash; e.g. "KPCOFGS"
+	 */
+	public static String getPathLetters() {
+		return new String(PATH_RANK_LETTERS).toUpperCase();
+	}
+
 	private static TaxonomicLevels instance;
 
 	/**
@@ -127,7 +179,7 @@ public class TaxonomicLevels {
 	 */
 	public static int getRankForOneLetterCode(String oneLetterLabel) {
 		return switch (oneLetterLabel.toLowerCase()) {
-			case "d" -> getId(Domain);
+			case "d", "k" -> getId(Domain); // 'k' is how a path writes Domain
 			case "p" -> getId(Phylum);
 			case "c" -> getId(Class);
 			case "o" -> getId(Order);
@@ -144,13 +196,8 @@ public class TaxonomicLevels {
 	 * @return code or null
 	 */
 	public static String getOneLetterCodeFromRank(int rank) {
-		if (isMajorRank(rank)) {
-			for (String name : getAllMajorRanks()) {
-				if (getId(name) == rank)
-					return name.substring(0, 1).toLowerCase();
-			}
-		}
-		return null;
+		final var letter = getPathLetter(rank);
+		return letter == 0 ? null : String.valueOf(letter);
 	}
 
 	/* used to set up table

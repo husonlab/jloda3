@@ -222,7 +222,9 @@ public class TaxonomyData {
 	 */
 	public static String getPath(int taxId, boolean majorRanksOnly) {
 
-		var expectedPath = "DKPCOFGS";
+		// the ranks a path is made of, and the letters they are written as: Domain..Species, Kingdom excluded
+		// (TaxonomicLevels.PATH_RANK_IDS explains why), with Domain written 'K' by the Greengenes convention
+		var expectedPath = TaxonomicLevels.getPathLetters();
 		var expectedIndex = 0;
 
 		final var v = taxonomyClassification.getFullTree().getANode(taxId);
@@ -231,7 +233,7 @@ public class TaxonomyData {
 			{
 				var w = v;
 				while (true) {
-					if (!majorRanksOnly || TaxonomicLevels.isMajorRank(taxonomyClassification.getId2Rank().get((Integer) w.getInfo())))
+					if (!majorRanksOnly || TaxonomicLevels.isPathRank(taxonomyClassification.getId2Rank().get((Integer) w.getInfo())))
 						path.push(w);
 					if (w.getInDegree() > 0)
 						w = w.getFirstInEdge().getSource();
@@ -245,25 +247,21 @@ public class TaxonomyData {
 				var id = (Integer) w.getInfo();
 				if (id != null) {
 					if (majorRanksOnly) {
-						var letters = TaxonomicLevels.getName(taxonomyClassification.getId2Rank().get((Integer) w.getInfo()));
+						// the letter comes from the shared path definition, not from the rank's name: a database may
+						// rename a rank (TaxonomicLevels.setFromDatabase), and Domain is written 'K' regardless
+						var key = Character.toUpperCase(TaxonomicLevels.getPathLetter(taxonomyClassification.getId2Rank().get(id)));
 
-						var key = Character.toUpperCase(letters.charAt(0));
 						while (expectedIndex < expectedPath.length() && key != expectedPath.charAt(expectedIndex)) {
-							var missing = expectedPath.charAt(expectedIndex);
-							if (missing != 'K') {
-								if (!buf.isEmpty())
-									buf.append(" ");
-								buf.append("[").append(missing == 'D' ? "D" : missing).append("] unknown;");
-							}
+							if (!buf.isEmpty())
+								buf.append(" ");
+							buf.append("[").append(expectedPath.charAt(expectedIndex)).append("] unknown;");
 							expectedIndex++;
 						}
 						expectedIndex++;
 
-						letters = letters.substring(0, 1);
-
 						if (!buf.isEmpty())
 							buf.append(" ");
-						buf.append("[").append(letters).append("] ").append(taxonomyClassification.getName2IdMap().get(id)).append(";");
+						buf.append("[").append(key).append("] ").append(taxonomyClassification.getName2IdMap().get(id)).append(";");
 					} else {
 						if (!buf.isEmpty())
 							buf.append(" ");
