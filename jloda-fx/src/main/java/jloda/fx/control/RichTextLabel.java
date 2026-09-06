@@ -312,6 +312,8 @@ public class RichTextLabel extends Group {
 	private static final int MAX_UPRIGHT_TRIES = 5;
 	private int _uprightTryCount = 0;
 
+	public static boolean DEBUG_UPRIGHT = false; // set true to trace label uprighting to System.err
+
 	/**
 	 * ensure text is upright
 	 */
@@ -341,11 +343,24 @@ public class RichTextLabel extends Group {
 						var upsideDown = (screenAngle.isPresent()
 										  && screenAngle.get() > 90 && screenAngle.get() < 270);
 
-						if (mirrored) {
+						// Correct BOTH axes in one pass so the glyph ends up non-mirrored with its local +X
+						// pointing right (upright). A single mirror-or-180 correction is not enough: after a
+						// reflection combined with an odd rotation (e.g. a circular layout rotated 90 then
+						// flipped) a label is both mirrored AND turned, and the old mirror-only branch left it
+						// rotated ~180. Here flipX turns +X back to the right; flipY removes any residual
+						// reflection. The four cases (mirrored x pointsLeft) all end det>0 with +X to the right.
+						var pointsLeft = upsideDown;
+						var flipX = pointsLeft;
+						var flipY = (mirrored != pointsLeft);
+						if (DEBUG_UPRIGHT)
+							System.err.printf("ensureUpright '%s': rotate=%.0f mirrored=%s screenAngle=%s -> flipX=%s flipY=%s%n",
+									getRawText(), getRotate(), mirrored,
+									screenAngle.map(a -> String.format("%.0f", a)).orElse("n/a"), flipX, flipY);
+						if (flipX) {
 							textFlow.setScaleX(-textFlow.getScaleX());
 							same = false;
-						} else if (upsideDown) {
-							textFlow.setScaleX(-textFlow.getScaleX());
+						}
+						if (flipY) {
 							textFlow.setScaleY(-textFlow.getScaleY());
 							same = false;
 						}
