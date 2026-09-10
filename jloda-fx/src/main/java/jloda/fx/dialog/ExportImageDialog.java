@@ -35,6 +35,7 @@ import javafx.stage.Stage;
 import jloda.fx.print.SaveToPDF;
 import jloda.fx.print.SaveToPNG;
 import jloda.fx.print.SaveToSVG;
+import jloda.fx.print.SaveToTikZ;
 import jloda.fx.util.FileChooserManager;
 import jloda.fx.util.ProgramProperties;
 import jloda.fx.window.MainWindowManager;
@@ -92,7 +93,7 @@ public class ExportImageDialog {
 		fileChooser.setInitialDirectory(new File(file).getParentFile());
 		fileChooser.setInitialFileName(FileUtils.getFileNameWithoutPathOrSuffix(file) + "." + previousFormat);
 
-		var supported = new String[]{"png", "pdf", "svg"};
+		var supported = new String[]{"png", "pdf", "svg", "tex"};
 		var formats = Arrays.stream(supported).map(f -> "*." + f).toArray(String[]::new);
 		fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(String.format("Image Files (%s)", StringUtils.toString(supported, ", ")), formats));
 
@@ -121,6 +122,7 @@ public class ExportImageDialog {
 				case "pdf" -> SaveToPDF.apply(node, file);
 				case "svg" -> SaveToSVG.apply(node, file);
 				case "png" -> SaveToPNG.apply(node, file);
+				case "tex" -> SaveToTikZ.apply(node, file);
 				default -> throw new IOException("Write failed: format not supported: " + formatName);
 			}
 		} finally {

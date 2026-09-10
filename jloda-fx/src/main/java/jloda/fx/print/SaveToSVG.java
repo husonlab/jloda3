@@ -23,8 +23,13 @@ package jloda.fx.print;
 import javafx.geometry.Bounds;
 import javafx.geometry.Point2D;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.SnapshotParameters;
 import javafx.scene.canvas.Canvas;
+import javafx.scene.effect.DropShadow;
+import javafx.scene.effect.Effect;
+import javafx.scene.effect.GaussianBlur;
+import javafx.scene.effect.InnerShadow;
 import javafx.scene.chart.Chart;
 import javafx.scene.control.Labeled;
 import javafx.scene.control.TextInputControl;
@@ -39,7 +44,6 @@ import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import jloda.fx.control.RichTextLabel;
 import jloda.fx.thirdparty.PngEncoderFX;
-import jloda.fx.util.BasicFX;
 import jloda.fx.util.GeometryUtilsFX;
 import jloda.fx.window.MainWindowManager;
 import jloda.util.Basic;
@@ -53,10 +57,14 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * save a root node and all descendants to an SVG image.
- * This is very incomplete. It doesn't reproduce CSS styling and doesn't reproduce effects and non-color paints
+ * This is very incomplete. It doesn't reproduce CSS styling and doesn't reproduce non-color paints.
+ * Common JavaFX effects (DropShadow, InnerShadow and GaussianBlur), such as the drop shadows used to
+ * highlight or indicate selection, are reproduced as SVG filters; other effect types are ignored.
  * Daniel Huson, 6.2023
  */
 public class SaveToSVG {
@@ -104,16 +112,20 @@ public class SaveToSVG {
 				<use xlink:href="#global-clip" />
 			 */
 
+		var filterDefs = new FilterDefs();
+		var body = new StringBuilder();
+
 		if (MainWindowManager.isUseDarkTheme()) {
-			buf.append(createRect(-5, -5, bounds.getWidth() + 10, bounds.getHeight() + 10, "fill=\"%s\"".formatted(asSvgColor(Color.web("rgb(60, 63, 65)")))));
+			body.append(createRect(-5, -5, bounds.getWidth() + 10, bounds.getHeight() + 10, "fill=\"%s\"".formatted(asSvgColor(Color.web("rgb(60, 63, 65)")))));
 		}
 
-		for (var n : BasicFX.getAllRecursively(root, n -> true)) {
-			// System.err.println("n: " + n.getClass().getSimpleName());
-			if (isNodeVisible(n)) {
-				buf.append(getSVG(root, n));
-			}
-		}
+		// a node that carries a translatable effect (e.g. a DropShadow highlight) is wrapped in a
+		// <g filter="url(#..)">, so the effect applies to the composited subtree, just as on screen
+		writeNodeRecursively(root, root, body, filterDefs);
+
+		if (!filterDefs.isEmpty())
+			buf.append(filterDefs.toSVG());
+		buf.append(body);
 		buf.append("</svg>\n");
 		try (var writer = FileUtils.getOutputWriterPossiblyZIPorGZIP(file.getPath())) {
 			writer.write(buf.toString());
@@ -253,6 +265,154 @@ public class SaveToSVG {
 		return buf.toString();
 	}
 
+
+	/**
+	 * recursively writes a node and all its descendants to the buffer. A node that carries a translatable
+	 * JavaFX effect (for example a DropShadow used to highlight a subtree or to indicate selection) is wrapped
+	 * in a {@code <g filter="url(#..)">} element, so the effect is applied to the composited subtree exactly as
+	 * it appears on screen. All geometry is emitted in root-local coordinates, so no transform is needed on the
+	 * wrapping group.
+	 *
+	 * @param root       the root node, used to resolve coordinates and scale
+	 * @param node       the current node
+	 * @param buf        the output buffer
+	 * @param filterDefs collects the SVG filter definitions
+	 */
+	private static void writeNodeRecursively(Node root, Node node, StringBuilder buf, FilterDefs filterDefs) {
+		if (!node.isVisible() || "iceberg".equals(node.getId()))
+			return;
+
+		String filterId = null;
+		if (node.getEffect() != null)
+			filterId = filterDefs.filterId(node.getEffect(), computeScaleFactor(root, node));
+
+		if (filterId != null)
+			buf.append("<g filter=\"url(#%s)\">%n".formatted(filterId));
+
+		if (selfDrawable(node))
+			buf.append(getSVG(root, node));
+
+		if (node instanceof Parent parent) {
+			for (var child : parent.getChildrenUnmodifiable())
+				writeNodeRecursively(root, child, buf, filterDefs);
+		}
+
+		if (filterId != null)
+			buf.append("</g>\n");
+	}
+
+	/**
+	 * should this node draw itself, independently of its children? Mirrors the node's own part of
+	 * {@link #isNodeVisible(Node)} (the ancestor visibility is handled by the recursion).
+	 */
+	private static boolean selfDrawable(Node node) {
+		if (node instanceof Shape shape)
+			return (shape.getFill() != null && shape.getFill() != Color.TRANSPARENT) || (shape.getStroke() != null && shape.getStroke() != Color.TRANSPARENT);
+		return true;
+	}
+
+	/**
+	 * accumulates SVG {@code <filter>} definitions for JavaFX effects, de-duplicating identical ones so that a
+	 * shared effect (such as a singleton selection effect) produces a single filter.
+	 */
+	private static final class FilterDefs {
+		private final StringBuilder defs = new StringBuilder();
+		private final Map<String, String> idByBody = new LinkedHashMap<>();
+
+		/**
+		 * returns the id of a filter realizing the given effect, or null if the effect type is not supported
+		 * (in which case the effect is silently ignored and only the geometry is exported)
+		 */
+		private String filterId(Effect effect, double scale) {
+			var body = filterBody(effect, scale <= 0 ? 1.0 : scale);
+			if (body == null)
+				return null;
+			return idByBody.computeIfAbsent(body, b -> {
+				var id = "effect" + (idByBody.size() + 1);
+				defs.append("<filter id=\"%s\" x=\"-20%%\" y=\"-20%%\" width=\"140%%\" height=\"140%%\">%n".formatted(id));
+				defs.append(b);
+				defs.append("</filter>\n");
+				return id;
+			});
+		}
+
+		private boolean isEmpty() {
+			return defs.isEmpty();
+		}
+
+		private String toSVG() {
+			return "<defs>\n" + defs + "</defs>\n";
+		}
+	}
+
+	/**
+	 * translates a JavaFX effect into the body (filter primitives) of an SVG filter, or returns null if the
+	 * effect type is not supported. Radii and offsets are given in the node's local units and are scaled to
+	 * root-local units by {@code scale}.
+	 */
+	private static String filterBody(Effect effect, double scale) {
+		if (effect instanceof DropShadow ds) {
+			var radius = clamp(ds.getRadius(), 0, 127) * scale;
+			var spread = clamp(ds.getSpread(), 0, 1);
+			return shadowFilter(false, radius, spread, ds.getColor(), ds.getOffsetX() * scale, ds.getOffsetY() * scale);
+		} else if (effect instanceof InnerShadow is) {
+			var radius = clamp(is.getRadius(), 0, 127) * scale;
+			var choke = clamp(is.getChoke(), 0, 1);
+			return shadowFilter(true, radius, choke, is.getColor(), is.getOffsetX() * scale, is.getOffsetY() * scale);
+		} else if (effect instanceof GaussianBlur gb) {
+			return "<feGaussianBlur in=\"SourceGraphic\" stdDeviation=\"%.3f\"/>%n".formatted(clamp(gb.getRadius(), 0, 63) * scale / 2.0);
+		} else {
+			return null; // unsupported effect type: geometry is still exported, only the effect is dropped
+		}
+	}
+
+	/**
+	 * builds the filter primitives for a drop shadow (shadow drawn behind the source) or an inner shadow
+	 * (shadow drawn inside, over the source). The shadow silhouette is the source alpha, optionally thickened
+	 * (spread/choke, via feMorphology) and softened (the remaining radius, via feGaussianBlur), then offset and
+	 * tinted.
+	 */
+	private static String shadowFilter(boolean inner, double radius, double spreadOrChoke, Color color, double dx, double dy) {
+		var dilate = spreadOrChoke * radius;
+		var sigma = Math.max(0.0, radius - dilate) / 2.0;
+		var buf = new StringBuilder();
+		var src = "SourceAlpha";
+		if (!inner && dilate > 0.05) {
+			buf.append("<feMorphology in=\"%s\" operator=\"dilate\" radius=\"%.3f\" result=\"eSpread\"/>%n".formatted(src, dilate));
+			src = "eSpread";
+		}
+		if (sigma > 0.05) {
+			buf.append("<feGaussianBlur in=\"%s\" stdDeviation=\"%.3f\" result=\"eBlur\"/>%n".formatted(src, sigma));
+			src = "eBlur";
+		}
+		if (dx != 0 || dy != 0) {
+			buf.append("<feOffset in=\"%s\" dx=\"%.3f\" dy=\"%.3f\" result=\"eOffset\"/>%n".formatted(src, dx, dy));
+			src = "eOffset";
+		}
+		buf.append("<feFlood flood-color=\"%s\" flood-opacity=\"%.3f\" result=\"eColor\"/>%n".formatted(asSvgColorRGB(color), color.getOpacity()));
+		if (inner) {
+			// keep the part of the shadow that lies inside the shape but is NOT covered by the offset/blurred alpha
+			buf.append("<feComposite in=\"SourceAlpha\" in2=\"%s\" operator=\"out\" result=\"eHole\"/>%n".formatted(src));
+			buf.append("<feComposite in=\"eColor\" in2=\"eHole\" operator=\"in\" result=\"eShadow\"/>%n");
+			buf.append("<feMerge><feMergeNode in=\"SourceGraphic\"/><feMergeNode in=\"eShadow\"/></feMerge>\n");
+		} else {
+			buf.append("<feComposite in=\"eColor\" in2=\"%s\" operator=\"in\" result=\"eShadow\"/>%n".formatted(src));
+			buf.append("<feMerge><feMergeNode in=\"eShadow\"/><feMergeNode in=\"SourceGraphic\"/></feMerge>\n");
+		}
+		return buf.toString();
+	}
+
+	private static double clamp(double value, double min, double max) {
+		return Math.max(min, Math.min(max, value));
+	}
+
+	/**
+	 * a shape's color as an SVG {@code #RRGGBB} string, ignoring the alpha (opacity is handled separately, e.g.
+	 * via a filter's flood-opacity)
+	 */
+	public static String asSvgColorRGB(Color color) {
+		return String.format("#%02X%02X%02X", (int) (color.getRed() * 255), (int) (color.getGreen() * 255), (int) (color.getBlue() * 255));
+	}
 
 	public static String createLine(double x1, double y1, double x2, double y2, String formatting) {
 		return "<line x1=\"%.2f\" y1=\"%.2f\" x2=\"%.2f\" y2=\"%.2f\" %s/>%n".formatted(x1, y1, x2, y2, formatting);
