@@ -1,5 +1,6 @@
 package jloda.fx.print;
 
+import javafx.geometry.Rectangle2D;
 import javafx.scene.image.Image;
 import javafx.scene.image.PixelReader;
 import javafx.scene.image.WritableImage;
@@ -133,6 +134,41 @@ public final class ImageCropper {
 		bin[1] += c.getRed();
 		bin[2] += c.getGreen();
 		bin[3] += c.getBlue();
+	}
+
+	/**
+	 * the tight bounding rectangle, in image pixels, of the content that is neither the background colour
+	 * (white, or the detected background when {@link #CROP_TO_BACKGROUND} is set) nor transparent. This is the
+	 * same detection that {@link #cropMargins} uses, but returns the rectangle rather than a cropped image, so
+	 * that a vector export can crop to exactly what the raster crop would have kept. No padding is applied.
+	 *
+	 * @return content rectangle in pixels, or null if the image is empty or entirely background
+	 */
+	public static Rectangle2D contentRectangle(Image image, double tol, double alphaTol) {
+		if (image == null) return null;
+		var w = (int) Math.round(image.getWidth());
+		var h = (int) Math.round(image.getHeight());
+		if (w <= 0 || h <= 0) return null;
+		var pr = image.getPixelReader();
+		if (pr == null) return null;
+
+		Color background = Color.WHITE;
+		if (CROP_TO_BACKGROUND) {
+			var detected = detectBackgroundColor(image, MIN_BACKGROUND_SHARE);
+			if (detected != null) background = detected;
+		}
+
+		var top = 0;
+		var bottom = h - 1;
+		var left = 0;
+		var right = w - 1;
+		while (top <= bottom && rowIsBackground(pr, w, top, background, tol, alphaTol)) top++;
+		while (bottom >= top && rowIsBackground(pr, w, bottom, background, tol, alphaTol)) bottom--;
+		while (left <= right && colIsBackground(pr, h, left, background, tol, alphaTol)) left++;
+		while (right >= left && colIsBackground(pr, h, right, background, tol, alphaTol)) right--;
+
+		if (top > bottom || left > right) return null; // all background
+		return new Rectangle2D(left, top, right - left + 1, bottom - top + 1);
 	}
 
 	/**

@@ -20,6 +20,8 @@
 
 package jloda.fx.dialog;
 
+import javafx.geometry.Bounds;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.SnapshotParameters;
 import javafx.scene.control.ScrollPane;
@@ -32,10 +34,12 @@ import javafx.scene.transform.NonInvertibleTransformException;
 import javafx.scene.transform.Transform;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import jloda.fx.print.ContentBoundsUtil;
 import jloda.fx.print.SaveToPDF;
 import jloda.fx.print.SaveToPNG;
 import jloda.fx.print.SaveToSVG;
 import jloda.fx.print.SaveToTikZ;
+import jloda.fx.print.TightSnapshot;
 import jloda.fx.util.FileChooserManager;
 import jloda.fx.util.ProgramProperties;
 import jloda.fx.window.MainWindowManager;
@@ -85,6 +89,16 @@ public class ExportImageDialog {
 	 * @param mainNode the main node to be exported
 	 */
 	public static void show(String file, Stage stage, Node mainNode) {
+		show(file, stage, mainNode, false);
+	}
+
+	/**
+	 * show a dialog for saving as an image in PNG, SVG, PDF or TeX format.
+	 *
+	 * @param tightCrop if true, the exported image is cropped to the node's painted content (all formats),
+	 *                  rather than to the node's full bounds, so that a wide pane does not leave white margins
+	 */
+	public static void show(String file, Stage stage, Node mainNode, boolean tightCrop) {
 		final var fileChooser = new FileChooser();
 		fileChooser.setTitle("Export Image");
 
@@ -103,7 +117,7 @@ public class ExportImageDialog {
 				var suffix = FileUtils.getFileSuffix(selectedFile.getName()).replaceAll("^.", "");
 				var format = Arrays.stream(supported).filter(s -> s.equalsIgnoreCase(suffix)).findAny().orElse(null);
 				if (format != null) {
-					saveNodeAsImage(mainNode, format, selectedFile);
+					saveNodeAsImage(mainNode, format, selectedFile, tightCrop);
 					ProgramProperties.put("SaveImageFormat", format);
 				} else
 					throw new IOException("Unknown image format: " + suffix);
@@ -114,15 +128,41 @@ public class ExportImageDialog {
 	}
 
 	public static void saveNodeAsImage(Node node, String formatName, File file) throws IOException {
+		saveNodeAsImage(node, formatName, file, false);
+	}
+
+	/**
+	 * writes a node to an image file. When tightCrop is set, the image is cropped to the node's painted content
+	 * (detected by rendering the node, in the same way as "Copy Image"), so that white margins around a wide pane
+	 * are removed while everything the node paints - including an overlaid legend - is kept.
+	 */
+	public static void saveNodeAsImage(Node node, String formatName, File file, boolean tightCrop) throws IOException {
 		var dark = MainWindowManager.isUseDarkTheme();
 		try {
 			if (dark)
 				MainWindowManager.setUseDarkTheme(false);
+			// compute the crop bounds in the same (light) theme in which the node is rendered and exported
+			var bounds = tightCrop ? ContentBoundsUtil.renderedContentBoundsLocal(node, 2) : null;
 			switch (formatName.toLowerCase()) {
-				case "pdf" -> SaveToPDF.apply(node, file);
-				case "svg" -> SaveToSVG.apply(node, file);
-				case "png" -> SaveToPNG.apply(node, file);
-				case "tex" -> SaveToTikZ.apply(node, file);
+				case "pdf" -> {
+					if (bounds != null) SaveToPDF.apply(node, bounds, file);
+					else SaveToPDF.apply(node, file);
+				}
+				case "svg" -> {
+					if (bounds != null) SaveToSVG.apply(node, bounds, file);
+					else SaveToSVG.apply(node, file);
+				}
+				case "png" -> {
+					if (bounds != null)
+						SaveToPNG.apply(TightSnapshot.snapshotBBoxTight(node,
+								new Rectangle2D(bounds.getMinX(), bounds.getMinY(), bounds.getWidth(), bounds.getHeight()),
+								Color.WHITE, 300, 0), file);
+					else SaveToPNG.apply(node, file);
+				}
+				case "tex" -> {
+					if (bounds != null) SaveToTikZ.apply(node, bounds, file);
+					else SaveToTikZ.apply(node, file);
+				}
 				default -> throw new IOException("Write failed: format not supported: " + formatName);
 			}
 		} finally {

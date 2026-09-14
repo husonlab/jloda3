@@ -1,13 +1,18 @@
 package jloda.fx.print;
 
+import javafx.geometry.BoundingBox;
 import javafx.geometry.Bounds;
 import javafx.geometry.Point2D;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.Parent;
+import javafx.scene.SnapshotParameters;
 import javafx.scene.control.Labeled;
+import javafx.scene.image.WritableImage;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
+import javafx.scene.transform.Transform;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -16,6 +21,59 @@ import java.util.List;
 public final class ContentBoundsUtil {
 
 	private ContentBoundsUtil() {
+	}
+
+	/**
+	 * the tight bounding box, in the node's local coordinates, of what the node actually paints, found by
+	 * rendering the node and detecting the non-background (non-white, opaque) pixels. Unlike
+	 * {@link #computeContentBoundsLocal}, which unions the geometric bounds of every descendant (and so
+	 * includes full-size transparent panes), this reflects only painted content, exactly as the raster crop
+	 * used for "Copy Image" does. Intended to supply crop bounds to the vector exporters.
+	 *
+	 * @param node the node to measure, must be in a scene
+	 * @param pad  padding, in local units, to keep around the detected content
+	 * @return tight content bounds in node-local coordinates, or null if nothing is painted
+	 */
+	public static Bounds renderedContentBoundsLocal(Node node, double pad) {
+		if (node == null || node.getScene() == null) return null;
+		node.applyCss();
+		if (node instanceof Parent parent) parent.layout();
+
+		var bil = node.getBoundsInLocal();
+		var w = bil.getWidth();
+		var h = bil.getHeight();
+		if (w <= 0 || h <= 0) return null;
+
+		// render at scale 1, but cap the pixel count so a huge (zoomed) drawing does not allocate a giant image;
+		// a slightly coarser bbox is fine as we pad it and clamp back to the node's own bounds
+		var maxPixels = 8_000_000.0;
+		var scale = (w * h > maxPixels) ? Math.sqrt(maxPixels / (w * h)) : 1.0;
+		var pxW = Math.max(1, (int) Math.ceil(w * scale));
+		var pxH = Math.max(1, (int) Math.ceil(h * scale));
+
+		var sp = new SnapshotParameters();
+		sp.setFill(Color.WHITE);
+		// map local point p to pixel (p - min) * scale, so pixel (px,py) corresponds to local (min + px/scale)
+		sp.setTransform(Transform.scale(scale, scale)
+				.createConcatenation(Transform.translate(-bil.getMinX(), -bil.getMinY())));
+
+		var image = node.snapshot(sp, new WritableImage(pxW, pxH));
+		var rect = ImageCropper.contentRectangle(image, 0.02, 0.1);
+		if (rect == null) return null;
+
+		var minX = bil.getMinX() + rect.getMinX() / scale - pad;
+		var minY = bil.getMinY() + rect.getMinY() / scale - pad;
+		var maxX = bil.getMinX() + (rect.getMinX() + rect.getWidth()) / scale + pad;
+		var maxY = bil.getMinY() + (rect.getMinY() + rect.getHeight()) / scale + pad;
+
+		// clamp to the node's own bounds
+		minX = Math.max(minX, bil.getMinX());
+		minY = Math.max(minY, bil.getMinY());
+		maxX = Math.min(maxX, bil.getMaxX());
+		maxY = Math.min(maxY, bil.getMaxY());
+		if (maxX <= minX || maxY <= minY) return null;
+
+		return new BoundingBox(minX, minY, maxX - minX, maxY - minY);
 	}
 
 	public static Rectangle2D computeContentBoundsLocal(Node root) {
