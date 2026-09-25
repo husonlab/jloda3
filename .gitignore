@@ -35,4 +35,7 @@ replay_pid*
 # Build
 target/
 
+# private AI working area (governance/lab notes); kept locally, not tracked
+/ai/
+
 
