@@ -224,7 +224,7 @@ public class Legend extends StackPane {
 												}
 											}
 										});
-										ProgramExecutorService.submit(10000, () -> Platform.runLater(() -> hbox.getChildren().remove(colorPicker)));
+										ProgramExecutorService.submit(120000, () -> Platform.runLater(() -> hbox.getChildren().remove(colorPicker)));
 									}
 								}
 								e.consume();
