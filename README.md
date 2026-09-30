@@ -5,7 +5,10 @@ This is the third major release of the JLODA java library of data-structures and
 
 The library has been split into multiple parts:
 
-- jloda-core contains core classes that do not use either Swing or JavaFX.
+- jloda-core contains core classes that do not use either Swing or JavaFX. New in September 2026:
+  `jloda.graph.layout.RectilinearLayout` straightens a drawing of a graph on a grid, so that edges run horizontally
+  or vertically where possible and diagonally otherwise, as in hand-drawn haplotype networks. It is used by the
+  network view of SplitsTree6 and by PhyloSketch2.
 - jloda-swing contains Swing-specific classes
 - jloda-fx contains JavaFX-specific classes
 - jloda-connect contains code to open a SQLite database file. This is currently isolated because it causes problems when transpiling to iOS
