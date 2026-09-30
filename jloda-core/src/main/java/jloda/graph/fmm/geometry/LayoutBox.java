@@ -90,9 +90,9 @@ public class LayoutBox {
     public void update(Graph graph, NodeArray<NodeAttributes> nodeAttributes) {
         if (!nodeAttributes.isEmpty()) {
             var xMin = Double.MAX_VALUE;
-            var xMax = Double.MIN_VALUE;
+            var xMax = Double.NEGATIVE_INFINITY; // not Double.MIN_VALUE, which is the smallest positive value
             var yMin = Double.MAX_VALUE;
-            var yMax = Double.MIN_VALUE;
+            var yMax = Double.NEGATIVE_INFINITY;
 
             for (var na : nodeAttributes) {
                 var pt = na.getPosition();

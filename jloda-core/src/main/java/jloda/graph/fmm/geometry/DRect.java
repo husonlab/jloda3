@@ -117,9 +117,9 @@ public class DRect implements FastMultiLayerMethodLayout.Point, FastMultiLayerMe
     public static DRect computeBBox(Collection<? extends FastMultiLayerMethodLayout.Point> points) {
         if (!points.isEmpty()) {
             double minX = Double.MAX_VALUE;
-            double maxX = Double.MIN_VALUE;
+            double maxX = Double.NEGATIVE_INFINITY; // not Double.MIN_VALUE, which is the smallest positive value
             double minY = Double.MAX_VALUE;
-            double maxY = Double.MIN_VALUE;
+            double maxY = Double.NEGATIVE_INFINITY;
             for (var point : points) {
                 minX = Math.min(minX, point.getX());
                 maxX = Math.max(maxX, point.getX());
