@@ -52,7 +52,7 @@ public class TriangularTreeLayout {
 					firstLastLeafBelowMap.put(v, new FirstLast<>(v, v));
 				} else {
 					var min = Double.MAX_VALUE;
-					var max = Double.MIN_VALUE;
+					var max = Double.NEGATIVE_INFINITY; // not Double.MIN_VALUE, which is the smallest positive value
 					Node firstLeafBelow = null;
 					Node lastLeafBelow = null;
 					for (var w : lsaBelow) {

@@ -102,7 +102,7 @@ public class GraphUtils {
 			return new Bounds(height, height);
 		} else {
 			double min = Double.MAX_VALUE;
-			double max = Double.MIN_VALUE;
+			double max = Double.NEGATIVE_INFINITY; // not Double.MIN_VALUE, which is the smallest positive value
 			for (var w : children) {
 				var minMax = computeNodeHeightMapRec(w, childrenMap, next, nodeHeightMap);
 				min = Math.min(min, minMax.min());

@@ -32,7 +32,7 @@ public class ComputeOrthogonalDisplacement {
 
 	public static <Node, Edge> double apply(Iterable<Node> nodes, Iterable<Edge> edges, Function<Edge, Node> getSource, Function<Edge, Node> getTarget, Predicate<Edge> useEdge, ToDoubleFunction<Node> nodeHeight) {
 		var min = Double.MAX_VALUE;
-		var max = Double.MIN_VALUE;
+		var max = Double.NEGATIVE_INFINITY; // not Double.MIN_VALUE, which is the smallest positive value
 		for (var v : nodes) {
 			min = Math.min(min, nodeHeight.applyAsDouble(v));
 			max = Math.max(max, nodeHeight.applyAsDouble(v));
