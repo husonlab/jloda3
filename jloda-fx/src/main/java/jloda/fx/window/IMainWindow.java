@@ -20,6 +20,7 @@
 
 package jloda.fx.window;
 
+import javafx.scene.layout.Pane;
 import javafx.stage.Stage;
 
 /**
@@ -54,4 +55,20 @@ public interface IMainWindow {
 	 */
 	void close();
 
+	/**
+	 * the pane that in-window notifications are shown over, or null if this window does not want them
+	 * <p>
+	 * The default is the scene root. Override this to put the notifications somewhere more specific:
+	 * over the document area rather than over the whole window, say, so that they do not cover a
+	 * status bar.
+	 *
+	 * @return the pane, or null to fall back to a screen notification
+	 */
+	default Pane getNotificationPane() {
+		var stage = getStage();
+		if (stage != null && stage.getScene() != null && stage.getScene().getRoot() instanceof Pane pane)
+			return pane;
+		else
+			return null;
+	}
 }

@@ -31,6 +31,7 @@ import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.util.Duration;
+import jloda.fx.icons.MaterialIcons;
 
 import java.util.*;
 
@@ -41,12 +42,20 @@ import java.util.*;
  * WindowNotifications.show(rootPane, "Hello world", MessageType.INFO);
  */
 public final class WindowNotifications {
-	public enum MessageType {INFO, WARNING, ERROR}
+	public enum MessageType {INFO, CONFIRMATION, WARNING, ERROR}
 
 	// Durations per message type
 	private static final Duration INFO_LIFETIME = Duration.seconds(8);
 	private static final Duration WARNING_LIFETIME = Duration.seconds(30);
 	private static final Duration ERROR_LIFETIME = Duration.seconds(120);
+
+	public static Duration defaultLifetime(MessageType type) {
+		return switch (type) {
+			case ERROR -> ERROR_LIFETIME;
+			case WARNING -> WARNING_LIFETIME;
+			default -> INFO_LIFETIME;
+		};
+	}
 
 	// Animation settings
 	private static final Duration ANIM_DURATION = Duration.millis(200);
@@ -76,16 +85,27 @@ public final class WindowNotifications {
 	 * Show a notification on the given pane.
 	 */
 	public static void show(Pane pane, String text, MessageType type) {
+		show(pane, null, text, type, null);
+	}
+
+	/**
+	 * Show a notification on the given pane, with a title line and an explicit lifetime.
+	 *
+	 * @param title    shown small above the message, or null for none
+	 * @param lifetime how long before it fades, or null for the default for this type
+	 */
+	public static void show(Pane pane, String title, String text, MessageType type, Duration lifetime) {
 		if (pane == null || text == null || type == null) return;
 		if (!Platform.isFxApplicationThread()) {
-			Platform.runLater(() -> show(pane, text, type));
+			Platform.runLater(() -> show(pane, title, text, type, lifetime));
 			return;
 		}
 
 		Pane overlay = getOrCreateOverlay(pane);
 		List<Notification> list = ACTIVE.computeIfAbsent(pane, ap -> new ArrayList<>());
 
-		Notification notification = createNotification(pane, overlay, text, type);
+		Notification notification = createNotification(pane, overlay, title, text, type,
+				lifetime != null ? lifetime : defaultLifetime(type));
 		list.add(notification);
 		overlay.getChildren().add(notification.node);
 
@@ -139,6 +159,18 @@ public final class WindowNotifications {
 			AnchorPane.setRightAnchor(overlay, 0.0);
 			AnchorPane.setBottomAnchor(overlay, 0.0);
 			AnchorPane.setLeftAnchor(overlay, 0.0);
+		} else {
+			// Any other pane either ignores a plain child (BorderPane, which positions only the
+			// children in its five slots) or lays it out as content (StackPane, which would centre
+			// it at its preferred size - zero, because the notifications inside are positioned by
+			// hand). Take it out of the parent's layout altogether and cover the pane ourselves;
+			// unmanaged also keeps the overlay out of the parent's own preferred-size computation,
+			// which would otherwise be a loop.
+			overlay.setManaged(false);
+			final Runnable fit = () -> overlay.resizeRelocate(0, 0, root.getWidth(), root.getHeight());
+			root.widthProperty().addListener((obs, o, n) -> fit.run());
+			root.heightProperty().addListener((obs, o, n) -> fit.run());
+			fit.run();
 		}
 
 		root.getChildren().add(overlay);
@@ -151,10 +183,22 @@ public final class WindowNotifications {
 	}
 
 	// Create a single notification node
-	private static Notification createNotification(Pane root, Pane overlay, String text, MessageType type) {
+	private static Notification createNotification(Pane root, Pane overlay, String title, String text,
+												   MessageType type, Duration lifetime) {
 		var label = new Label(text);
 		label.setWrapText(true);
 		label.setStyle("-fx-text-fill: white; -fx-font-size: 13;");
+
+		// the message, with the title above it when there is one
+		var textBox = new VBox(1);
+		if (title != null && !title.isBlank()) {
+			var titleLabel = new Label(title);
+			titleLabel.setStyle("-fx-text-fill: white; -fx-font-size: 10; -fx-opacity: 0.8;");
+			titleLabel.setMouseTransparent(true);
+			textBox.getChildren().add(titleLabel);
+		}
+		textBox.getChildren().add(label);
+		HBox.setHgrow(textBox, Priority.ALWAYS);
 
 		var spacer = new Region();
 		spacer.setMinWidth(0);
@@ -168,27 +212,26 @@ public final class WindowNotifications {
 				"-fx-text-fill: white; -fx-font-size: 11; -fx-padding: 0 0 0 8;"
 		);
 
-		var box = new HBox(10, label, spacer, closeButton);
+		var icon = MaterialIcons.graphic(switch (type) {
+			case CONFIRMATION -> MaterialIcons.task_alt;
+			case WARNING -> MaterialIcons.warning;
+			case ERROR -> MaterialIcons.error;
+			default -> MaterialIcons.info;
+		}, "-fx-font-size: 20; -fx-text-fill: white;");
+		icon.setMouseTransparent(true);
+
+		var box = new HBox(10, icon, textBox, spacer, closeButton);
 		box.setPadding(new Insets(8, 12, 8, 12));
 		box.setAlignment(Pos.CENTER_LEFT);
 		box.setMaxWidth(MAX_WIDTH);
 		box.setMinHeight(Region.USE_PREF_SIZE);
-		label.maxWidthProperty().bind(box.widthProperty().subtract(40));
+		label.maxWidthProperty().bind(box.widthProperty().subtract(80));
 
-		String bgColor;
-		var lifetime = switch (type) {
-			case ERROR -> {
-				bgColor = "#C53030";
-				yield ERROR_LIFETIME;
-			}
-			case WARNING -> {
-				bgColor = "#B7791F";
-				yield WARNING_LIFETIME;
-			}
-			default -> {
-				bgColor = "#2B6CB0";
-				yield INFO_LIFETIME;
-			}
+		var bgColor = switch (type) {
+			case ERROR -> "#C53030";
+			case WARNING -> "#B7791F";
+			case CONFIRMATION -> "#2F855A";
+			default -> "#2B6CB0";
 		};
 
 		box.setStyle("-fx-background-color: " + bgColor + "; -fx-background-radius: 6; -fx-border-radius: 6;");
@@ -197,9 +240,31 @@ public final class WindowNotifications {
 		var expiry = new PauseTransition(lifetime);
 		var notification = new Notification(box, expiry);
 		expiry.setOnFinished(e -> dismiss(root, notification));
-		closeButton.setOnAction(e -> dismiss(root, notification));
+		// shift-click closes all of them, as the popup implementation did
+		closeButton.setOnMousePressed(e -> {
+			if (e.isShiftDown())
+				dismissAll(root);
+			else
+				dismiss(root, notification);
+		});
 
 		return notification;
+	}
+
+	/**
+	 * Dismiss every notification showing on the given pane.
+	 */
+	public static void dismissAll(Pane root) {
+		if (!Platform.isFxApplicationThread()) {
+			Platform.runLater(() -> dismissAll(root));
+			return;
+		}
+		var list = ACTIVE.get(root);
+		if (list == null)
+			return;
+		for (var notification : new ArrayList<>(list)) {
+			dismiss(root, notification);
+		}
 	}
 
 	/**

@@ -36,6 +36,7 @@ import javafx.stage.*;
 import javafx.util.Duration;
 import jloda.fx.icons.MaterialIcons;
 import jloda.fx.notifications.NotificationsWindow;
+import jloda.fx.windownotifications.WindowNotifications;
 import jloda.util.ProgramProperties;
 
 import java.text.SimpleDateFormat;
@@ -67,6 +68,22 @@ public class NotificationManager {
 	private static String title;
 
 	public static boolean useNotificationsWindow = false;
+
+	/**
+	 * Show notifications inside the window rather than as popups anchored to the screen.
+	 * <p>
+	 * On by default, because the popup implementation has three faults that an in-window
+	 * notification does not have by construction: a popup is a CHILD WINDOW of its owner, so the
+	 * window manager moves it when the user drags the window although it was positioned in screen
+	 * coordinates (measured: move the owner by (+320,-240) and the notification goes with it, while
+	 * Popup.getX() keeps reporting the old position, which is what the stacking animation then
+	 * computes from); a screen holds about 22 of them and the rest march off the top; and a popup is
+	 * a separate native window, which is why the mobile apps switch notifications off altogether.
+	 * <p>
+	 * Set false to go back to the popups. Where no suitable pane can be found, the popups are used
+	 * anyway, so an application whose scene root lays out its own children is unaffected either way.
+	 */
+	public static boolean useWindowNotifications = true;
 
 	private static boolean showNotifications = ProgramProperties.get("ShowNotifications", true);
 
@@ -166,118 +183,31 @@ public class NotificationManager {
 				return;
 			}
 
-			final Window window = getWindow(owner);
-			if (window != null) {
-				if (title == null || title.isEmpty()) {
-					title = ProgramProperties.getProgramName();
-				}
-				{
-					final SimpleDateFormat simpleDateFormat = new SimpleDateFormat("HH:mm:ss");
-					title += " at " + simpleDateFormat.format(System.currentTimeMillis());
-				}
-
-				final Popup notification = new Popup();
-
-				notification.setOnHidden((e) -> {
-					slot2notification[notification2slot.get(notification)] = null;
-					notification2slot.remove(notification);
-				});
-
-				final var anchorPane = new AnchorPane();
-				notification.getContent().add(anchorPane);
-				notification.setUserData(anchorPane);
-
-				final var mainPanel = new BorderPane();
-				{
-					var backgroundColor = (ProgramProperties.get("UseDarkTheme", false) ? Color.BLACK : Color.WHITE).deriveColor(1, 1, 1, 0.8);
-					mainPanel.setBackground(new Background(new BackgroundFill(backgroundColor, null, null)));
-					mainPanel.setEffect(new DropShadow(3, Color.BLACK));
-					mainPanel.setMinHeight(notificationHeight);
-					mainPanel.setMaxHeight(notificationHeight);
-					mainPanel.setMinWidth(100);
-
-					mainPanel.setMouseTransparent(true);
-					AnchorPane.setLeftAnchor(mainPanel, 0d);
-					AnchorPane.setRightAnchor(mainPanel, 0d);
-					AnchorPane.setTopAnchor(mainPanel, 0d);
-					AnchorPane.setBottomAnchor(mainPanel, 0d);
-					anchorPane.getChildren().add(mainPanel);
-				}
-
-				{
-					final var messageLabel = new Label(" " + message);
-					messageLabel.setFont(new Font(messageLabel.getFont().getName(), 12));
-					mainPanel.setCenter(messageLabel);
-				}
-
-				{
-					final Label titleLabel = new Label(title);
-					titleLabel.setFont(new Font(titleLabel.getFont().getName(), 10));
-					titleLabel.setMouseTransparent(true);
-					AnchorPane.setTopAnchor(titleLabel, 2d);
-					AnchorPane.setLeftAnchor(titleLabel, 10d);
-					anchorPane.getChildren().add(titleLabel);
-				}
-
-				{
-					final Button close = new Button("x");
-					close.setFont(new Font(close.getFont().getName(), 8));
-					close.setBackground(null);
-					close.setOnMousePressed((e) -> {
-						if (e.isShiftDown()) { // hide all
-							final ArrayList<Popup> all = new ArrayList<>(notification2slot.keySet());
-							for (Popup one : all) {
-								createFadeTransition(one, -1, 0, one::hide).play();
-							}
-						} else
-							createFadeTransition(notification, -1, 0, notification::hide).play();
-					});
-
-					close.setMinWidth(20);
-					close.setMaxWidth(20);
-					close.setMinHeight(20);
-					close.setMaxHeight(20);
-
-					AnchorPane.setTopAnchor(close, 2d);
-					AnchorPane.setRightAnchor(close, 2d);
-
-					anchorPane.getChildren().add(close);
-				}
-
-				{
-					var icon = switch (mode) {
-						case confirmation -> MaterialIcons.graphic(MaterialIcons.task_alt, "-fx-font-size:  32;");
-						case warning -> MaterialIcons.graphic(MaterialIcons.warning, "-fx-font-size:  32;");
-						case information -> MaterialIcons.graphic(MaterialIcons.info, "-fx-font-size:  32;");
-						case error -> MaterialIcons.graphic(MaterialIcons.error, "-fx-font-size:  32;");
-					};
-					mainPanel.setPadding(new Insets(1, 5, 1, 5));
-					mainPanel.setLeft(new StackPane(icon));
-				}
-
-				//notificationPopup.sizeToScene();
-
-				var screenBounds = Screen.getPrimary().getVisualBounds();
-
-				for (var screen : Screen.getScreensForRectangle(new Rectangle2D(window.getX(), window.getY(), window.getWidth(), window.getHeight()))) {
-					if (screen.getBounds().contains(window.getX(), window.getY()))
-						screenBounds = screen.getVisualBounds();
-				}
-
-				notification.setX(screenBounds.getMinX() + 5);
-				notification.setY(screenBounds.getMaxY() - notificationHeight - vGap);
-
-				final var removeAfterShowing = createFadeTransition(notification, 1, 0, notification::hide);
-				removeAfterShowing.setDelay(Duration.millis(milliseconds));
-				removeAfterShowing.play();
-
-				addToShowingNotifications(notification, screenBounds.getMaxY());
-
-				Platform.runLater(() -> {
-					notification.show(window);
-					createFadeTransition(notification, 0, 1, null).play();
-				});
+			if (title == null || title.isEmpty()) {
+				title = ProgramProperties.getProgramName();
 			}
+			{
+				final SimpleDateFormat simpleDateFormat = new SimpleDateFormat("HH:mm:ss");
+				title += " at " + simpleDateFormat.format(System.currentTimeMillis());
+			}
+
+			// Readers and algorithms call this from worker threads, and both routes below touch the
+			// scene graph, so get onto the FX thread before deciding anything.
+			final var fullTitle = title;
+			final Runnable show = () -> {
+				final var pane = (useWindowNotifications ? findNotificationPane(owner) : null);
+				if (pane != null) {
+					WindowNotifications.show(pane, fullTitle, message, messageTypeFor(mode), Duration.millis(milliseconds));
+				} else {
+					final var window = getWindow(owner);
+					if (window != null)
+						showAsPopup(window, fullTitle, message, mode, milliseconds);
+				}
+			};
+			if (Platform.isFxApplicationThread())
+				show.run();
+			else
+				Platform.runLater(show);
 		}
 
 		if (!isShowNotifications() || isEchoToConsole()) {
@@ -291,10 +221,178 @@ public class NotificationManager {
 		}
 	}
 
+	private static WindowNotifications.MessageType messageTypeFor(Mode mode) {
+		return switch (mode) {
+			case error -> WindowNotifications.MessageType.ERROR;
+			case warning -> WindowNotifications.MessageType.WARNING;
+			case confirmation -> WindowNotifications.MessageType.CONFIRMATION;
+			case information -> WindowNotifications.MessageType.INFO;
+		};
+	}
+
+	/**
+	 * the pane to show an in-window notification over, or null if there is none to be had
+	 * <p>
+	 * Must be called on the FX thread. An explicitly named owner wins; otherwise ask the window
+	 * manager which main window was last focused, which is the same question
+	 * {@link jloda.fx.notifications.NotificationsWindow} asks when it centres itself, and a better
+	 * answer than scanning {@link Window#getWindows()} because it skips dialogs and popups.
+	 */
+	private static Pane findNotificationPane(Stage owner) {
+		if (owner != null)
+			return paneOf(owner);
+
+		var mainWindow = MainWindowManager.getInstance().getLastFocusedMainWindow();
+		if (mainWindow != null) {
+			var pane = mainWindow.getNotificationPane();
+			if (pane != null)
+				return pane;
+		}
+		return (getWindow(null) instanceof Stage stage ? paneOf(stage) : null);
+	}
+
+	/**
+	 * the scene root, when it is a pane; the overlay the notifications live in takes itself out of
+	 * that pane's layout, so it does not matter which kind of pane it is
+	 */
+	private static Pane paneOf(Stage stage) {
+		if (stage.getScene() != null && stage.getScene().getRoot() instanceof Pane pane)
+			return pane;
+		else
+			return null;
+	}
+
+	/**
+	 * the original implementation: a notification in its own popup window, anchored to the screen
+	 * <p>
+	 * Used when no pane can be found to put the notification in. See {@link #useWindowNotifications}
+	 * for what is wrong with it.
+	 */
+	private static void showAsPopup(Window window, String title, String message, Mode mode, long milliseconds) {
+		final Popup notification = new Popup();
+
+		notification.setOnHidden((e) -> {
+			// remove first and test: a notification evicted by addToShowingNotifications is
+			// already out of the map, and get() on a missing key unboxes null
+			final var slot = notification2slot.remove(notification);
+			if (slot != null)
+				slot2notification[slot] = null;
+		});
+
+		final var anchorPane = new AnchorPane();
+		notification.getContent().add(anchorPane);
+		notification.setUserData(anchorPane);
+
+		final var mainPanel = new BorderPane();
+		{
+			var backgroundColor = (ProgramProperties.get("UseDarkTheme", false) ? Color.BLACK : Color.WHITE).deriveColor(1, 1, 1, 0.8);
+			mainPanel.setBackground(new Background(new BackgroundFill(backgroundColor, null, null)));
+			mainPanel.setEffect(new DropShadow(3, Color.BLACK));
+			mainPanel.setMinHeight(notificationHeight);
+			mainPanel.setMaxHeight(notificationHeight);
+			mainPanel.setMinWidth(100);
+
+			mainPanel.setMouseTransparent(true);
+			AnchorPane.setLeftAnchor(mainPanel, 0d);
+			AnchorPane.setRightAnchor(mainPanel, 0d);
+			AnchorPane.setTopAnchor(mainPanel, 0d);
+			AnchorPane.setBottomAnchor(mainPanel, 0d);
+			anchorPane.getChildren().add(mainPanel);
+		}
+
+		{
+			final var messageLabel = new Label(" " + message);
+			messageLabel.setFont(new Font(messageLabel.getFont().getName(), 12));
+			mainPanel.setCenter(messageLabel);
+		}
+
+		{
+			final Label titleLabel = new Label(title);
+			titleLabel.setFont(new Font(titleLabel.getFont().getName(), 10));
+			titleLabel.setMouseTransparent(true);
+			AnchorPane.setTopAnchor(titleLabel, 2d);
+			AnchorPane.setLeftAnchor(titleLabel, 10d);
+			anchorPane.getChildren().add(titleLabel);
+		}
+
+		{
+			final Button close = new Button("x");
+			close.setFont(new Font(close.getFont().getName(), 8));
+			close.setBackground(null);
+			close.setOnMousePressed((e) -> {
+				if (e.isShiftDown()) { // hide all
+					final ArrayList<Popup> all = new ArrayList<>(notification2slot.keySet());
+					for (Popup one : all) {
+						createFadeTransition(one, -1, 0, one::hide).play();
+					}
+				} else
+					createFadeTransition(notification, -1, 0, notification::hide).play();
+			});
+
+			close.setMinWidth(20);
+			close.setMaxWidth(20);
+			close.setMinHeight(20);
+			close.setMaxHeight(20);
+
+			AnchorPane.setTopAnchor(close, 2d);
+			AnchorPane.setRightAnchor(close, 2d);
+
+			anchorPane.getChildren().add(close);
+		}
+
+		{
+			var icon = switch (mode) {
+				case confirmation -> MaterialIcons.graphic(MaterialIcons.task_alt, "-fx-font-size:  32;");
+				case warning -> MaterialIcons.graphic(MaterialIcons.warning, "-fx-font-size:  32;");
+				case information -> MaterialIcons.graphic(MaterialIcons.info, "-fx-font-size:  32;");
+				case error -> MaterialIcons.graphic(MaterialIcons.error, "-fx-font-size:  32;");
+			};
+			mainPanel.setPadding(new Insets(1, 5, 1, 5));
+			mainPanel.setLeft(new StackPane(icon));
+		}
+
+		//notificationPopup.sizeToScene();
+
+		var screenBounds = Screen.getPrimary().getVisualBounds();
+
+		for (var screen : Screen.getScreensForRectangle(new Rectangle2D(window.getX(), window.getY(), window.getWidth(), window.getHeight()))) {
+			if (screen.getBounds().contains(window.getX(), window.getY()))
+				screenBounds = screen.getVisualBounds();
+		}
+
+		notification.setX(screenBounds.getMinX() + 5);
+		notification.setY(screenBounds.getMaxY() - notificationHeight - vGap);
+
+		final var removeAfterShowing = createFadeTransition(notification, 1, 0, notification::hide);
+		removeAfterShowing.setDelay(Duration.millis(milliseconds));
+		removeAfterShowing.play();
+
+		addToShowingNotifications(notification, screenBounds.getMaxY());
+
+		Platform.runLater(() -> {
+			notification.show(window);
+			createFadeTransition(notification, 0, 1, null).play();
+		});
+	}
+
 	private static void addToShowingNotifications(Popup newNotification, double maxY) {
 		var firstEmptySlot = 0;
 		while (firstEmptySlot < MAX_NUMBER_MESSAGES && slot2notification[firstEmptySlot] != null) {
 			firstEmptySlot++;
+		}
+
+		if (firstEmptySlot == MAX_NUMBER_MESSAGES) {
+			// Every slot is taken, so drop the oldest - the one furthest up the screen - to make room.
+			// Without this the loop below writes slot2notification[MAX_NUMBER_MESSAGES] and throws
+			// ArrayIndexOutOfBoundsException into whatever asked for the notification, which for a
+			// reader emitting warnings in a loop means the file load dies on the hundredth warning.
+			firstEmptySlot = MAX_NUMBER_MESSAGES - 1;
+			final var oldest = slot2notification[firstEmptySlot];
+			if (oldest != null) {
+				slot2notification[firstEmptySlot] = null;
+				notification2slot.remove(oldest);
+				oldest.hide();
+			}
 		}
 
 		for (int i = firstEmptySlot; i > 0; i--) {
