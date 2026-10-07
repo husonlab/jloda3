@@ -26,6 +26,7 @@ import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.ToDoubleFunction;
+import java.util.function.ToIntFunction;
 
 import static jloda.phylogeny.utils.GraphUtils.postOrderTraversal;
 
@@ -39,26 +40,8 @@ public class LayoutRootedPhylogeny {
 	public enum Scaling {ToScale, EarlyBranching, LateBranching}
 
 	/**
-	 * compute coordinates for a rooted tree or network
-	 *
-	 * @param root                    the root node
-	 * @param nodes                   all nodes
-	 * @param edges                   all edges
-	 * @param inEdges                 gets node in edges
-	 * @param outEdges                gets node out edges
-	 * @param source                  gets source of edge
-	 * @param target                  gets target of edges
-	 * @param weight                  gets weight of edge
-	 * @param edgeType                gets type of edge
-	 * @param layout                  desired layout
-	 * @param scaling                 desired scaling
-	 * @param averaging               desired averaging
-	 * @param optimizeReticulateEdges should reticulate edges be displacement optimized?
-	 * @param random                  random number source
-	 * @param nodeAngleMap            returns node to angle map
-	 * @param nodePointMap            returns node locations
-	 * @param <Node>                  generic node type
-	 * @param <Edge>                  generic edge type
+	 * compute coordinates for a rooted tree or network, treating all reticulate (non-acceptor) edges as having
+	 * multiplicity 1 in the displacement optimization. See the overload below to supply per-edge multiplicities.
 	 */
 	public static <Node, Edge> void apply(Node root, List<Node> nodes, List<Edge> edges,
 										  Function<Node, List<Edge>> inEdges,
@@ -67,6 +50,44 @@ public class LayoutRootedPhylogeny {
 										  ToDoubleFunction<Edge> weight,
 										  Function<Edge, EdgeType> edgeType,
 										  Layout layout, Scaling scaling, Averaging averaging, boolean optimizeReticulateEdges, Random random,
+										  Map<Node, Double> nodeAngleMap, Map<Node, Point2D> nodePointMap, Map<Node, List<Node>> lsaChildren) {
+		apply(root, nodes, edges, inEdges, outEdges, source, target, weight, edgeType,
+				layout, scaling, averaging, optimizeReticulateEdges, e -> 1, random,
+				nodeAngleMap, nodePointMap, lsaChildren);
+	}
+
+	/**
+	 * compute coordinates for a rooted tree or network
+	 *
+	 * @param root                       the root node
+	 * @param nodes                      all nodes
+	 * @param edges                      all edges
+	 * @param inEdges                    gets node in edges
+	 * @param outEdges                   gets node out edges
+	 * @param source                     gets source of edge
+	 * @param target                     gets target of edges
+	 * @param weight                     gets weight (length) of edge
+	 * @param edgeType                   gets type of edge
+	 * @param layout                     desired layout
+	 * @param scaling                    desired scaling
+	 * @param averaging                  desired averaging
+	 * @param optimizeReticulateEdges    should reticulate edges be displacement optimized?
+	 * @param reticulateEdgeMultiplicity the multiplicity of a reticulate (non-acceptor) edge, e.g. the number of
+	 *                                   trees traced through it; used to weight the displacement optimization
+	 * @param random                     random number source
+	 * @param nodeAngleMap               returns node to angle map
+	 * @param nodePointMap               returns node locations
+	 * @param <Node>                     generic node type
+	 * @param <Edge>                     generic edge type
+	 */
+	public static <Node, Edge> void apply(Node root, List<Node> nodes, List<Edge> edges,
+										  Function<Node, List<Edge>> inEdges,
+										  Function<Node, List<Edge>> outEdges,
+										  Function<Edge, Node> source, Function<Edge, Node> target,
+										  ToDoubleFunction<Edge> weight,
+										  Function<Edge, EdgeType> edgeType,
+										  Layout layout, Scaling scaling, Averaging averaging, boolean optimizeReticulateEdges,
+										  ToIntFunction<Edge> reticulateEdgeMultiplicity, Random random,
 										  Map<Node, Double> nodeAngleMap, Map<Node, Point2D> nodePointMap, Map<Node, List<Node>> lsaChildren) {
 
 		if (layout == Layout.Radial && averaging == Averaging.ChildAverage) {
@@ -99,6 +120,7 @@ public class LayoutRootedPhylogeny {
 
 		if (optimizeReticulateEdges && hasReticulations) {
 			var reticulateMap = new HashMap<Node, List<Node>>();
+			var multiplicityMap = new HashMap<Node, HashMap<Node, Integer>>();
 			for (var e : edges) {
 				if (edgeTypeMap != null) {
 					edgeTypeMap.put(e, inEdges.apply(target.apply(e)).size() <= 1 ? EdgeType.tree : EdgeType.combining);
@@ -106,12 +128,18 @@ public class LayoutRootedPhylogeny {
 				var type = edgeType.apply(e);
 
 				if (type == EdgeType.combining) {
-					reticulateMap.computeIfAbsent(source.apply(e), k -> new ArrayList<>()).add(target.apply(e));
-					reticulateMap.computeIfAbsent(target.apply(e), k -> new ArrayList<>()).add(source.apply(e));
+					var s = source.apply(e);
+					var t = target.apply(e);
+					var multiplicity = Math.max(1, reticulateEdgeMultiplicity.applyAsInt(e));
+					reticulateMap.computeIfAbsent(s, k -> new ArrayList<>()).add(t);
+					reticulateMap.computeIfAbsent(t, k -> new ArrayList<>()).add(s);
+					multiplicityMap.computeIfAbsent(s, k -> new HashMap<>()).put(t, multiplicity);
+					multiplicityMap.computeIfAbsent(t, k -> new HashMap<>()).put(s, multiplicity);
 				}
 			}
 			var circular = (layout != Layout.Rectangular);
-			var result = NetworkDisplacementOptimization.apply(root, lsaChildren::get, reticulateMap::get, circular, random, () -> false);
+			var result = NetworkDisplacementOptimization.apply(root, lsaChildren::get, reticulateMap::get,
+					(v, w) -> multiplicityMap.get(v).get(w), circular, random, () -> false);
 			lsaChildren.clear();
 			lsaChildren.putAll(result);
 		}

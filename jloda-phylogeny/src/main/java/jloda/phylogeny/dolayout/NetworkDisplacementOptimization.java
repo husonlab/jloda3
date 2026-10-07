@@ -23,8 +23,7 @@ package jloda.phylogeny.dolayout;
 import jloda.phylogeny.utils.GraphUtils;
 
 import java.util.*;
-import java.util.function.BooleanSupplier;
-import java.util.function.Function;
+import java.util.function.*;
 
 /**
  * Compute a (reticulate) displacement optimized (DO) layout for a rooted network
@@ -47,7 +46,7 @@ public class NetworkDisplacementOptimization {
 	 */
 	public static <Node> Map<Node, List<Node>> apply(Node root, Function<Node, List<Node>> backboneChildren, Function<Node, List<Node>> reticulateEdges, boolean circular, BooleanSupplier canceled) {
 		var random = new Random(666);
-		return apply(root, backboneChildren, reticulateEdges, circular, random, canceled);
+		return apply(root, backboneChildren, reticulateEdges, (v,w)->1,circular, random, canceled);
 
 	}
 
@@ -57,13 +56,14 @@ public class NetworkDisplacementOptimization {
 	 * @param root             the root node
 	 * @param backboneChildren for each node, the list of its children in the backbone tree
 	 * @param reticulateEdges  for each node, all nodes that it is connected to via a reticulate edge (excluding transfer-acceptor edges)
+	 * @param reticulateEdgeMultiplicity for a pair of reticulate-edge-connected nodes, the edge's multiplicity (e.g. the number of trees traced through it); weights the displacement
 	 * @param circular         true, if we are optimizing for a circular layout
 	 * @param random           random number generator used in simulated annealing search
 	 * @param canceled         returns true, if calculation has been canceled
 	 * @param <Node>           the node of a tree
 	 * @return an optimized LSA tree mapping
 	 */
-	public static <Node> Map<Node, List<Node>> apply(Node root, Function<Node, List<Node>> backboneChildren, Function<Node, List<Node>> reticulateEdges, boolean circular, Random random, BooleanSupplier canceled) {
+	public static <Node> Map<Node, List<Node>> apply(Node root, Function<Node, List<Node>> backboneChildren, Function<Node, List<Node>> reticulateEdges, ToIntBiFunction<Node,Node> reticulateEdgeMultiplicity, boolean circular, Random random, BooleanSupplier canceled) {
 		var childrenMap = new HashMap<Node, List<Node>>();
 
 		{
@@ -88,7 +88,8 @@ public class NetworkDisplacementOptimization {
 						var min = Math.min(hV, hW);
 						var max = Math.max(hV, hW);
 						var diff = Math.min(max - min, (totalMax - max) + (min - totalMin) + 1);
-						displacement += 0.5 * diff;
+						var multiplicity=reticulateEdgeMultiplicity.applyAsInt(v,w);
+						displacement += 0.5 * diff*multiplicity;
 					}
 				}
 				return displacement;
@@ -104,7 +105,8 @@ public class NetworkDisplacementOptimization {
 					for (var w : reticulateNeighbors) {
 						var hW = nodeHeightMap.get(w);
 						var diff = Math.abs(hV - hW);
-						displacement += 0.5 * diff;
+						var multiplicity=reticulateEdgeMultiplicity.applyAsInt(v,w);
+						displacement += 0.5 * diff*multiplicity;
 						if (reticulateEdges.apply(w).contains(v)) {
 							if (hW > hV)
 								fromBelow++;

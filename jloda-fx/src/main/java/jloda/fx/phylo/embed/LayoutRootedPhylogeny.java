@@ -23,6 +23,7 @@ import javafx.geometry.Point2D;
 import jloda.fx.util.GeometryUtilsFX;
 import jloda.graph.DAGTraversals;
 import jloda.graph.Node;
+import jloda.phylo.CommentData;
 import jloda.phylo.LSAUtils;
 import jloda.phylo.PhyloTree;
 import jloda.phylogeny.dolayout.NetworkDisplacementOptimization;
@@ -63,14 +64,24 @@ public class LayoutRootedPhylogeny {
 
 		if (optimizeReticulateEdges && network.hasReticulateEdges()) {
 			var reticulateMap = new HashMap<Node, List<Node>>();
+			var multiplicityMap=new HashMap<Node,HashMap<Node,Integer>>();
 			for (var e : network.edges()) {
 				if (network.isReticulateEdge(e) && !network.isTransferAcceptorEdge(e)) {
+					var multiplicity=1;
+					if(network.getData(e) instanceof CommentData data) {
+						var trees=data.getIntSetValue("TT");
+						if (trees.isPresent()) {
+							multiplicity=Math.max(1,trees.get().cardinality());
+						}
+					}
 					reticulateMap.computeIfAbsent(e.getSource(), k -> new ArrayList<>()).add(e.getTarget());
+					multiplicityMap.computeIfAbsent(e.getSource(),k->new HashMap<>()).put(e.getTarget(),multiplicity);
 					reticulateMap.computeIfAbsent(e.getTarget(), k -> new ArrayList<>()).add(e.getSource());
+					multiplicityMap.computeIfAbsent(e.getTarget(),k->new HashMap<>()).put(e.getSource(),multiplicity);
 				}
 			}
 			var circular = (layout != Layout.Rectangular);
-			var result = NetworkDisplacementOptimization.apply(network.getRoot(), network.getLSAChildrenMap()::get, reticulateMap::get, circular, random, () -> false);
+			var result = NetworkDisplacementOptimization.apply(network.getRoot(), network.getLSAChildrenMap()::get,reticulateMap::get ,(v,w)->multiplicityMap.get(v).get(w),circular, random, () -> false);
 			network.getLSAChildrenMap().clear();
 			network.getLSAChildrenMap().putAll(result);
 		}
