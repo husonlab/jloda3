@@ -142,7 +142,7 @@ public class ColorTable {
 	 *
 	 * @return color on a log scale
 	 */
-	public Color getColorLogScale(int count, double inverseLogMaxReads) {
+	public Color getColorLogScale(double count, double inverseLogMaxReads) {
 		int index = Math.max(1, Math.min(colors.length - 1, (int) Math.round(colors.length * Math.log(count + 1) * inverseLogMaxReads)));
 		return get(index);
 	}
@@ -152,18 +152,18 @@ public class ColorTable {
 	 *
 	 * @return color on a log scale
 	 */
-	public Color getColorSqrtScale(int count, double inverseSqrtMaxReads) {
+	public Color getColorSqrtScale(double count, double inverseSqrtMaxReads) {
 		int index = Math.max(1, Math.min(colors.length - 1, (int) Math.round(colors.length * Math.sqrt(count) * inverseSqrtMaxReads)));
 		return get(index);
 	}
 
 	/**
-	 * get color on linear scale
+	 * get color on linear scale. The counts are doubles: an int saturates at 2^31, which base-weighted counts exceed
 	 *
 	 * @return color
 	 */
-	public Color getColor(int count, int maxCount) {
-		int index = Math.min(colors.length - 1, (int) Math.round(((double) count * colors.length) / (double) maxCount));
+	public Color getColor(double count, double maxCount) {
+		int index = Math.min(colors.length - 1, (int) Math.round((count * colors.length) / maxCount));
 		return get(index);
 	}
 }
