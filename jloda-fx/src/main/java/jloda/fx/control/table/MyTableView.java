@@ -25,6 +25,7 @@ import javafx.beans.InvalidationListener;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.*;
 import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.collections.ObservableMap;
 import javafx.collections.ObservableSet;
@@ -93,6 +94,7 @@ public class MyTableView extends Pane {
 
     // the table's cell selection is the one source of truth; everything below is derived from it
     private final ObservableList<String> selectedRowNames = FXCollections.observableArrayList();
+    private List<String> rowsSelectedBeforeColumnsChanged = List.of(); // see the listeners on the columns
     private final ObservableList<String> unmodifiableSelectedRowNames = FXCollections.unmodifiableObservableList(selectedRowNames);
     private final LongProperty selectionUpdate = new SimpleLongProperty(0);
     private int selectionPauseLevel = 0; // while larger than 0, selection changes are collected rather than applied
@@ -137,7 +139,7 @@ public class MyTableView extends Pane {
         tableView = new TableView<>();
         tableView.setEditable(true);
         tableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-        tableView.getSelectionModel().setCellSelectionEnabled(true);
+        applySelectionMode(List.of());
         tableView.getStylesheets().add(Objects.requireNonNull(MyTableView.class.getResource("mytable.css")).toExternalForm());
 
         rowCount.bind(Bindings.size(tableView.getItems()));
@@ -345,7 +347,14 @@ public class MyTableView extends Pane {
             }
         });
 
-        tableView.getColumns().addListener((InvalidationListener) e -> postUpdate());
+        // JavaFX runs invalidation listeners before change listeners. The selected rows are captured by the former, while
+        // the TableView has not yet dropped the cells of a removed column, and restored by the latter, once the TableView
+        // has registered an added column, since a row cannot be re-selected until it has
+        tableView.getColumns().addListener((InvalidationListener) e -> rowsSelectedBeforeColumnsChanged = new ArrayList<>(getSelectedRows()));
+        tableView.getColumns().addListener((ListChangeListener<TableColumn<MyTableRow, ?>>) c -> {
+            applySelectionMode(rowsSelectedBeforeColumnsChanged);
+            postUpdate();
+        });
 
         tableView.getSelectionModel().getSelectedCells().addListener((InvalidationListener) (e) -> {
             if (selectionPauseLevel > 0)
@@ -632,6 +641,23 @@ public class MyTableView extends Pane {
             runnable.run();
         } finally {
             resumeSelectionUpdates();
+        }
+    }
+
+    /**
+     * cells can only be selected where there are columns, so with none a row is selected as a row: the table
+     * switches between cell and row selection as columns come and go, re-selecting the given rows.
+     * Without this, a table with rows but no columns could not select anything at all
+     */
+    private void applySelectionMode(List<String> selectedRows) {
+        final boolean cellMode = !tableView.getColumns().isEmpty();
+        final var selectionModel = tableView.getSelectionModel();
+        if (selectionModel.isCellSelectionEnabled() != cellMode) {
+            inOneSelectionStep(() -> {
+                selectionModel.clearSelection();
+                selectionModel.setCellSelectionEnabled(cellMode);
+                selectRows(selectedRows, true);
+            });
         }
     }
 
@@ -1053,9 +1079,14 @@ public class MyTableView extends Pane {
     }
 
     public void selectRow(int row, boolean select) {
-        if (row >= 0 && row < tableView.getItems().size() && !tableView.getColumns().isEmpty()) {
+        if (row >= 0 && row < tableView.getItems().size()) {
             inOneSelectionStep(() -> {
-                if (select)
+                if (tableView.getColumns().isEmpty()) { // no cells to select, so the row is selected as a row
+                    if (select)
+                        tableView.getSelectionModel().select(row);
+                    else
+                        tableView.getSelectionModel().clearSelection(row);
+                } else if (select)
                     tableView.getSelectionModel().selectRange(row, getCol(0), row, getCol(getColCount() - 1));
                 else {
                     for (TableColumn<MyTableRow, ?> column : tableView.getColumns())
@@ -1154,7 +1185,8 @@ public class MyTableView extends Pane {
         final BitSet cols = new BitSet();
         try {
             for (TablePosition position : getSelectedCells()) {
-                cols.set(position.getColumn());
+                if (position.getColumn() >= 0) // a row selected where there are no columns has none
+                    cols.set(position.getColumn());
             }
         } catch (IndexOutOfBoundsException ignored) {
         }
