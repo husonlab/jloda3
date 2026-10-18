@@ -245,7 +245,9 @@ public class SaveToSVG {
 				var y = (bounds.getMinY());
 				var height = (bounds.getHeight());
 				buf.append(createImage(x, y, width, height, imageView.getImage()));
-			} else if (node instanceof Shape3D || node instanceof Canvas || node instanceof Chart || node instanceof Arc) {
+			} else if (node instanceof Arc arc) {
+				buf.append(createArc(arc, root, formatting));
+			} else if (node instanceof Shape3D || node instanceof Canvas || node instanceof Chart) {
 				var layoutBounds = node.getLayoutBounds();
 				var writableImage = new WritableImage((int) layoutBounds.getWidth() * 3, (int) layoutBounds.getHeight() * 3);
 				var parameters = new SnapshotParameters();
@@ -485,6 +487,37 @@ public class SaveToSVG {
 			buf.append("\" ").append(formatting).append("/>\n");
 		}
 		return buf.toString();
+	}
+
+	/**
+	 * an arc as a polygon or polyline of short segments in root coordinates, so that it stays a vector under any
+	 * transform; before, an arc was rasterized, which cut its stroke at the edge of the bitmap and lost
+	 * resolution. A full turn is written as a closed outline without the two radii, which a round arc of 360
+	 * degrees would otherwise draw on top of each other.
+	 *
+	 * @param arc        the arc
+	 * @param root       the root node, whose coordinates the output uses
+	 * @param formatting the fill, stroke and opacity attributes
+	 * @return the SVG element
+	 */
+	private static String createArc(Arc arc, Node root, String formatting) {
+		var full = Math.abs(arc.getLength()) >= 360;
+		var length = (full ? 360.0 : arc.getLength());
+		var steps = Math.max(8, (int) Math.ceil(Math.abs(length) / 2.0)); // a segment per two degrees
+		var points = new ArrayList<Point2D>();
+		if (!full && arc.getType() == ArcType.ROUND)
+			points.add(root.sceneToLocal(arc.localToScene(arc.getCenterX(), arc.getCenterY())));
+		for (var i = 0; i < (full ? steps : steps + 1); i++) {
+			// JavaFX measures the angle counter-clockwise while y grows downwards
+			var angle = Math.toRadians(arc.getStartAngle() + length * i / steps);
+			var x = arc.getCenterX() + arc.getRadiusX() * Math.cos(angle);
+			var y = arc.getCenterY() - arc.getRadiusY() * Math.sin(angle);
+			points.add(root.sceneToLocal(arc.localToScene(x, y)));
+		}
+		if (full || arc.getType() != ArcType.OPEN)
+			return createPolygon(points, formatting);
+		else
+			return createPolyline(points, formatting);
 	}
 
 	public static String createPolygon(ArrayList<Point2D> points, String formatting) {
