@@ -24,6 +24,7 @@ import javafx.beans.InvalidationListener;
 import javafx.beans.WeakInvalidationListener;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.input.KeyCharacterCombination;
 import javafx.scene.input.KeyCombination;
 
@@ -37,6 +38,14 @@ public class SetupWindowMenu {
 	public static void apply(IMainWindow window, Menu windowMenu) {
 		final ArrayList<MenuItem> originalWindowMenuItems = new ArrayList<>(windowMenu.getItems());
 
+		// The last of the items that came from the FXML, when it is a separator, is there to divide them
+		// from the window entries appended below. Nothing follows it until those are added, so an
+		// application that prunes its menus - splitstree6's MenuFilter hides a trailing separator, as it
+		// should - has already hidden it by the time we get here, and the entries then appear with no
+		// divider above them. Its visibility therefore has to follow whether there is anything to divide.
+		final MenuItem trailingSeparator = (!originalWindowMenuItems.isEmpty()
+											&& originalWindowMenuItems.get(originalWindowMenuItems.size() - 1) instanceof SeparatorMenuItem last ? last : null);
+
 		final InvalidationListener invalidationListener = observable -> {
 			synchronized (originalWindowMenuItems) {
 				// Keep the static items in place and rebuild only the dynamic per-window tail. Replacing the
@@ -44,6 +53,8 @@ public class SetupWindowMenu {
 				// com.sun.glass.ui.Menu.insert, so we remove/add only the entries that actually change.
 				if (windowMenu.getItems().size() > originalWindowMenuItems.size())
 					windowMenu.getItems().remove(originalWindowMenuItems.size(), windowMenu.getItems().size());
+				if (trailingSeparator != null)
+					trailingSeparator.setVisible(false); // nothing below it until the entries go back
 				if (window.getStage().isFocused()) {
 					var newMenuItems = new ArrayList<MenuItem>();
 					var count = 0;
@@ -71,6 +82,8 @@ public class SetupWindowMenu {
 						}
 					}
 					windowMenu.getItems().addAll(newMenuItems);
+					if (trailingSeparator != null)
+						trailingSeparator.setVisible(!newMenuItems.isEmpty());
 				}
 			}
 		};
