@@ -69,7 +69,7 @@ public class RichTextLabel extends Group {
 			   "<size \"font-size\">text</size>, " +
 			   "<c \"font-color\">text</c>, " +
 			   "<bg \"bg-color\">text</bg>, " +
-			   "<mark shape=\"value\" width=\"value\" height=\"value\" fill=\"color\" stroke=\"color\"> adds a mark, " +
+			   "<mark shape=\"value\" width=\"value\" height=\"value\" fill=\"color\" stroke=\"color\" node=\"true|false\"> adds a mark (node=\"true\": the mark is the node of the taxon, drawn by the viewer, not next to the label), " +
 			   "<img src=\"url\" alt=\"text\" width=\"value\" height=\"value\"> adds an image. Supports HTML numeric codes.";
 	}
 
@@ -598,7 +598,7 @@ public class RichTextLabel extends Group {
 						} catch (IllegalArgumentException ignored) {
 						}
 					}
-				} else if (isShowMarks() && event.change() == Event.Change.mark) {
+				} else if (isShowMarks() && event.change() == Event.Change.mark && !isNodeMarkSpecification(event.argument())) {
 					final var node = createMark(event.argument(), getScale(), getFontSize(), getTextFill());
 					if (node != null) {
 						node.setTranslateY(offset);
@@ -1073,6 +1073,14 @@ public class RichTextLabel extends Group {
 	}
 
 	public static String setMark(String text, NodeShape shape, Double width, Double height, Color fill, Color stroke) {
+		return setMark(text, shape, width, height, fill, stroke, false);
+	}
+
+	/**
+	 * sets the mark of the text, replacing any mark it has. With node true, the mark is meant as the node of the taxon:
+	 * a viewer that supports this draws the mark in place of the node, and the label does not show it
+	 */
+	public static String setMark(String text, NodeShape shape, Double width, Double height, Color fill, Color stroke, boolean node) {
 		var prefixElement = getPrefixElement(text, Event.Change.mark.type());
 		if (prefixElement != null)
 			text = removePrefixElement(text, prefixElement);
@@ -1088,6 +1096,8 @@ public class RichTextLabel extends Group {
 			tag += String.format(" fill=\"%s\"", fill);
 		if (stroke != null)
 			tag += String.format(" stroke=\"%s\"", stroke);
+		if (node)
+			tag += " node=\"true\"";
 
 		tag += ">";
 		return insertPrefix(text, tag);
@@ -1117,6 +1127,30 @@ public class RichTextLabel extends Group {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * is the mark of the text meant as the node of the taxon (node="true")?
+	 */
+	public static boolean isNodeMark(String text) {
+		var start = text.indexOf("<mark ");
+		if (start != -1) {
+			var end = text.indexOf(">", start + 5);
+			if (end != -1)
+				return isNodeMarkSpecification(text.substring(start, end));
+		}
+		return false;
+	}
+
+	/**
+	 * the mark of the text if it is meant as the node of the taxon, else null
+	 */
+	public static Shape getNodeMark(String text) {
+		return isNodeMark(text) ? getMark(text) : null;
+	}
+
+	private static boolean isNodeMarkSpecification(String specification) {
+		return specification != null && "true".equalsIgnoreCase(getMap(specification).get("node"));
 	}
 
 	public boolean isShowMarks() {
