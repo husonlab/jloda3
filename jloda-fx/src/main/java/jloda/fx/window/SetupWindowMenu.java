@@ -48,15 +48,13 @@ public class SetupWindowMenu {
 
 		final InvalidationListener invalidationListener = observable -> {
 			synchronized (originalWindowMenuItems) {
-				// Keep the static items in place and rebuild only the dynamic per-window tail. Replacing the
-				// whole list (setAll) on a live macOS system menu can throw IndexOutOfBoundsException in
-				// com.sun.glass.ui.Menu.insert, so we remove/add only the entries that actually change.
+				// Keep the static items in place and rebuild only the per-window tail, and set the divider once, at
+				// the end: on macOS every change of a menu item's visibility rebuilds the whole system menu bar (and
+				// JavaFX before 23.0.1 and 24 left a stale listener on each menu it discarded, JDK-8319779).
 				if (windowMenu.getItems().size() > originalWindowMenuItems.size())
 					windowMenu.getItems().remove(originalWindowMenuItems.size(), windowMenu.getItems().size());
-				if (trailingSeparator != null)
-					trailingSeparator.setVisible(false); // nothing below it until the entries go back
+				var newMenuItems = new ArrayList<MenuItem>();
 				if (window.getStage().isFocused()) {
-					var newMenuItems = new ArrayList<MenuItem>();
 					var count = 0;
 					for (var otherWindow : MainWindowManager.getInstance().getMainWindows()) {
 						if (otherWindow.getStage() != null) {
@@ -82,9 +80,9 @@ public class SetupWindowMenu {
 						}
 					}
 					windowMenu.getItems().addAll(newMenuItems);
-					if (trailingSeparator != null)
-						trailingSeparator.setVisible(!newMenuItems.isEmpty());
 				}
+				if (trailingSeparator != null)
+					trailingSeparator.setVisible(!newMenuItems.isEmpty()); // a divider only above entries
 			}
 		};
 		MainWindowManager.getInstance().changedProperty().addListener(new WeakInvalidationListener(invalidationListener));
