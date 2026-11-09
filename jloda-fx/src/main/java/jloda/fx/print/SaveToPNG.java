@@ -26,7 +26,7 @@ import javafx.scene.SnapshotParameters;
 import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import javafx.scene.transform.Scale;
-import jloda.fx.thirdparty.PngEncoderFX;
+import jloda.fx.util.PngWriter;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -61,7 +61,7 @@ public class SaveToPNG {
 	public static void apply(Image image, File file) throws IOException {
 		if (file.exists())
 			Files.delete(file.toPath());
-		var bytes = new PngEncoderFX(image, true, PngEncoderFX.FILTER_NONE, 9).pngEncode();
+		var bytes = PngWriter.encode(image);
 		try (var outs = new FileOutputStream(file)) {
 			outs.write(bytes);
 		}

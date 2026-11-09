@@ -43,7 +43,7 @@ import javafx.scene.shape.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import jloda.fx.control.RichTextLabel;
-import jloda.fx.thirdparty.PngEncoderFX;
+import jloda.fx.util.PngWriter;
 import jloda.fx.util.GeometryUtilsFX;
 import jloda.fx.window.MainWindowManager;
 import jloda.util.Basic;
@@ -569,8 +569,7 @@ public class SaveToSVG {
 
 	public static String createImage(double x, double y, double width, double height, Image image) {
 		var buf = new StringBuilder();
-		var encoder = new PngEncoderFX(image, true);
-		var base64Data = Base64.getEncoder().encodeToString(encoder.pngEncode(true));
+		var base64Data = Base64.getEncoder().encodeToString(PngWriter.encode(image));
 		buf.append("<image xlink:href=\"data:image/png;base64,").append(base64Data).append("\"");
 		buf.append(" x=\"%.2f\" y=\"%.2f\" width=\"%.2f\" height=\"%.2f\"/>\n".formatted(x, y, width, height));
 		return buf.toString();
