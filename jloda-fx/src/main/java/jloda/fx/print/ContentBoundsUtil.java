@@ -96,6 +96,10 @@ public final class ContentBoundsUtil {
 
 			// Convert those bounds to scene coords, then back to root local via 4 corners
 			Bounds bScene = n.localToScene(b);
+			// only what is visible counts: content that an ancestor clips away, such as the part of a drawing that is
+			// scrolled out of the viewport of a scroll pane, is not painted and must not enlarge the bounds
+			bScene = clipToAncestors(n, root, bScene);
+			if (bScene == null) continue;
 
 			Point2D p1 = root.sceneToLocal(bScene.getMinX(), bScene.getMinY());
 			Point2D p2 = root.sceneToLocal(bScene.getMaxX(), bScene.getMinY());
@@ -115,6 +119,34 @@ public final class ContentBoundsUtil {
 
 		if (!Double.isFinite(minX) || !Double.isFinite(minY)) return null;
 		return new Rectangle2D(minX, minY, maxX - minX, maxY - minY);
+	}
+
+	/**
+	 * intersects bounds, given in scene coordinates, with the clips of the node and of its ancestors up to the root
+	 *
+	 * @return the visible part of the bounds, or null, if nothing is visible
+	 */
+	private static Bounds clipToAncestors(Node node, Node root, Bounds boundsInScene) {
+		var minX = boundsInScene.getMinX();
+		var minY = boundsInScene.getMinY();
+		var maxX = boundsInScene.getMaxX();
+		var maxY = boundsInScene.getMaxY();
+		for (var p = node; p != null; p = p.getParent()) {
+			var clip = p.getClip();
+			if (clip != null) {
+				// the clip is given in the local coordinates of the node that it clips
+				var clipInScene = p.localToScene(clip.getBoundsInParent());
+				minX = Math.max(minX, clipInScene.getMinX());
+				minY = Math.max(minY, clipInScene.getMinY());
+				maxX = Math.min(maxX, clipInScene.getMaxX());
+				maxY = Math.min(maxY, clipInScene.getMaxY());
+				if (maxX <= minX || maxY <= minY)
+					return null;
+			}
+			if (p == root)
+				break;
+		}
+		return new javafx.geometry.BoundingBox(minX, minY, maxX - minX, maxY - minY);
 	}
 
 	/**

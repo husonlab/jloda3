@@ -51,13 +51,12 @@ public class MultiTouchGestureMonitor {
 
 			pane.addEventFilter(TouchEvent.TOUCH_RELEASED, e -> {
 				activeTouches.remove(e.getTouchPoint().getId());
-				// Keep consuming until all touches are gone
+				// The release is not consumed: the skin of the enclosing scroll pane has to see that the finger is
+				// gone. If it does not, it believes that the touch is still in progress and never hides its scroll
+				// bars again, which on a touch screen are shown only while scrolling.
 				boolean stillAnyTouchDown = !activeTouches.isEmpty();
-				if (multiTouchGestureInProgress.get()) {
-					e.consume();
-					if (!stillAnyTouchDown) {
-						multiTouchGestureInProgress.set(false);
-					}
+				if (multiTouchGestureInProgress.get() && !stillAnyTouchDown) {
+					multiTouchGestureInProgress.set(false);
 				}
 			});
 		}

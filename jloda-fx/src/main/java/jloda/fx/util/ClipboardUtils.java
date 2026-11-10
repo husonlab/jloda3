@@ -20,6 +20,8 @@
 package jloda.fx.util;
 
 import javafx.application.Platform;
+import javafx.scene.control.ScrollBar;
+import java.util.HashMap;
 import javafx.geometry.Rectangle2D;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanProperty;
@@ -161,23 +163,22 @@ public class ClipboardUtils {
 	 */
 	public static void putImageAsFile(Stage stage, Node node, File pngFile, Consumer<File> additionalFileConsumer) {
 		var dark = MainWindowManager.isUseDarkTheme();
+		// scroll bars are part of the user interface, not of the drawing: hide them while the image is taken
+		var scrollBarOpacities = new HashMap<ScrollBar, Double>();
+		for (var scrollBar : BasicFX.getAllRecursively(node, ScrollBar.class)) {
+			scrollBarOpacities.put(scrollBar, scrollBar.getOpacity());
+			scrollBar.setOpacity(0);
+		}
 		try {
 			if (dark)
 				MainWindowManager.ensureDarkTheme(stage, false);
-			// The content bounds are the union of the bounds of all descendants, including parts of a scrolled drawing
-			// that lie outside of the node and so are clipped away. Restrict them to the node itself, otherwise a
-			// long drawing is scaled down until nothing of the visible part is left.
-			var bounds = node.getLayoutBounds();
+			// the bounds of what the node shows; content that is scrolled out of view inside the node is clipped away
+			// and does not count, and a drawing may well extend beyond the layout bounds of the node itself
 			var bbox = ContentBoundsUtil.computeContentBoundsLocal(node);
-			if (bbox != null) {
-				var minX = Math.max(bbox.getMinX(), bounds.getMinX());
-				var minY = Math.max(bbox.getMinY(), bounds.getMinY());
-				var maxX = Math.min(bbox.getMaxX(), bounds.getMaxX());
-				var maxY = Math.min(bbox.getMaxY(), bounds.getMaxY());
-				bbox = (maxX > minX && maxY > minY ? new Rectangle2D(minX, minY, maxX - minX, maxY - minY) : null);
-			}
-			if (bbox == null)
+			if (bbox == null || bbox.getWidth() <= 0 || bbox.getHeight() <= 0) {
+				var bounds = node.getLayoutBounds();
 				bbox = new Rectangle2D(bounds.getMinX(), bounds.getMinY(), bounds.getWidth(), bounds.getHeight());
+			}
 			var snapshot = jloda.fx.print.TightSnapshot.snapshotBBoxTight(node, bbox, Color.WHITE, 300, 10);
 			if (snapshot == null)
 				throw new IOException("Nothing to copy");
@@ -196,6 +197,7 @@ public class ClipboardUtils {
 			}
 		} catch (IOException ignored) {
 		} finally {
+			scrollBarOpacities.forEach(ScrollBar::setOpacity);
 			if (dark)
 				MainWindowManager.ensureDarkTheme(stage, true);
 		}
