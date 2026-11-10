@@ -151,6 +151,21 @@ public class QRViewUtils {
 		show.addListener(listener);
 	}
 
+	/**
+	 * can the text be shown as a QR code? This is determined by encoding it, as the capacity of a QR code depends on
+	 * the characters used (about 2950 characters for text with lower-case letters and brackets)
+	 */
+	public static boolean canEncode(String text) {
+		if (text == null || text.isBlank())
+			return false;
+		try {
+			new QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 64, 64);
+			return true;
+		} catch (Exception ex) {
+			return false;
+		}
+	}
+
 	public static Image createImage(String text, int width, int height) {
 		try {
 			var image = new WritableImage(width, height);
