@@ -20,6 +20,7 @@
 package jloda.fx.util;
 
 import javafx.application.Platform;
+import javafx.geometry.Rectangle2D;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -28,14 +29,12 @@ import javafx.concurrent.Task;
 import javafx.scene.Node;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.DataFormat;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-import jloda.fx.dialog.ExportImageDialog;
 import jloda.fx.print.ContentBoundsUtil;
 import jloda.fx.print.Print;
 import jloda.fx.window.MainWindowManager;
@@ -165,10 +164,28 @@ public class ClipboardUtils {
 		try {
 			if (dark)
 				MainWindowManager.ensureDarkTheme(stage, false);
+			// The content bounds are the union of the bounds of all descendants, including parts of a scrolled drawing
+			// that lie outside of the node and so are clipped away. Restrict them to the node itself, otherwise a
+			// long drawing is scaled down until nothing of the visible part is left.
+			var bounds = node.getLayoutBounds();
 			var bbox = ContentBoundsUtil.computeContentBoundsLocal(node);
-			var snapshot = jloda.fx.print.TightSnapshot.snapshotBBoxTight(node, bbox, Color.WHITE, 300, 200);
-			snapshot = jloda.fx.print.ImageCropper.cropMargins(snapshot, 20, 0.02, 0.1);
-			ExportImageDialog.saveNodeAsImage(new ImageView(snapshot), "png", pngFile);
+			if (bbox != null) {
+				var minX = Math.max(bbox.getMinX(), bounds.getMinX());
+				var minY = Math.max(bbox.getMinY(), bounds.getMinY());
+				var maxX = Math.min(bbox.getMaxX(), bounds.getMaxX());
+				var maxY = Math.min(bbox.getMaxY(), bounds.getMaxY());
+				bbox = (maxX > minX && maxY > minY ? new Rectangle2D(minX, minY, maxX - minX, maxY - minY) : null);
+			}
+			if (bbox == null)
+				bbox = new Rectangle2D(bounds.getMinX(), bounds.getMinY(), bounds.getWidth(), bounds.getHeight());
+			var snapshot = jloda.fx.print.TightSnapshot.snapshotBBoxTight(node, bbox, Color.WHITE, 300, 10);
+			if (snapshot == null)
+				throw new IOException("Nothing to copy");
+			Image image = jloda.fx.print.ImageCropper.cropMargins(snapshot, 20, 0.02, 0.1);
+			if (image == null) // all white
+				image = snapshot;
+			// write the image as is: rendering it again through an image view doubles its size and adds a transparent margin
+			jloda.fx.print.SaveToPNG.apply(image, pngFile);
 			if (FileUtils.fileExistsAndIsNonEmpty(pngFile)) {
 				if (additionalFileConsumer != null) {
 					additionalFileConsumer.accept(pngFile);

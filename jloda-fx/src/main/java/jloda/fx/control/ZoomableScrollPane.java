@@ -31,6 +31,7 @@ import javafx.scene.control.ScrollBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
+import jloda.fx.util.PinchDirection;
 
 /**
  * zoomable scroll pane that zooms to point under mouse
@@ -158,9 +159,15 @@ public class ZoomableScrollPane extends ScrollPane {
 				}
 			});
 		else { // zoom by zoom rather than by scroll
+			// a pinch with the fingers side by side zooms horizontally, one above the other zooms vertically and a
+			// diagonal pinch zooms both; with a locked aspect ratio, doZoom applies any zoom to both directions
+			var pinchDirection = PinchDirection.install(outerNode);
 			outerNode.setOnZoom(e -> {
-				if (ZoomableScrollPane.this.isAllowZoom())
-					ZoomableScrollPane.this.doZoom(e.getZoomFactor(), e.getZoomFactor(), new Point2D(e.getX(), e.getY()));
+				if (ZoomableScrollPane.this.isAllowZoom()) {
+					var direction = pinchDirection.getDirection();
+					ZoomableScrollPane.this.doZoom(direction.isHorizontal() ? e.getZoomFactor() : 1.0,
+							direction.isVertical() ? e.getZoomFactor() : 1.0, new Point2D(e.getX(), e.getY()));
+				}
 			});
 		}
 
