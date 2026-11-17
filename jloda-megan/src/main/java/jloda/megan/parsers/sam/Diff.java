@@ -48,8 +48,9 @@ public class Diff {
 		int posQuery = 0;
 		int posRef = 0;
 		for (DiffElement element : differences) {
-			// skip gaps in reference sequence:
-			while (isGap(gappedReferenceSequenceTemplate.charAt(posRef))) {
+			// skip gaps in reference sequence. The end of the alignment may already have been reached here: the
+			// SAM specification requires an MD string to end on a number, so a final mismatch is followed by 0
+			while (posRef < gappedReferenceSequenceTemplate.length() && isGap(gappedReferenceSequenceTemplate.charAt(posRef))) {
 				buffer.append(gappedReferenceSequenceTemplate.charAt(posRef));
 				posQuery++;
 				posRef++;
