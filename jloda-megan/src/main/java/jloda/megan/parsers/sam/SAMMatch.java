@@ -19,12 +19,12 @@
  */
 package jloda.megan.parsers.sam;
 
+import jloda.megan.util.BlosumMatrix;
 import jloda.seq.BlastMode;
 import jloda.seq.SequenceUtils;
 import jloda.util.NumberUtils;
 import jloda.util.Single;
 import jloda.util.StringUtils;
-import jloda.megan.util.BlosumMatrix;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -237,7 +237,10 @@ public class SAMMatch implements jloda.megan.rma3.IMatch {
 			// first need to trim:
 			if (mode != BlastMode.BlastX) {
 				if (getCigar().getCigarElements().size() > 0) {
-					CigarElement element = getCigar().getCigarElement(0);
+					// query positions refer to the read as sequenced. For a DNA alignment to the reverse strand, the cigar
+					// describes the reverse complement of the read, so the part clipped at the start of the read comes last
+					final boolean reverse = (mode == BlastMode.BlastN && isReverseComplemented());
+					CigarElement element = getCigar().getCigarElement(reverse ? getCigar().numCigarElements() - 1 : 0);
 					if (element.getOperator() == CigarOperator.S || element.getOperator() == CigarOperator.H) {
 						queryStart = element.getLength() + 1;
 					}
