@@ -88,6 +88,22 @@ public class BoyerMoore {
 			right[this.pattern[j] & 0xff] = j;
 	}
 
+	/**
+	 * Preprocesses the pattern given as a sub-range of a byte array.
+	 * <p>
+	 * The {@code R} argument is retained only for backward compatibility and is ignored:
+	 * the bad-character table always uses a radix of 256, so that every possible (unsigned)
+	 * byte value is covered. Prefer {@link #BoyerMoore(byte[], int, int)}.
+	 *
+	 * @param pattern the buffer containing the pattern
+	 * @param offset  the start of the pattern within the buffer
+	 * @param length  the length of the pattern
+	 * @param R       ignored (see above)
+	 */
+	public BoyerMoore(byte[] pattern, int offset, int length, int R) {
+		this(pattern, offset, length);
+	}
+
 
 	/**
 	 * Returns the index of the first occurrence of the pattern string
