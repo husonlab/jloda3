@@ -24,6 +24,7 @@
 package jloda.util;
 
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 /**
  * The <tt>BoyerMoore</tt> class finds the first occurrence of a pattern string
@@ -31,6 +32,12 @@ import java.util.Iterator;
  * <p>
  * This implementation uses the Boyer-Moore algorithm (with the bad-character
  * rule, but not the strong good suffix rule).
+ * <p>
+ * An instance operates in exactly one mode, determined by its constructor: a
+ * {@link String} pattern is searched with {@link #search(String)}, a
+ * {@code byte[]} pattern with {@link #search(byte[])} / {@link #search(byte[], int)}
+ * and {@link #iterator(byte[])}. Calling a search method that does not match the
+ * constructor used throws an {@link IllegalStateException}.
  * <p>
  * For additional documentation,
  * see <a href="http://algs4.cs.princeton.edu/53substring">Section 5.3</a> of
@@ -61,13 +68,15 @@ public class BoyerMoore {
 	}
 
 	/**
-	 * Preprocesses the pattern string.
+	 * Preprocesses the pattern given as a sub-range of a byte array. The bad-character
+	 * table always uses a radix of 256, so every possible (unsigned) byte value is covered.
 	 *
-	 * @param pattern the pattern string
-	 * @param R       the alphabet size
+	 * @param pattern the buffer containing the pattern
+	 * @param offset  the start of the pattern within the buffer
+	 * @param length  the length of the pattern
 	 */
-	public BoyerMoore(byte[] pattern, int offset, int length, int R) {
-		this.R = R;
+	public BoyerMoore(byte[] pattern, int offset, int length) {
+		this.R = 256;
 		this.pattern = new byte[length];
 		System.arraycopy(pattern, offset, this.pattern, 0, length);
 
@@ -75,8 +84,8 @@ public class BoyerMoore {
 		right = new int[R];
 		for (int c = 0; c < R; c++)
 			right[c] = -1;
-		for (int j = 0; j < pattern.length; j++)
-			right[pattern[j]] = j;
+		for (int j = 0; j < this.pattern.length; j++)
+			right[this.pattern[j] & 0xff] = j;
 	}
 
 
@@ -86,9 +95,11 @@ public class BoyerMoore {
 	 *
 	 * @param txt the text string
 	 * @return the index of the first occurrence of the pattern string
-	 * in the text string; -1 if no such match
+	 * in the text string; N (the text length) if no such match
 	 */
 	public int search(String txt) {
+		if (pat == null)
+			throw new IllegalStateException("search(String) requires a String pattern; this instance was built from a byte[]");
 		int M = pat.length();
 		int N = txt.length();
 		int skip;
@@ -106,40 +117,28 @@ public class BoyerMoore {
 	}
 
 	/**
-	 * Returns the index of the first occurrrence of the pattern string
-	 * in the text string.
+	 * Returns the index of the first occurrence of the pattern in the text.
 	 *
-	 * @param text the text string
-	 * @return the index of the first occurrence of the pattern string
-	 * in the text string; N if no such match
+	 * @param text the text
+	 * @return the index of the first occurrence of the pattern in the text;
+	 * N (the text length) if no such match
 	 */
 	public int search(byte[] text) {
-		int M = pattern.length;
-		int N = text.length;
-		int skip;
-		for (int i = 0; i <= N - M; i += skip) {
-			skip = 0;
-			for (int j = M - 1; j >= 0; j--) {
-				if (pattern[j] != text[i + j]) {
-					skip = Math.max(1, j - right[text[i + j]]);
-					break;
-				}
-			}
-			if (skip == 0) return i;    // found
-		}
-		return N;                       // not found
+		return search(text, 0);
 	}
 
 	/**
-	 * Returns the index of the first occurrrence of the pattern string
-	 * in the text string.
+	 * Returns the index of the first occurrence of the pattern in the text,
+	 * at or after the given start position.
 	 *
-	 * @param text  the text string
-	 * @param start starting positions
-	 * @return the index of the first occurrence of the pattern string
-	 * in the text string; N if no such match
+	 * @param text  the text
+	 * @param start the first position to consider
+	 * @return the index of the first occurrence of the pattern in the text;
+	 * N (the text length) if no such match
 	 */
 	public int search(byte[] text, int start) {
+		if (pattern == null)
+			throw new IllegalStateException("search(byte[]) requires a byte[] pattern; this instance was built from a String");
 		int M = pattern.length;
 		int N = text.length;
 		int skip;
@@ -147,7 +146,7 @@ public class BoyerMoore {
 			skip = 0;
 			for (int j = M - 1; j >= 0; j--) {
 				if (pattern[j] != text[i + j]) {
-					skip = Math.max(1, j - right[text[i + j]]);
+					skip = Math.max(1, j - right[text[i + j] & 0xff]);
 					break;
 				}
 			}
@@ -157,7 +156,7 @@ public class BoyerMoore {
 	}
 
 	/**
-	 * get an interator over all occurrences
+	 * get an iterator over all (possibly overlapping) occurrences
 	 *
 	 * @return iterator
 	 */
@@ -176,9 +175,10 @@ public class BoyerMoore {
 
 			@Override
 			public Integer next() {
+				if (!hasNext())
+					throw new NoSuchElementException();
 				int result = next;
-				if (result < text.length)
-					next = search(text, result + 1);
+				next = search(text, result + 1);
 				return result;
 			}
 
