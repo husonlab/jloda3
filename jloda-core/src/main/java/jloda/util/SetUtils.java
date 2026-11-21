@@ -75,7 +75,7 @@ public class SetUtils {
 	 */
 	public static <T> Iterable<T> union(final Collection<T>... sets) {
 		return () -> new Iterator<>() {
-			int which = 0;
+			int which = 1; // the next collection to open; the first one is open
 			Iterator<T> it = sets.length == 0 ? null : sets[0].iterator();
 			final Set<T> seen = new HashSet<>();
 			T next = null;
@@ -85,8 +85,10 @@ public class SetUtils {
 					while (which < sets.length && !it.hasNext()) {
 						it = sets[which++].iterator();
 					}
-					if (it.hasNext())
+					if (it.hasNext()) {
 						next = it.next();
+						seen.add(next);
+					}
 				}
 			}
 
