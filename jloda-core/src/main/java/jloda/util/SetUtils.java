@@ -58,9 +58,11 @@ public class SetUtils {
 				if (result != null) {
 					v = null;
 					while (it.hasNext()) {
-						v = it.next();
-						if (b.contains(v))
+						var w = it.next();
+						if (b.contains(w)) {
+							v = w; // only an element that qualifies; the last one tried must not be left in v
 							break;
+						}
 					}
 				}
 				return result;
@@ -152,9 +154,11 @@ public class SetUtils {
 				if (result != null) {
 					v = null;
 					while (it.hasNext()) {
-						v = it.next();
-						if (a.contains(v) != b.contains(v))
+						var w = it.next();
+						if (a.contains(w) != b.contains(w)) {
+							v = w; // only an element that qualifies; the last one tried must not be left in v
 							break;
+						}
 					}
 				}
 				return result;

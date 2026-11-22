@@ -85,10 +85,7 @@ public class FindToolBar extends VBox {
             if (n) {
                 if (!getChildren().contains(controller.getAnchorPane()))
                     getChildren().add(controller.getAnchorPane());
-                Platform.runLater(() -> {
-                    controller.getSearchComboBox().getEditor().requestFocus();
-                    controller.getSearchComboBox().getEditor().selectAll();
-                });
+                focusSearchField(20);
             } else {
                 getChildren().remove(controller.getAnchorPane());
                 cancel();
@@ -311,10 +308,30 @@ public class FindToolBar extends VBox {
     public void setShowFindToolBar(boolean showFindToolBar) {
         this.showFindToolBar.set(showFindToolBar);
         if (showFindToolBar)
-            Platform.runLater(() -> {
-                controller.getSearchComboBox().getEditor().requestFocus();
-                controller.getSearchComboBox().getEditor().selectAll();
-            });
+            focusSearchField(20);
+    }
+
+    /**
+     * give the keyboard focus to the text field. Right after the tool bar has been added the field is not yet part
+     * of the scene (the combo box builds it during the next layout), and a request for the focus then has no
+     * effect; so the request is repeated every 50 ms until the field has the focus, at most the given number of times
+     */
+    private void focusSearchField(int attempts) {
+        final var editor = controller.getSearchComboBox().getEditor();
+        if (!isShowFindToolBar())
+            return;
+        if (editor.getScene() != null) {
+            editor.requestFocus();
+            if (editor.isFocused()) {
+                editor.selectAll();
+                return;
+            }
+        }
+        if (attempts > 0) {
+            var pause = new javafx.animation.PauseTransition(javafx.util.Duration.millis(50));
+            pause.setOnFinished(e -> focusSearchField(attempts - 1));
+            pause.play();
+        }
     }
 
     public boolean getShowReplaceToolBar() {
