@@ -44,68 +44,25 @@ public class IntervalChain {
             b = tmp;
         }
 
-        if (head == null) {
-            head = new Interval(a, b, null);
-            return;
+        // everything that ends before a stays as it is
+        Interval prev = null;
+        Interval current = head;
+        while (current != null && current.getB() < a) {
+            prev = current;
+            current = current.getNext();
         }
-
-        Interval lastBefore;
-        if (head.getA() <= a) {
-            lastBefore = head;
-            while (lastBefore.getNext() != null && lastBefore.getNext().getA() <= a)
-                lastBefore = lastBefore.getNext();
-            if (lastBefore.getB() >= b)
-                return; // contained...
-        } else
-            lastBefore = null;
-
-        Interval firstAfter = (lastBefore != null ? lastBefore : head);
-        while (firstAfter != null && firstAfter.getB() < b)
-            firstAfter = firstAfter.getNext();
-
-        if (lastBefore == null && firstAfter == null) {
-            head = new Interval(a, b, null); // this when all existing intervals are contained in [a,b]
+        // everything that overlaps [a,b] is taken into it. There may be several: handling only one on each
+        // side and leaving those in between in the chain is what made getLength() count a base twice
+        while (current != null && current.getA() <= b) {
+            a = Math.min(a, current.getA());
+            b = Math.max(b, current.getB());
+            current = current.getNext();
         }
-
-        if (lastBefore == null && firstAfter != null) {
-            if (overlaps(firstAfter, a, b)) {
-                firstAfter.setA(a);
-            } else {
-                head = new Interval(a, b, head);
-            }
-        }
-        if (lastBefore != null && firstAfter == null) {
-            if (overlaps(lastBefore, a, b)) {
-                lastBefore.setB(b);
-            } else {
-                lastBefore.setNext(new Interval(a, b, null));
-            }
-        }
-        if (lastBefore != null && firstAfter != null && lastBefore != firstAfter) {
-            if (overlaps(firstAfter, a, b)) {
-                if (overlaps(lastBefore, a, b)) {
-                    lastBefore.setB(firstAfter.getB());
-                    lastBefore.setNext(firstAfter.getNext());
-                } else {
-                    firstAfter.setA(a);
-                }
-            } else { // doesn't overlap lastBefore
-                if (overlaps(lastBefore, a, b)) {
-                    firstAfter.setA(a);
-                } else { // doesn't overlap any
-                    lastBefore.setNext(new Interval(a, b, firstAfter));
-                }
-            }
-        }
-    }
-
-    /**
-     * does interval overlap with [a,b]?
-     *
-     * @return true, if overlaps
-     */
-    private boolean overlaps(Interval interval, int a, int b) {
-        return interval.a <= b && interval.b >= a;
+        final Interval merged = new Interval(a, b, current);
+        if (prev == null)
+            head = merged;
+        else
+            prev.setNext(merged);
     }
 
     /**
