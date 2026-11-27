@@ -31,6 +31,9 @@ public class UpdateItemList extends LinkedList<UpdateItem> {
 	private final Map<Integer, UpdateItem>[] first;
 	private final Map<Integer, UpdateItem>[] last;
 	private final Map<Integer, Float>[] weights;
+	// the totals are accumulated here, in double: a float stops growing at 2^24 = 16,777,216 when 1 is added to
+	// it, which capped the size of any class holding more reads than that. weights holds these totals as floats
+	private final Map<Integer, Double>[] exactWeights;
 
 	/**
 	 * constructor
@@ -42,10 +45,12 @@ public class UpdateItemList extends LinkedList<UpdateItem> {
 		first = new HashMap[numberOfClassifications];
 		last = new HashMap[numberOfClassifications];
 		weights = new HashMap[numberOfClassifications];
+		exactWeights = new HashMap[numberOfClassifications];
 		for (int i = 0; i < numberOfClassifications; i++) {
 			first[i] = new HashMap<>(1000000);
 			last[i] = new HashMap<>(1000000);
 			weights[i] = new HashMap<>(1000000);
+			exactWeights[i] = new HashMap<>(1000000);
 		}
 	}
 
@@ -73,11 +78,11 @@ public class UpdateItemList extends LinkedList<UpdateItem> {
 				if (lastInClass == null) {
 					first[i].put(id, item);
 					last[i].put(id, item);
-					weights[i].put(id, readWeight);
+					setWeight(i, id, readWeight);
 				} else {
 					lastInClass.setNextInClassifaction(i, item);
 					last[i].put(id, item);
-					weights[i].put(id, weights[i].get(id) + readWeight);
+					setWeight(i, id, exactWeights[i].get(id) + readWeight);
 				}
 			}
 		}
@@ -93,8 +98,9 @@ public class UpdateItemList extends LinkedList<UpdateItem> {
 		return Objects.requireNonNullElse(result, 0f);
 	}
 
-	private void setWeight(int classificationId, int classId, float weight) {
-		this.weights[classificationId].put(classId, weight);
+	private void setWeight(int classificationId, int classId, double weight) {
+		this.exactWeights[classificationId].put(classId, weight);
+		this.weights[classificationId].put(classId, (float) weight);
 	}
 
 	/**
@@ -156,6 +162,7 @@ public class UpdateItemList extends LinkedList<UpdateItem> {
 		last[classificationId].remove(classId);
 		weights[classificationId].put(classId, null);
 		weights[classificationId].remove(classId);
+		exactWeights[classificationId].remove(classId);
 	}
 
 	/**
@@ -164,7 +171,7 @@ public class UpdateItemList extends LinkedList<UpdateItem> {
 	 * target on every merge — that re-sort was ~30% of binning CPU on a short-read run.
 	 */
 	public void appendClass(int classificationId, int srcClassId, int tarClassId) {
-		float newSize = getWeight(classificationId, srcClassId) + getWeight(classificationId, tarClassId);
+		double newSize = exactWeights[classificationId].getOrDefault(srcClassId, 0d) + exactWeights[classificationId].getOrDefault(tarClassId, 0d);
 
 		if (newSize > 0) {
 			UpdateItem firstItemSrc = getFirst(classificationId, srcClassId);

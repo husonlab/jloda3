@@ -56,6 +56,10 @@ public class ModifyClassificationsDAA {
 			for (int classId : id2locations.keySet()) {
 				writerClassKeys.writeInt(classId);
 				float weight = fName2ClassId2Weight[c].get(classId);
+				// the file format holds a class's weight as a 32-bit int, so the cast caps it at 2,147,483,647. That is
+				// reached by "Not assigned" on a long-read run of 2.8 Gb aligned bases; say so rather than cap silently
+				if (weight > Integer.MAX_VALUE)
+					System.err.printf("Warning: %s: the weight of class %d is %,.0f, which the file format stores as %,d%n", cName, classId, weight, Integer.MAX_VALUE);
 				writerClassKeys.writeInt((int) weight);
 				final ListOfLongs list = id2locations.get(classId);
 				writerClassKeys.writeInt(list.size());
